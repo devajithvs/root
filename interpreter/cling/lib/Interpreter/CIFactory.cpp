@@ -24,6 +24,7 @@
 #include "clang/Driver/Compilation.h"
 #include "clang/Driver/Driver.h"
 #include "clang/Driver/Job.h"
+#include "clang/Driver/Options.h"
 #include "clang/Driver/Tool.h"
 #include "clang/Frontend/FrontendAction.h"
 #include "clang/Frontend/FrontendDiagnostic.h"
@@ -33,6 +34,7 @@
 #include "clang/Frontend/VerifyDiagnosticConsumer.h"
 #include "clang/Lex/Preprocessor.h"
 #include "clang/Lex/PreprocessorOptions.h"
+#include "clang/Parse/ParseAST.h"
 #include "clang/Sema/Sema.h"
 #include "clang/Sema/SemaDiagnostic.h"
 #include "clang/Serialization/ASTReader.h"
@@ -371,7 +373,7 @@ namespace {
 
 #endif // _MSC_VER
 
-      if (!opts.ResourceDir && !opts.NoBuiltinInc) {
+      if (!opts.ResourceDir) {
         std::string resourcePath = getResourceDir(llvmdir);
 
         // FIXME: Handle cases, where the cling is part of a library/framework.
@@ -710,25 +712,29 @@ namespace {
 
 #ifdef _WIN32
     #ifdef CLING_SUPPORT_VC
-    maybeAppendOverlayEntry(vcIncLoc.str(), "vcruntime.modulemap",
-                            clingIncLoc.str().str(), MOverlay,
-                            /*RegisterModuleMap=*/ true,
-                            /*AllowModulemapOverride=*/ false);
+    if (!vcIncLoc.empty())
+      maybeAppendOverlayEntry(vcIncLoc.str(), "vcruntime.modulemap",
+                              clingIncLoc.str().str(), MOverlay,
+                              /*RegisterModuleMap=*/ true,
+                              /*AllowModulemapOverride=*/ false);
     #endif
-    maybeAppendOverlayEntry(servIncLoc.str(), "services_msvc.modulemap",
-                            clingIncLoc.str().str(), MOverlay,
-                            /*RegisterModuleMap=*/ true,
-                            /*AllowModulemapOverride=*/ false);
-    maybeAppendOverlayEntry(cIncLoc.str(), "libc_msvc.modulemap",
-                            clingIncLoc.str().str(), MOverlay,
-                            /*RegisterModuleMap=*/ true,
-                            /*AllowModulemapOverride=*/ false);
-    maybeAppendOverlayEntry(stdIncLoc.str(), "std_msvc.modulemap",
-                            clingIncLoc.str().str(), MOverlay,
-                            /*RegisterModuleMap=*/ true,
-                            /*AllowModulemapOverride=*/ false);
+    if (!servIncLoc.empty())
+      maybeAppendOverlayEntry(servIncLoc.str(), "services_msvc.modulemap",
+                              clingIncLoc.str().str(), MOverlay,
+                              /*RegisterModuleMap=*/ true,
+                              /*AllowModulemapOverride=*/ false);
+    if (!cIncLoc.empty())
+      maybeAppendOverlayEntry(cIncLoc.str(), "libc_msvc.modulemap",
+                              clingIncLoc.str().str(), MOverlay,
+                              /*RegisterModuleMap=*/ true,
+                              /*AllowModulemapOverride=*/ false);
+    if (!stdIncLoc.empty())
+      maybeAppendOverlayEntry(stdIncLoc.str(), "std_msvc.modulemap",
+                              clingIncLoc.str().str(), MOverlay,
+                              /*RegisterModuleMap=*/ true,
+                              /*AllowModulemapOverride=*/ false);
 #elif __APPLE__
-    if (Triple.isMacOSX()) {
+    if (Triple.isMacOSX() && !stdIncLoc.empty()) {
       if (CI.getTarget().getSDKVersion() < VersionTuple(14, 4)) {
         maybeAppendOverlayEntry(stdIncLoc.str(),
                                 "std_darwin.MacOSX14.2.sdk.modulemap",
@@ -743,14 +749,16 @@ namespace {
       }
     }
 #else
-    maybeAppendOverlayEntry(cIncLoc.str(), "libc.modulemap",
-                            clingIncLoc.str().str(), MOverlay,
-                            /*RegisterModuleMap=*/ true,
-                            /*AllowModulemapOverride=*/true);
-    maybeAppendOverlayEntry(stdIncLoc.str(), "std.modulemap",
-                            clingIncLoc.str().str(), MOverlay,
-                            /*RegisterModuleMap=*/ true,
-                            /*AllowModulemapOverride=*/true);
+    if (!cIncLoc.empty())
+      maybeAppendOverlayEntry(cIncLoc.str(), "libc.modulemap",
+                              clingIncLoc.str().str(), MOverlay,
+                              /*RegisterModuleMap=*/ true,
+                              /*AllowModulemapOverride=*/true);
+    if (!stdIncLoc.empty())
+      maybeAppendOverlayEntry(stdIncLoc.str(), "std.modulemap",
+                              clingIncLoc.str().str(), MOverlay,
+                              /*RegisterModuleMap=*/ true,
+                              /*AllowModulemapOverride=*/true);
 #endif // _WIN32
 
     if (!tinyxml2IncLoc.empty())
@@ -1283,6 +1291,18 @@ namespace {
                                          /*FindModuleFileExtensions=*/true,
                                          Listener,
                                          HSOpts.ModulesValidateDiagnosticOptions);
+    } else if (FrontendOpts.ProgramAction == clang::frontend::GenerateModule) {
+      // We will not call ParseAST which intializes the Sema via the Parser.
+      //CI.getSema().Initialize();
+      FrontendInputFile Input = FrontendOpts.Inputs[0];
+      /// Overwrite the virtual main source file with the modulemap.
+      CI.InitializeSourceManager(Input);
+
+      clang::SetupModuleBuiltFromModuleMap(CI, Input);
+
+      clang::ParseAST(CI.getSema(), CI.getFrontendOpts().ShowStats,
+
+                      CI.getFrontendOpts().SkipFunctionBodies);
     }
   }
 
@@ -1521,7 +1541,11 @@ namespace {
     // Configure our handling of diagnostics.
     ProcessWarningOptions(*Diags, DiagOpts, VFS);
 
-    if (COpts.HasOutput && !OnlyLex) {
+    clang::CompilerInvocation& Invocation = CI->getInvocation();
+    FrontendOptions& FrontendOpts = Invocation.getFrontendOpts();
+
+    if (COpts.HasOutput && !OnlyLex &&
+        FrontendOpts.ProgramAction != clang::frontend::GenerateModule) {
       ActionScan scan(clang::driver::Action::PrecompileJobClass,
                       clang::driver::Action::PreprocessJobClass);
       if (!scan.find(Compilation.get())) {
@@ -1536,7 +1560,7 @@ namespace {
       return CI.release();
     }
 
-    clang::CompilerInvocation& Invocation = CI->getInvocation();
+    CI->createFileManager();
     std::string& PCHFile = Invocation.getPreprocessorOpts().ImplicitPCHInclude;
     bool InitLang = true, InitTarget = true;
     if (!PCHFile.empty()) {
@@ -1610,8 +1634,6 @@ namespace {
       }
     }
 
-    FrontendOptions& FrontendOpts = Invocation.getFrontendOpts();
-
     // Register the externally constructed extensions.
     assert(FrontendOpts.ModuleFileExtensions.empty() && "Extensions exist!");
     for (auto& E : moduleExtensions)
@@ -1646,23 +1668,24 @@ namespace {
     // be registered as $PWD instead, which is stable even after chdirs.
     llvm::consumeError(FM.getDirectoryRef(platform::GetCwd()).takeError());
 
-    // Build the virtual file, Give it a name that's likely not to ever
-    // be #included (so we won't get a clash in clang's cache).
-    const char* Filename = "<<< cling interactive line includer >>>";
-    FileEntryRef FE = FM.getVirtualFileRef(Filename, 1U << 15U, time(0));
+    if (COpts.ModuleName.empty() || !COpts.HasOutput) {
+       // Build the virtual file, Give it a name that's likely not to ever
+       // be #included (so we won't get a clash in clang's cache).
+       const char* Filename = "<<< cling interactive line includer >>>";
+       FileEntryRef FE = FM.getVirtualFileRef(Filename, 1U << 15U, time(0));
 
-    // Tell ASTReader to create a FileID even if this file does not exist:
-    SM->setFileIsTransient(FE);
-    FileID MainFileID = SM->createFileID(FE, SourceLocation(), SrcMgr::C_User);
-    SM->setMainFileID(MainFileID);
-    if (!Buffer)
-      Buffer = llvm::MemoryBuffer::getMemBuffer("/*CLING DEFAULT MEMBUF*/;\n");
+       // Tell ASTReader to create a FileID even if this file does not exist:
+       SM->setFileIsTransient(FE);
+       FileID MainFileID = SM->createFileID(FE, SourceLocation(), SrcMgr::C_User);
+       SM->setMainFileID(MainFileID);
+       if (!Buffer)
+          Buffer = llvm::MemoryBuffer::getMemBuffer("/*CLING DEFAULT MEMBUF*/;\n");
 
-    // Adapted from upstream clang/lib/Interpreter/Interpreter.cpp
-    // FIXME: Merge with CompilerInstance::ExecuteAction.
-    llvm::MemoryBuffer* MB = Buffer.release();
-    CI->getPreprocessorOpts().addRemappedFile(Filename, MB);
-
+        // Adapted from upstream clang/lib/Interpreter/Interpreter.cpp
+        // FIXME: Merge with CompilerInstance::ExecuteAction.
+        llvm::MemoryBuffer* MB = Buffer.release();
+        CI->getPreprocessorOpts().addRemappedFile(Filename, MB);
+    }
     // Create TargetInfo for the other side of CUDA and OpenMP compilation.
     if ((CI->getLangOpts().CUDA || CI->getLangOpts().OpenMPIsTargetDevice) &&
         !CI->getFrontendOpts().AuxTriple.empty()) {
@@ -1705,43 +1728,70 @@ namespace {
     // generation of the PCM file itself in case we want to generate
     // a C++ module with the current interpreter instance.
     if (COpts.CxxModules && !COpts.ModuleName.empty()) {
-      // Code below from the (private) code in the GenerateModuleAction class.
-      llvm::SmallVector<char, 256> Output;
-      llvm::sys::path::append(Output, COpts.CachePath,
-                              COpts.ModuleName + ".pcm");
-      StringRef ModuleOutputFile = StringRef(Output.data(), Output.size());
+      llvm::StringRef InFile = FrontendOpts.Inputs[0].getFile();
 
+      if (COpts.HasOutput) {
+         Consumers.pop_back();
+         /// The driver sets the location of the module file in /tmp/...
+        FrontendOpts.OutputFile
+          = Compilation->getInputArgs().getLastArg(driver::options::OPT_o)->getValue();
+        // The driver tries to append a non-existent resource dir if none was
+        // specified.
+        if (COpts.ResourceDir)
+           CI->getHeaderSearchOpts().ResourceDir = "";
+      } else {
+        //GenerateModuleFromModuleMapAction::CreateOutputFile:
+        // If no output file was provided, figure out where this module would go
+        // in the module cache.
+        //if (FrontendOpts.OutputFile.empty()) {
+          StringRef ModuleMapFile = FrontendOpts.OriginalModuleMap;
+          if (ModuleMapFile.empty())
+            ModuleMapFile = InFile;
+
+          HeaderSearch &HS = PP.getHeaderSearchInfo();
+          FrontendOpts.OutputFile =
+            HS.getPrebuiltModuleFileName(CI->getLangOpts().CurrentModule, /*FileMapOnly=*/false);
+          //}
+      }
+
+      // We use createOutputFile here because this is exposed via libclang, and we
+      // must disable the RemoveFileOnSignal behavior.
+      // We use a temporary to avoid race conditions.
       std::unique_ptr<raw_pwrite_stream> OS =
-          CI->createOutputFile(ModuleOutputFile, /*Binary=*/true,
+          CI->createOutputFile(FrontendOpts.OutputFile, /*Binary=*/true,
                                /*RemoveFileOnSignal=*/false,
                                /*useTemporary=*/true,
                                /*CreateMissingDirectories=*/true);
       assert(OS);
 
       std::string Sysroot;
+      std::string OutputFile = FrontendOpts.OutputFile;
 
       auto PCHBuff = std::make_shared<PCHBuffer>();
 
       Consumers.push_back(std::make_unique<PCHGenerator>(
-          CI->getPreprocessor(), CI->getModuleCache(), ModuleOutputFile,
+          CI->getPreprocessor(), CI->getModuleCache(), OutputFile,
           Sysroot, PCHBuff, CI->getFrontendOpts().ModuleFileExtensions,
           /*AllowASTWithErrors=*/false,
           /*IncludeTimestamps=*/
           +CI->getFrontendOpts().BuildingImplicitModule));
+
       Consumers.push_back(
           CI->getPCHContainerWriter().CreatePCHContainerGenerator(
-                      *CI, "", ModuleOutputFile.str(), std::move(OS), PCHBuff));
+                      *CI, InFile.str(), OutputFile, std::move(OS), PCHBuff));
 
-      // Set the current module name for clang. With that clang doesn't start
-      // to build the current module on demand when we include a header
-      // from the current module.
-      CI->getLangOpts().CurrentModule = COpts.ModuleName;
-      CI->getLangOpts().setCompilingModule(LangOptions::CMK_ModuleMap);
+      if (FrontendOpts.ProgramAction != clang::frontend::GenerateModule) {
+         // Set the current module name for clang. With that clang doesn't start
+         // to build the current module on demand when we include a header
+         // from the current module.
+         CI->getLangOpts().CurrentModule = COpts.ModuleName;
+         CI->getLangOpts().setCompilingModule(LangOptions::CMK_ModuleMap);
 
-      // Push the current module to the build stack so that clang knows when
-      // we have a cyclic dependency.
-      SM->pushModuleBuildStack(COpts.ModuleName,
-                               FullSourceLoc(SourceLocation(), *SM));
+         // Push the current module to the build stack so that clang knows when
+         // we have a cyclic dependency.
+         SM->pushModuleBuildStack(COpts.ModuleName,
+                                  FullSourceLoc(SourceLocation(), *SM));
+      }
     }
 
     std::unique_ptr<clang::MultiplexConsumer> multiConsumer(

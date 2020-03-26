@@ -1559,7 +1559,7 @@ TCling::TCling(const char *name, const char *title, const char* const argv[], vo
         extraArgs && *extraArgs; ++extraArgs) {
       if (!strcmp(*extraArgs, "-resource-dir")) {
          // Take the next arg as the llvm resource directory.
-         llvmResourceDir = *(++extraArgs);
+         //llvmResourceDir = *(++extraArgs);
       } else {
          interpArgs.push_back(*extraArgs);
       }

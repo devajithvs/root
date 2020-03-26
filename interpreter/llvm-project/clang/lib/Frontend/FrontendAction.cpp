@@ -582,6 +582,43 @@ getInputBufferForModule(CompilerInstance &CI, Module *M) {
       HeaderContents, Module::getModuleInputBufferName());
 }
 
+///\returns true on success.
+bool clang::SetupModuleBuiltFromModuleMap(CompilerInstance &CI,
+                                          FrontendInputFile& Input) {
+  CI.getLangOpts().setCompilingModule(LangOptions::CMK_ModuleMap);
+
+  std::string PresumedModuleMapFile;
+  unsigned OffsetToContents;
+  if (loadModuleMapForModuleBuild(CI, Input.isSystem(),
+                                  Input.isPreprocessed(),
+                                  PresumedModuleMapFile, OffsetToContents))
+    return false;
+
+  auto *CurrentModule = prepareToBuildModule(CI, Input.getFile());
+  if (!CurrentModule)
+    return false;
+
+  CurrentModule->PresumedModuleMapFile = PresumedModuleMapFile;
+
+  if (OffsetToContents)
+    // If the module contents are in the same file, skip to them.
+    CI.getPreprocessor().setSkipMainFilePreamble(OffsetToContents, true);
+  else {
+    // Otherwise, convert the module description to a suitable input buffer.
+    auto Buffer = getInputBufferForModule(CI, CurrentModule);
+    if (!Buffer)
+      return false;
+
+      // Reinitialize the main file entry to refer to the new input.
+      auto Kind = CurrentModule->IsSystem ? SrcMgr::C_System : SrcMgr::C_User;
+      auto &SourceMgr = CI.getSourceManager();
+      auto BufferID = SourceMgr.createFileID(std::move(Buffer), Kind);
+      assert(BufferID.isValid() && "couldn't create module buffer ID");
+      SourceMgr.setMainFileID(BufferID);
+    }
+  return true;
+}
+
 bool FrontendAction::BeginSourceFile(CompilerInstance &CI,
                                      const FrontendInputFile &RealInput) {
   FrontendInputFile Input(RealInput);
@@ -884,37 +921,8 @@ bool FrontendAction::BeginSourceFile(CompilerInstance &CI,
   // For module map files, we first parse the module map and synthesize a
   // "<module-includes>" buffer before more conventional processing.
   if (Input.getKind().getFormat() == InputKind::ModuleMap) {
-    CI.getLangOpts().setCompilingModule(LangOptions::CMK_ModuleMap);
-
-    std::string PresumedModuleMapFile;
-    unsigned OffsetToContents;
-    if (loadModuleMapForModuleBuild(CI, Input.isSystem(),
-                                    Input.isPreprocessed(),
-                                    PresumedModuleMapFile, OffsetToContents))
+    if (!SetupModuleBuiltFromModuleMap(CI, Input))
       return false;
-
-    auto *CurrentModule = prepareToBuildModule(CI, Input.getFile());
-    if (!CurrentModule)
-      return false;
-
-    CurrentModule->PresumedModuleMapFile = PresumedModuleMapFile;
-
-    if (OffsetToContents)
-      // If the module contents are in the same file, skip to them.
-      CI.getPreprocessor().setSkipMainFilePreamble(OffsetToContents, true);
-    else {
-      // Otherwise, convert the module description to a suitable input buffer.
-      auto Buffer = getInputBufferForModule(CI, CurrentModule);
-      if (!Buffer)
-        return false;
-
-      // Reinitialize the main file entry to refer to the new input.
-      auto Kind = CurrentModule->IsSystem ? SrcMgr::C_System : SrcMgr::C_User;
-      auto &SourceMgr = CI.getSourceManager();
-      auto BufferID = SourceMgr.createFileID(std::move(Buffer), Kind);
-      assert(BufferID.isValid() && "couldn't create module buffer ID");
-      SourceMgr.setMainFileID(BufferID);
-    }
   }
 
   // Initialize the action.

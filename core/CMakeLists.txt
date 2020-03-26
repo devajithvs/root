@@ -92,6 +92,43 @@ add_subdirectory(winnt)
 
 #-------------------------------------------------------------------------------
 
+set(extra_cxxmodules_dependencies)
+if(runtime_cxxmodules)
+  # We load the builtin modulemap at rootcling bare-cling init.
+  # FIXME: What happens when the <resource_dir>/include/* changes?
+  #ROOT_GENERATE_CXXMODULE(_Builtin_stddef_max_align_t)
+  #ROOT_GENERATE_CXXMODULE(_Builtin_intrinsics)
+  set (libc)
+  if (APPLE)
+    set(libc Darwin)
+  else()
+    set(libc libc)
+  endif()
+
+  ROOT_GENERATE_CXXMODULE(${libc} "/usr/include")
+
+  get_property(cxx_headers_location GLOBAL PROPERTY ROOT_CLING_CXX_HEADERS_LOCATION)
+
+  # Assume the first component is where the public headers are.
+  string(FIND ${cxx_headers_location} ":" idx)
+  string(SUBSTRING ${cxx_headers_location} 0 ${idx} cxx_headers_location)
+
+  ROOT_GENERATE_CXXMODULE(std ${cxx_headers_location} DEPENDENCIES ${libc})
+  ROOT_GENERATE_CXXMODULE(Cling_Runtime ${CMAKE_BINARY_DIR}/etc/cling DEPENDENCIES std)
+  ROOT_GENERATE_CXXMODULE(Cling_Runtime_Extra ${CMAKE_BINARY_DIR}/etc/cling DEPENDENCIES Cling_Runtime)
+
+  if(cuda)
+    ROOT_GENERATE_CXXMODULE(cuda ${CUDA_INCLUDE_DIRS})
+  endif(cuda)
+
+  ROOT_GENERATE_CXXMODULE(ROOT_Config ${CMAKE_BINARY_DIR}/include DEPENDENCIES Cling_Runtime_Extra)
+  ROOT_GENERATE_CXXMODULE(ROOT_Rtypes ${CMAKE_BINARY_DIR}/include DEPENDENCIES ROOT_Config)
+  ROOT_GENERATE_CXXMODULE(ROOT_Foundation_C ${CMAKE_BINARY_DIR}/include DEPENDENCIES ROOT_Rtypes)
+  ROOT_GENERATE_CXXMODULE(ROOT_Foundation_Stage1_NoRTTI ${CMAKE_BINARY_DIR}/include DEPENDENCIES ROOT_Foundation_C)
+
+  set(extra_cxxmodules_dependencies ${libc} std Cling_Runtime Cling_Runtime_Extra ROOT_Config ROOT_Rtypes ROOT_Foundation_Stage1_NoRTTI)
+endif(runtime_cxxmodules)
+
 if (libcxx AND NOT APPLE)
   # In case we use libcxx and glibc together there is a mismatch of the
   # signatures of functions in the header wchar.h. This macro tweaks the
@@ -143,4 +180,6 @@ ROOT_GENERATE_DICTIONARY(G__Core
     ${core_implicit_modules}
   LINKDEF
     base/inc/LinkDef.h
+  DEPENDENCIES
+    ${extra_cxxmodules_dependencies}
 )

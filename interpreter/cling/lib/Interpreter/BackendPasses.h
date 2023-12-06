@@ -11,6 +11,11 @@
 #define CLING_BACKENDPASSES_H
 
 #include "llvm/IR/LegacyPassManager.h"
+#include "llvm/IR/PassManager.h"
+#include "llvm/Analysis/LoopAnalysisManager.h"
+#include "llvm/Analysis/CGSCCPassManager.h"
+#include "llvm/Passes/OptimizationLevel.h"
+#include "llvm/Passes/PassBuilder.h"
 
 #include <array>
 #include <memory>
@@ -42,6 +47,12 @@ namespace cling {
   class BackendPasses {
     std::array<std::unique_ptr<llvm::legacy::PassManager>, 4> m_MPM;
     std::array<std::unique_ptr<llvm::legacy::FunctionPassManager>, 4> m_FPM;
+
+    std::array<llvm::ModulePassManager, 4> m_nMPM;
+    std::array<llvm::LoopAnalysisManager, 4> m_LAM;
+    std::array<llvm::FunctionAnalysisManager, 4> m_FAM;
+    std::array<llvm::CGSCCAnalysisManager, 4> m_CGAM;
+    std::array<llvm::ModuleAnalysisManager, 4> m_MAM;
 
     llvm::TargetMachine& m_TM;
     IncrementalJIT &m_JIT;

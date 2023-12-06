@@ -2038,7 +2038,7 @@ void TROOT::InitInterpreter()
       }
 
       char *libcling = gSystem->DynamicPathName("libCling");
-      gInterpreterLib = dlopen(libcling, RTLD_LAZY|RTLD_LOCAL);
+      gInterpreterLib = dlopen(libcling, RTLD_LAZY|RTLD_GLOBAL);
       delete [] libcling;
 
       if (!gInterpreterLib) {

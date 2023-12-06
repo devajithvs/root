@@ -40,6 +40,8 @@ set(LLVM_LINK_COMPONENTS
   scalaropts
   support
   target
+  targetparser
+  passes
   transformutils
   binaryformat
   ${LLVM_TARGETS_TO_BUILD}

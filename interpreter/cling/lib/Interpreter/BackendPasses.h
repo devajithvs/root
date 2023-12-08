@@ -10,7 +10,8 @@
 #ifndef CLING_BACKENDPASSES_H
 #define CLING_BACKENDPASSES_H
 
-#include "llvm/IR/LegacyPassManager.h"
+#include "llvm/Passes/PassBuilder.h"
+#include "llvm/Passes/PassPlugin.h"
 
 #include <array>
 #include <memory>
@@ -40,8 +41,8 @@ namespace cling {
   ///\brief Runs passes on IR. Remove once we can migrate from ModuleBuilder to
   /// what's in clang's CodeGen/BackendUtil.
   class BackendPasses {
-    std::array<std::unique_ptr<llvm::legacy::PassManager>, 4> m_MPM;
-    std::array<std::unique_ptr<llvm::legacy::FunctionPassManager>, 4> m_FPM;
+    std::array<llvm::ModulePassManager, 4> m_MPM;
+    std::array<std::unique_ptr<llvm::FunctionPassManager>, 4> m_FPM;
 
     llvm::TargetMachine& m_TM;
     IncrementalJIT &m_JIT;

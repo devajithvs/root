@@ -33,8 +33,6 @@
 #include "clang/Basic/CharInfo.h"
 #include "clang/Basic/CodeGenOptions.h"
 
-#include <iostream>
-
 using namespace cling;
 using namespace clang;
 using namespace llvm;
@@ -385,26 +383,26 @@ void BackendPasses::CreatePasses(llvm::Module& M, int OptLevel)
   if (OptLevel == 0) {
     // Build a minimal pipeline based on the semantics required by Clang, which
     // is just that always inlining occurs.
-    m_MPM[OptLevel]->addPass(AlwaysInlinerPass());
+    m_MPM[OptLevel].addPass(AlwaysInlinerPass());
   } else {
     // Otherwise, use the default pass pipeline. We also have to map our
     // optimization levels into one of the distinct levels used to configure
     // the pipeline.
     OptimizationLevel Level = mapToLevel(m_CGOpts);
 
-    m_MPM[OptLevel] = std::make_unique<ModulePassManager>(PB.buildPerModuleDefaultPipeline(Level));
+    m_MPM[OptLevel] = PB.buildPerModuleDefaultPipeline(Level);
   }
 
-  m_MPM[OptLevel]->addPass(KeepLocalGVPass());
-  m_MPM[OptLevel]->addPass(PreventLocalOptPass());
-  m_MPM[OptLevel]->addPass(WeakTypeinfoVTablePass());
-  m_MPM[OptLevel]->addPass(ReuseExistingWeakSymbols(m_JIT));
+  m_MPM[OptLevel].addPass(KeepLocalGVPass());
+  m_MPM[OptLevel].addPass(PreventLocalOptPass());
+  m_MPM[OptLevel].addPass(WeakTypeinfoVTablePass());
+  m_MPM[OptLevel].addPass(ReuseExistingWeakSymbols(m_JIT));
 
   // The function __cuda_module_ctor and __cuda_module_dtor will just generated,
   // if a CUDA fatbinary file exist. Without file path there is no need for the
   // function pass.
   if(!m_CGOpts.CudaGpuBinaryFileName.empty())
-    m_MPM[OptLevel]->addPass(UniqueCUDAStructorName());
+    m_MPM[OptLevel].addPass(UniqueCUDAStructorName());
 
   // Register all the basic analyses with the managers.
   PB.registerModuleAnalyses(MAM);
@@ -417,7 +415,7 @@ void BackendPasses::CreatePasses(llvm::Module& M, int OptLevel)
   //  addSymbolRewriterPass(CGOpts, m_MPM);
 
   if (m_CGOpts.VerifyModule)
-    m_MPM[OptLevel]->addPass(VerifierPass());
+    m_MPM[OptLevel].addPass(VerifierPass());
 }
 
 void BackendPasses::runOnModule(Module& M, int OptLevel) {
@@ -427,8 +425,10 @@ void BackendPasses::runOnModule(Module& M, int OptLevel) {
   if (OptLevel > 3)
     OptLevel = 3;
 
-  // if (!m_MPM[OptLevel])
-    CreatePasses(M, OptLevel);
+  CreatePasses(M, OptLevel);
+
+  // if (m_MPM[OptLevel].isEmpty())
+  //   CreatePasses(M, OptLevel);
 
   static constexpr std::array<llvm::CodeGenOpt::Level, 4> CGOptLevel {{
     llvm::CodeGenOpt::None,
@@ -441,6 +441,6 @@ void BackendPasses::runOnModule(Module& M, int OptLevel) {
 
   // Now that we have all of the passes ready, run them.
   {
-    m_MPM[OptLevel]->run(M, MAM);
+    m_MPM[OptLevel].run(M, MAM);
   }
 }

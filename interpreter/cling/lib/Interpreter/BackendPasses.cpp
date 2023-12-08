@@ -338,96 +338,6 @@ BackendPasses::~BackendPasses() {
   //delete m_PMBuilder->Inliner;
 }
 
-// void BackendPasses::CreatePasses(llvm::Module& M, int OptLevel)
-// {
-//   // From BackEndUtil's clang::EmitAssemblyHelper::CreatePasses().
-
-// #if 0
-//   CodeGenOptions::InliningMethod Inlining = m_CGOpts.getInlining();
-//   CodeGenOptions& CGOpts_ = const_cast<CodeGenOptions&>(m_CGOpts);
-//   // DON'T: we will not find our symbols...
-//   //CGOpts_.CXXCtorDtorAliases = 1;
-
-//   // Default clang -O2 on Linux 64bit also has the following, but see
-//   // CIFactory.cpp.
-//   CGOpts_.DisableFPElim = 0;
-//   CGOpts_.DiscardValueNames = 1;
-//   CGOpts_.OmitLeafFramePointer = 1;
-//   CGOpts_.OptimizationLevel = 2;
-//   CGOpts_.RelaxAll = 0;
-//   CGOpts_.UnrollLoops = 1;
-//   CGOpts_.VectorizeLoop = 1;
-//   CGOpts_.VectorizeSLP = 1;
-// #endif
-
-// #if 0 // def __GNUC__
-//   // Better inlining is pending https://bugs.llvm.org//show_bug.cgi?id=19668
-//   // and its consequence https://sft.its.cern.ch/jira/browse/ROOT-7111
-//   // shown e.g. by roottest/cling/stl/map/badstringMap
-//   if (Inlining > CodeGenOptions::NormalInlining)
-//     Inlining = CodeGenOptions::NormalInlining;
-// #endif
-
-//   // Handle disabling of LLVM optimization, where we want to preserve the
-//   // internal module before any optimization.
-//   if (m_CGOpts.DisableLLVMPasses) {
-//     OptLevel = 0;
-//     // Always keep at least ForceInline - NoInlining is deadly for libc++.
-//     // Inlining = CGOpts.NoInlining;
-//   }
-
-//   llvm::PassManagerBuilder PMBuilder;
-//   PMBuilder.OptLevel = OptLevel;
-//   PMBuilder.SizeLevel = m_CGOpts.OptimizeSize;
-//   PMBuilder.SLPVectorize = OptLevel > 1 ? 1 : 0; // m_CGOpts.VectorizeSLP
-//   PMBuilder.LoopVectorize = OptLevel > 1 ? 1 : 0; // m_CGOpts.VectorizeLoop
-
-//   PMBuilder.DisableUnrollLoops = !m_CGOpts.UnrollLoops;
-//   PMBuilder.MergeFunctions = m_CGOpts.MergeFunctions;
-
-//   PMBuilder.LibraryInfo = new TargetLibraryInfoImpl(m_TM.getTargetTriple());
-
-//   // At O0 and O1 we only run the always inliner which is more efficient. At
-//   // higher optimization levels we run the normal inliner.
-//   // See also call to `CGOpts.setInlining()` in CIFactory!
-//   if (PMBuilder.OptLevel <= 1) {
-//     bool InsertLifetimeIntrinsics = PMBuilder.OptLevel != 0;
-//     PMBuilder.Inliner = createAlwaysInlinerLegacyPass(InsertLifetimeIntrinsics);
-//   } else {
-//     PMBuilder.Inliner = createFunctionInliningPass(OptLevel,
-//                                                    PMBuilder.SizeLevel,
-//             (!m_CGOpts.SampleProfileFile.empty() && m_CGOpts.PrepareForThinLTO));
-//   }
-
-//   // Set up the per-module pass manager.
-//   m_MPM[OptLevel].reset(new legacy::PassManager());
-
-//   m_MPM[OptLevel]->add(new KeepLocalGVPass());
-//   m_MPM[OptLevel]->add(new PreventLocalOptPass());
-//   m_MPM[OptLevel]->add(new WeakTypeinfoVTablePass());
-//   m_MPM[OptLevel]->add(new ReuseExistingWeakSymbols(m_JIT));
-
-//   // The function __cuda_module_ctor and __cuda_module_dtor will just generated,
-//   // if a CUDA fatbinary file exist. Without file path there is no need for the
-//   // function pass.
-//   if(!m_CGOpts.CudaGpuBinaryFileName.empty())
-//     m_MPM[OptLevel]->add(new UniqueCUDAStructorName());
-//   m_MPM[OptLevel]->add(createTargetTransformInfoWrapperPass(
-//                                                    m_TM.getTargetIRAnalysis()));
-
-//   //if (!CGOpts.RewriteMapFiles.empty())
-//   //  addSymbolRewriterPass(CGOpts, m_MPM);
-
-//   PMBuilder.populateModulePassManager(*m_MPM[OptLevel]);
-
-//   m_FPM[OptLevel].reset(new legacy::FunctionPassManager(&M));
-//   m_FPM[OptLevel]->add(createTargetTransformInfoWrapperPass(
-//                                                    m_TM.getTargetIRAnalysis()));
-//   if (m_CGOpts.VerifyModule)
-      // m_FPM[OptLevel]->add(createVerifierPass());
-//   PMBuilder.populateFunctionPassManager(*m_FPM[OptLevel]);
-// }
-
 // From clang/lib/CodeGen/BackendUtil.cpp
 static OptimizationLevel mapToLevel(const CodeGenOptions &Opts) {
   switch (Opts.OptimizationLevel) {
@@ -494,10 +404,8 @@ void BackendPasses::runOnModule(Module& M, int OptLevel) {
     // Otherwise, use the default pass pipeline. We also have to map our
     // optimization levels into one of the distinct levels used to configure
     // the pipeline.
-    // FIXME: mapToLevel
     OptimizationLevel Level = mapToLevel(m_CGOpts);
 
-    // FIXME: new
     m_MPM[OptLevel] = PB.buildPerModuleDefaultPipeline(Level);
   }
 
@@ -527,15 +435,6 @@ void BackendPasses::runOnModule(Module& M, int OptLevel) {
   }};
   // TM's OptLevel is used to build orc::SimpleCompiler passes for every Module.
   m_TM.setOptLevel(CGOptLevel[OptLevel]);
-
-  // // Run the per-function passes on the module.
-  // m_FPM[OptLevel]->doInitialization();
-  // for (auto&& I: M.functions())
-  //   if (!I.isDeclaration())
-  //     m_FPM[OptLevel]->run(I);
-  // m_FPM[OptLevel]->doFinalization();
-
-  // m_MPM[OptLevel]->run(M);
 
   // Now that we have all of the passes ready, run them.
   {

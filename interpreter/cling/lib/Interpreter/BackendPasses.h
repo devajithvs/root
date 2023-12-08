@@ -42,7 +42,6 @@ namespace cling {
   /// what's in clang's CodeGen/BackendUtil.
   class BackendPasses {
     std::array<llvm::ModulePassManager, 4> m_MPM;
-    std::array<std::unique_ptr<llvm::FunctionPassManager>, 4> m_FPM;
 
     llvm::TargetMachine& m_TM;
     IncrementalJIT &m_JIT;

@@ -20,13 +20,7 @@ namespace llvm {
   class Function;
   class LLVMContext;
   class Module;
-  class PassManagerBuilder;
   class TargetMachine;
-
-  namespace legacy {
-    class FunctionPassManager;
-    class PassManager;
-  }
 }
 
 namespace clang {
@@ -42,6 +36,11 @@ namespace cling {
   /// what's in clang's CodeGen/BackendUtil.
   class BackendPasses {
     std::array<llvm::ModulePassManager, 4> m_MPM;
+
+    llvm::LoopAnalysisManager LAM;
+    llvm::FunctionAnalysisManager FAM;
+    llvm::CGSCCAnalysisManager CGAM;
+    llvm::ModuleAnalysisManager MAM;
 
     llvm::TargetMachine& m_TM;
     IncrementalJIT &m_JIT;

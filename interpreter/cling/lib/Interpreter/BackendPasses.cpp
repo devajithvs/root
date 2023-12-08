@@ -37,8 +37,6 @@ using namespace cling;
 using namespace clang;
 using namespace llvm;
 
-#include <iostream>
-
 namespace {
   class KeepLocalGVPass: public PassInfoMixin<KeepLocalGVPass> {
     static char ID;
@@ -325,21 +323,9 @@ namespace {
 
 char ReuseExistingWeakSymbols::ID = 0;
 
-
-BackendPasses::BackendPasses(const clang::CodeGenOptions &CGOpts,
-                             IncrementalJIT &JIT, llvm::TargetMachine& TM):
-   m_TM(TM),
-   m_JIT(JIT),
-   m_CGOpts(CGOpts)
-{}
-
-
-BackendPasses::~BackendPasses() {
-  //delete m_PMBuilder->Inliner;
-}
-
 // From clang/lib/CodeGen/BackendUtil.cpp
-static OptimizationLevel mapToLevel(const CodeGenOptions &Opts) {
+static OptimizationLevel mapToLevel(const CodeGenOptions &Opts)
+{
   switch (Opts.OptimizationLevel) {
   default:
     llvm_unreachable("Invalid optimization level!");
@@ -370,31 +356,29 @@ static OptimizationLevel mapToLevel(const CodeGenOptions &Opts) {
   }
 }
 
-void BackendPasses::runOnModule(Module& M, int OptLevel) {
+BackendPasses::BackendPasses(const clang::CodeGenOptions &CGOpts,
+                             IncrementalJIT &JIT, llvm::TargetMachine& TM):
+   m_TM(TM),
+   m_JIT(JIT),
+   m_CGOpts(CGOpts)
+{}
 
-  if (OptLevel < 0)
+
+BackendPasses::~BackendPasses() {
+  //delete m_PMBuilder->Inliner;
+}
+
+void BackendPasses::CreatePasses(llvm::Module& M, int OptLevel)
+{
+  // Handle disabling of LLVM optimization, where we want to preserve the
+  // internal module before any optimization.
+  if (m_CGOpts.DisableLLVMPasses) {
     OptLevel = 0;
-  if (OptLevel > 3)
-    OptLevel = 3;
-  
-  std::cerr << "Running on module working with new pass manager\n";
+    // Always keep at least ForceInline - NoInlining is deadly for libc++.
+    // Inlining = CGOpts.NoInlining;
+  }
 
   PassBuilder PB(&m_TM);
-
-  LoopAnalysisManager LAM;
-  FunctionAnalysisManager FAM;
-  CGSCCAnalysisManager CGAM;
-  ModuleAnalysisManager MAM;
-
-  // Register the AA manager first so that our version is the one used.
-  // FAM.registerPass([&] { return PB.buildDefaultAAPipeline(); });
-
-  // Register all the basic analyses with the managers.
-  PB.registerModuleAnalyses(MAM);
-  PB.registerCGSCCAnalyses(CGAM);
-  PB.registerFunctionAnalyses(FAM);
-  PB.registerLoopAnalyses(LAM);
-  PB.crossRegisterProxies(LAM, FAM, CGAM, MAM);
 
   if (OptLevel == 0) {
     // Build a minimal pipeline based on the semantics required by Clang, which
@@ -414,15 +398,34 @@ void BackendPasses::runOnModule(Module& M, int OptLevel) {
   m_MPM[OptLevel].addPass(WeakTypeinfoVTablePass());
   m_MPM[OptLevel].addPass(ReuseExistingWeakSymbols(m_JIT));
 
+  // The function __cuda_module_ctor and __cuda_module_dtor will just generated,
+  // if a CUDA fatbinary file exist. Without file path there is no need for the
+  // function pass.
   if(!m_CGOpts.CudaGpuBinaryFileName.empty())
     m_MPM[OptLevel].addPass(UniqueCUDAStructorName());
 
-  llvm::FunctionPassManager fpm;
+  // Register all the basic analyses with the managers.
+  PB.registerModuleAnalyses(MAM);
+  PB.registerCGSCCAnalyses(CGAM);
+  PB.registerFunctionAnalyses(FAM);
+  PB.registerLoopAnalyses(LAM);
+  PB.crossRegisterProxies(LAM, FAM, CGAM, MAM);
 
-  // if (m_CGOpts.VerifyModule)
-  //   fpm.addPass(createVerifierPass());
+  //if (!CGOpts.RewriteMapFiles.empty())
+  //  addSymbolRewriterPass(CGOpts, m_MPM);
 
-  // m_MPM[OptLevel].addPass(llvm::createModuleToFunctionPassAdaptor(std::move(fpm)));
+  if (m_CGOpts.VerifyModule)
+    m_MPM[OptLevel].addPass(VerifierPass());
+}
+
+void BackendPasses::runOnModule(Module& M, int OptLevel) {
+
+  if (OptLevel < 0)
+    OptLevel = 0;
+  if (OptLevel > 3)
+    OptLevel = 3;
+
+  CreatePasses(M, OptLevel);
 
   // if (!m_MPM[OptLevel])
   //   CreatePasses(M, OptLevel);

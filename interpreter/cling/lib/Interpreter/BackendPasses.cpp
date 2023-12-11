@@ -434,7 +434,13 @@ void BackendPasses::CreatePasses(llvm::Module& M, int OptLevel)
   PMBuilder.populateFunctionPassManager(*m_FPM[OptLevel]);
 }
 
+#include <chrono>
+#include <iostream>
+using namespace std::chrono;
+
 void BackendPasses::runOnModule(Module& M, int OptLevel) {
+
+  auto start = high_resolution_clock::now();
 
   if (OptLevel < 0)
     OptLevel = 0;
@@ -461,4 +467,8 @@ void BackendPasses::runOnModule(Module& M, int OptLevel) {
   m_FPM[OptLevel]->doFinalization();
 
   m_MPM[OptLevel]->run(M);
+
+  auto stop = high_resolution_clock::now();
+  auto duration = duration_cast<microseconds>(stop - start);
+  std::cout << duration.count() << std::endl;
 }

@@ -39,6 +39,7 @@
 
 #include "llvm/Support/Format.h"
 
+#include <experimental/source_location>
 #include <locale>
 #include <string>
 
@@ -575,6 +576,15 @@ namespace cling {
   std::string printValue(const wchar_t *Val) {
     return toUnicode(Val, 'L', 'x');
   }
+
+  CLING_LIB_EXPORT
+  std::string printValue(const std::experimental::source_location* location) {
+    cling::ostrstream strm;
+    strm << location->file_name() << ":" << location->line() << ":"
+         << location->function_name();
+    return strm.str().str();
+  }
+
 } // end namespace cling
 
 namespace {

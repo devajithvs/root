@@ -16,6 +16,7 @@
 
 #include <cling/Interpreter/Visibility.h>
 
+#include <experimental/source_location>
 #include <memory>
 #include <string>
 #include <tuple>
@@ -140,6 +141,9 @@ namespace cling {
   inline std::string printValue(char const (*val)[N]) {
     return toUTF8(reinterpret_cast<const char * const>(val), N, 1);
   }
+
+  CLING_LIB_EXPORT
+  std::string printValue(const std::experimental::source_location* location);
 
   // cling::Value
   CLING_LIB_EXPORT

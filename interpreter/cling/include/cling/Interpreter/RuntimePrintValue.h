@@ -16,8 +16,8 @@
 
 #include <cling/Interpreter/Visibility.h>
 
-#include <experimental/source_location>
 #include <memory>
+#include <source_location>
 #include <string>
 #include <tuple>
 #include <type_traits>
@@ -143,7 +143,7 @@ namespace cling {
   }
 
   CLING_LIB_EXPORT
-  std::string printValue(const std::experimental::source_location* location);
+  std::string printValue(const std::source_location* location);
 
   // cling::Value
   CLING_LIB_EXPORT

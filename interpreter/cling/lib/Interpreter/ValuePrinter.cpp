@@ -39,8 +39,8 @@
 
 #include "llvm/Support/Format.h"
 
-#include <experimental/source_location>
 #include <locale>
+#include <source_location>
 #include <string>
 
 // GCC 4.x doesn't have the proper UTF-8 conversion routines. So use the
@@ -578,7 +578,7 @@ namespace cling {
   }
 
   CLING_LIB_EXPORT
-  std::string printValue(const std::experimental::source_location* location) {
+  std::string printValue(const std::source_location* location) {
     cling::ostrstream strm;
     strm << location->file_name() << ":" << location->line() << ":"
          << location->function_name();

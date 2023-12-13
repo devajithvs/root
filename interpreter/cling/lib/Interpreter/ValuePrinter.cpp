@@ -40,7 +40,9 @@
 #include "llvm/Support/Format.h"
 
 #include <locale>
+#if __cplusplus >= 202002L
 #include <source_location>
+#endif
 #include <string>
 
 // GCC 4.x doesn't have the proper UTF-8 conversion routines. So use the
@@ -577,6 +579,7 @@ namespace cling {
     return toUnicode(Val, 'L', 'x');
   }
 
+#if __cplusplus >= 202002L
   CLING_LIB_EXPORT
   std::string printValue(const std::source_location* location) {
     cling::ostrstream strm;
@@ -584,6 +587,7 @@ namespace cling {
          << location->function_name();
     return strm.str().str();
   }
+#endif
 
 } // end namespace cling
 

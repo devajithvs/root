@@ -40,7 +40,8 @@
 #include "llvm/Support/Format.h"
 
 #include <locale>
-#if __cplusplus >= 202002L
+#include <version>
+#ifdef __cpp_lib_source_location
 #include <source_location>
 #endif
 #include <string>
@@ -579,7 +580,7 @@ namespace cling {
     return toUnicode(Val, 'L', 'x');
   }
 
-#if __cplusplus >= 202002L
+#ifdef __cpp_lib_source_location
   CLING_LIB_EXPORT
   std::string printValue(const std::source_location* location) {
     cling::ostrstream strm;

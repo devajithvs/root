@@ -7,10 +7,14 @@
 
 //------------------------------------------------------------------------------
 
-// RUN: cat %s | %cling | FileCheck %s
+// RUN: cat %s | %cling | FileCheck %s --allow-empty
 
 #ifdef __cpp_lib_source_location
 #include <source_location>
-std::source_location::current()
-// CHECK: (std::source_location) ROOT_prompt_0:2:__cling_Un1Qu30
+auto getsrcloc() {
+#line 42 "CHECK_SRCLOC"
+  return std::source_location::current();
+}
+getsrcloc()
+// CHECK: (std::source_location) CHECK_SRCLOC:42:auto getsrcloc()
 #endif

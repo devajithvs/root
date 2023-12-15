@@ -39,8 +39,6 @@ using namespace llvm;
 
 namespace {
   class KeepLocalGVPass : public PassInfoMixin<KeepLocalGVPass> {
-    static char ID;
-
     bool runOnGlobal(GlobalValue& GV) {
       if (GV.isDeclaration())
         return false; // no change.
@@ -83,12 +81,8 @@ namespace {
   };
 }
 
-char KeepLocalGVPass::ID = 0;
-
 namespace {
   class PreventLocalOptPass : public PassInfoMixin<PreventLocalOptPass> {
-    static char ID;
-
     bool runOnGlobal(GlobalValue& GV) {
       if (!GV.isDeclaration())
         return false; // no change.
@@ -132,12 +126,8 @@ namespace {
   };
 }
 
-char PreventLocalOptPass::ID = 0;
-
 namespace {
   class WeakTypeinfoVTablePass : public PassInfoMixin<WeakTypeinfoVTablePass> {
-    static char ID;
-
     bool runOnGlobalVariable(GlobalVariable& GV) {
       // Only need to consider symbols with external linkage because only
       // these could be reported as duplicate.
@@ -169,8 +159,6 @@ namespace {
   };
 }
 
-char WeakTypeinfoVTablePass::ID = 0;
-
 namespace {
 
   // Add a suffix to the CUDA module ctor/dtor, CUDA specific functions and
@@ -178,8 +166,6 @@ namespace {
   // compilation. Without suffix, cling cannot distinguish ctor/dtor, register
   // function and and ptx code string of subsequent modules.
   class UniqueCUDAStructorName : public PassInfoMixin<UniqueCUDAStructorName> {
-    static char ID;
-
     // append a suffix to a symbol to make it unique
     // the suffix is "_cling_module_<module number>"
     llvm::SmallString<128> add_module_suffix(const StringRef SymbolName,
@@ -241,16 +227,12 @@ namespace {
   };
 } // namespace
 
-char UniqueCUDAStructorName::ID = 0;
-
-
 namespace {
 
   // Replace definitions of weak symbols for which symbols already exist by
   // declarations. This reduces the amount of emitted symbols.
   class ReuseExistingWeakSymbols
       : public PassInfoMixin<ReuseExistingWeakSymbols> {
-    static char ID;
     cling::IncrementalJIT &m_JIT;
 
     bool shouldRemoveGlobalDefinition(GlobalValue& GV) {
@@ -320,8 +302,6 @@ namespace {
     }
   };
 }
-
-char ReuseExistingWeakSymbols::ID = 0;
 
 // From clang/lib/CodeGen/BackendUtil.cpp
 static OptimizationLevel mapToLevel(const CodeGenOptions& Opts) {

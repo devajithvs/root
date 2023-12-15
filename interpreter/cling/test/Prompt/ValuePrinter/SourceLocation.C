@@ -14,5 +14,5 @@ std::source_location getsrcloc() {
 #line 42 "CHECK_SRCLOC"
   return std::source_location::current();
 }
-getsrcloc()
-// CHECK: (std::source_location) CHECK_SRCLOC:42:std::source_location getsrcloc()
+getsrcloc() // CHECK: (std::source_location)
+            // CHECK: CHECK_SRCLOC:42:std::source_location getsrcloc()

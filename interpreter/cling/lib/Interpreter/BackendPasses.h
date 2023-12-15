@@ -35,8 +35,7 @@ namespace cling {
   ///\brief Runs passes on IR. Remove once we can migrate from ModuleBuilder to
   /// what's in clang's CodeGen/BackendUtil.
   class BackendPasses {
-    std::array<llvm::ModulePassManager, 4> m_MPM;
-
+    llvm::ModulePassManager m_MPM;
     llvm::LoopAnalysisManager LAM;
     llvm::FunctionAnalysisManager FAM;
     llvm::CGSCCAnalysisManager CGAM;

@@ -373,26 +373,26 @@ void BackendPasses::CreatePasses(llvm::Module& M, int OptLevel) {
   // At O0 and O1 we only run the always inliner which is more efficient. At
   // higher optimization levels we run the normal inliner.
   if (OptLevel <= 1) {
-    m_MPM[OptLevel].addPass(AlwaysInlinerPass());
+    m_MPM.addPass(AlwaysInlinerPass());
   } else {
     // Otherwise, use the default pass pipeline. We also have to map our
     // optimization levels into one of the distinct levels used to configure
     // the pipeline.
     OptimizationLevel Level = mapToLevel(m_CGOpts);
 
-    m_MPM[OptLevel] = PB.buildPerModuleDefaultPipeline(Level);
+    m_MPM = PB.buildPerModuleDefaultPipeline(Level);
   }
 
-  m_MPM[OptLevel].addPass(KeepLocalGVPass());
-  m_MPM[OptLevel].addPass(PreventLocalOptPass());
-  m_MPM[OptLevel].addPass(WeakTypeinfoVTablePass());
-  m_MPM[OptLevel].addPass(ReuseExistingWeakSymbols(m_JIT));
+  m_MPM.addPass(KeepLocalGVPass());
+  m_MPM.addPass(PreventLocalOptPass());
+  m_MPM.addPass(WeakTypeinfoVTablePass());
+  m_MPM.addPass(ReuseExistingWeakSymbols(m_JIT));
 
   // The function __cuda_module_ctor and __cuda_module_dtor will just generated,
   // if a CUDA fatbinary file exist. Without file path there is no need for the
   // function pass.
   if(!m_CGOpts.CudaGpuBinaryFileName.empty())
-    m_MPM[OptLevel].addPass(UniqueCUDAStructorName());
+    m_MPM.addPass(UniqueCUDAStructorName());
 
   // Register all the basic analyses with the managers.
   PB.registerModuleAnalyses(MAM);
@@ -405,7 +405,7 @@ void BackendPasses::CreatePasses(llvm::Module& M, int OptLevel) {
   //  addSymbolRewriterPass(CGOpts, m_MPM);
 
   if (m_CGOpts.VerifyModule)
-    m_MPM[OptLevel].addPass(VerifierPass());
+    m_MPM.addPass(VerifierPass());
 }
 
 void BackendPasses::runOnModule(Module& M, int OptLevel) {
@@ -415,9 +415,9 @@ void BackendPasses::runOnModule(Module& M, int OptLevel) {
   if (OptLevel > 3)
     OptLevel = 3;
 
-  // Module analysis (MAM) can get modified when passes are run. It has to be
-  // reinitialized for each run.
-  // if (m_MPM[OptLevel].isEmpty())
+  // With the new pass manager, module analysis (MAM) can get modified when
+  // passes are run. It has to be reinitialized for each run. if
+  // (m_MPM.isEmpty())
   CreatePasses(M, OptLevel);
 
   static constexpr std::array<llvm::CodeGenOpt::Level, 4> CGOptLevel {{
@@ -430,5 +430,5 @@ void BackendPasses::runOnModule(Module& M, int OptLevel) {
   m_TM.setOptLevel(CGOptLevel[OptLevel]);
 
   // Now that we have all of the passes ready, run them.
-  m_MPM[OptLevel].run(M, MAM);
+  m_MPM.run(M, MAM);
 }

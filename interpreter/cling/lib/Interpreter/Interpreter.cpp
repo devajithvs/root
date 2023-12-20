@@ -285,6 +285,24 @@ namespace cling {
       setupCallbacks(*this, parentInterp);
     }
 
+    //     if (getDynamicLibraryManager()->loadLibrary("libacpp-clang.so", false) ==
+    //     cling::DynamicLibraryManager::LoadLibResult::kLoadLibNotFound){
+    //   llvm::errs() << "Error: libacpp-clang.so not found!\n" <<
+    //     "Please add the acpp lib path to LD_LIBRARY_PATH or set it via -L argument.\n";
+    //   }
+
+    // if (getDynamicLibraryManager()->loadLibrary("libacpp-common.so", true) ==
+    //     cling::DynamicLibraryManager::LoadLibResult::kLoadLibNotFound){
+    //   llvm::errs() << "Error: libacpp-common.so not found!\n" <<
+    //     "Please add the acpp lib path to LD_LIBRARY_PATH or set it via -L argument.\n";
+    //   }
+
+    // if (getDynamicLibraryManager()->loadLibrary("libacpp-rt.so", false) ==
+    //     cling::DynamicLibraryManager::LoadLibResult::kLoadLibNotFound){
+    //   llvm::errs() << "Error: libacpp-rt.so not found!\n" <<
+    //     "Please add the acpp lib path to LD_LIBRARY_PATH or set it via -L argument.\n";
+    //   }
+
     if (m_Opts.CompilerOpts.CUDAHost && !isInSyntaxOnlyMode()) {
       if (getDynamicLibraryManager()->loadLibrary("libcudart.so", true) ==
           cling::DynamicLibraryManager::LoadLibResult::kLoadLibNotFound){

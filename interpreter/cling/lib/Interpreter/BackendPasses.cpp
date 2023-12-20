@@ -28,6 +28,7 @@
 #include "llvm/Transforms/IPO/PassManagerBuilder.h"
 #include "llvm/Transforms/Scalar.h"
 #include "llvm/Transforms/Utils.h"
+#include "llvm/Passes/PassPlugin.h"
 
 //#include "clang/Basic/LangOptions.h"
 //#include "clang/Basic/TargetOptions.h"
@@ -410,6 +411,18 @@ void BackendPasses::CreatePasses(int OptLevel, llvm::ModulePassManager& MPM,
       MPM.addPass(PB.buildPerModuleDefaultPipeline(Level));
     }
   }
+
+  // auto plugin2 = PassPlugin::Load("/usr/local/lib/libacpp-rt.so");
+
+  //   plugin2.get().registerPassBuilderCallbacks(PB);
+
+  auto plugin3 = PassPlugin::Load("/usr/local/lib/libacpp-clang.so");
+
+    plugin3.get().registerPassBuilderCallbacks(PB);
+
+  // auto plugin = PassPlugin::Load("/usr/local/lib/libacpp-common.so");
+
+  //   plugin.get().registerPassBuilderCallbacks(PB);
 
   // The function __cuda_module_ctor and __cuda_module_dtor will just generated,
   // if a CUDA fatbinary file exist. Without file path there is no need for the

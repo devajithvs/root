@@ -2046,7 +2046,18 @@ void TROOT::InitInterpreter()
          fprintf(stderr, "Fatal in <TROOT::InitInterpreter>: cannot load library %s\n", err.Data());
          exit(1);
       }
+
+      char *libacpp = gSystem->DynamicPathName("libacpp-rt");
+      void *libacppHandle = dlopen(libacpp, RTLD_LAZY|RTLD_GLOBAL);
+      delete [] libacpp;
+      if (!libacppHandle) {
+         TString err = dlerror();
+         fprintf(stderr, "Fatal in <TROOT::InitInterpreter>: cannot load library %s\n", err.Data());
+         exit(1);
+      }
+
       dlerror();   // reset error message
+
    } else {
       gInterpreterLib = RTLD_DEFAULT;
    }

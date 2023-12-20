@@ -17,7 +17,9 @@
 #include <cling/Interpreter/Visibility.h>
 
 #include <memory>
+#if __cplusplus >= 202002L
 #include <version>
+#endif
 #ifdef __cpp_lib_source_location
 #include <source_location>
 #endif

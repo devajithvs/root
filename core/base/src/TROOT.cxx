@@ -2076,8 +2076,16 @@ void TROOT::InitInterpreter()
          exit(1);
       }
 
+      void *libacppHandle = dlopen("/usr/local/lib/libacpp-rt.so", RTLD_LAZY | RTLD_GLOBAL);
+      if (!libacppHandle) {
+         fprintf(stderr, "Loading libacpp failed\n");
+         TString err = dlerror();
+         fprintf(stderr, "Fatal in <TROOT::InitInterpreter>: cannot load library %s\n", err.Data());
+         exit(1);
+      }
+
       char *libcling = gSystem->DynamicPathName("libCling");
-      gInterpreterLib = dlopen(libcling, RTLD_LAZY|RTLD_LOCAL);
+      gInterpreterLib = dlopen(libcling, RTLD_LAZY|RTLD_GLOBAL);
       delete [] libcling;
 
       if (!gInterpreterLib) {

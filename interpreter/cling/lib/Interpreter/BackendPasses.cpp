@@ -34,7 +34,9 @@
 #include "clang/Basic/CharInfo.h"
 #include "clang/Basic/CodeGenOptions.h"
 
+#include "llvm/ADT/StringRef.h"
 #include <optional>
+#include <unordered_set>
 
 using namespace cling;
 using namespace clang;
@@ -372,18 +374,20 @@ void BackendPasses::CreatePasses(int OptLevel, llvm::ModulePassManager& MPM,
 
     // Register a callback for disabling all other inliner passes.
     PIC.registerShouldRunOptionalPassCallback([](StringRef P, Any) {
-      if (P.equals("ModuleInlinerWrapperPass") ||
-          P.equals("InlineAdvisorAnalysisPrinterPass") ||
-          P.equals("PartialInlinerPass") || P.equals("buildInlinerPipeline") ||
-          P.equals("ModuleInlinerPass") || P.equals("InlinerPass") ||
-          P.equals("InlineAdvisorAnalysis") ||
-          P.equals("PartiallyInlineLibCallsPass") ||
-          P.equals("InlineCostAnnotationPrinterPass") ||
-          P.equals("InlineSizeEstimatorAnalysisPrinterPass") ||
-          P.equals("InlineSizeEstimatorAnalysis"))
-        return false;
-
-      return true;
+      // A set of all other inliner passes.
+      std::unordered_set<StringRef> passesToExclude = {
+          "ModuleInlinerWrapperPass",
+          "InlineAdvisorAnalysisPrinterPass",
+          "PartialInlinerPass",
+          "buildInlinerPipeline",
+          "ModuleInlinerPass",
+          "InlinerPass",
+          "InlineAdvisorAnalysis",
+          "PartiallyInlineLibCallsPass",
+          "InlineCostAnnotationPrinterPass",
+          "InlineSizeEstimatorAnalysisPrinterPass",
+          "InlineSizeEstimatorAnalysis"};
+      return passesToExclude.find(P) == passesToExclude.end();
     });
   }
 

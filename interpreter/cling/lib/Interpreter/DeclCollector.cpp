@@ -134,6 +134,7 @@ namespace cling {
  ASTTransformer::Result DeclCollector::TransformDecl(Decl* D) const {
     // We are sure it's safe to pipe it through the transformers
     // Consume late transformers init
+    llvm::errs() << "DeclCollector::TransformDecl\n";
     for (size_t i = 0; D && i < m_TransactionTransformers.size(); ++i) {
       ASTTransformer::Result NewDecl
         = m_TransactionTransformers[i]->Transform(D, m_CurTransaction);
@@ -160,6 +161,7 @@ namespace cling {
   }
 
   bool DeclCollector::Transform(DeclGroupRef& DGR) {
+    llvm::errs() << "DeclCollector::Transform\n";
     // Do not tranform recursively, e.g. when emitting a DeclExtracted decl.
     if (m_Transforming)
       return true;
@@ -189,6 +191,7 @@ namespace cling {
   }
 
   bool DeclCollector::HandleTopLevelDecl(DeclGroupRef DGR) {
+    llvm::errs() << "DeclCollector::HandleTopLevelDecl\n";
     if (!Transform(DGR))
       return false;
 

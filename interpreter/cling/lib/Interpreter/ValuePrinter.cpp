@@ -603,6 +603,7 @@ static const char* BuildAndEmitVPWrapperBody(cling::Interpreter &Interp,
                                              clang::QualType QT,
                                              const void* ValPtr)
 {
+  llvm::errs() << "BuildAndEmitVPWrapperBody\n";
   const clang::SourceLocation noSrcLoc;
   clang::Sema::SynthesizedFunctionScope SemaFScope(S, WrapperFD);
   clang::Parser::ParseScope parseScope(&Interp.getParser(),

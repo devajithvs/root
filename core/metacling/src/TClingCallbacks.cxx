@@ -410,9 +410,9 @@ bool TClingCallbacks::LookupObject(LookupResult &R, Scope *S) {
    // auto keyword must be injected and the stmt evaluation must not be delayed
    // until runtime.
    // For now supported only at the prompt.
-   if (tryInjectImplicitAutoKeyword(R, S)) {
-      return true;
-   }
+   // if (tryInjectImplicitAutoKeyword(R, S)) {
+   //    return true;
+   // }
 
    if (fIsAutoLoadingRecursively)
       return false;
@@ -813,16 +813,21 @@ bool TClingCallbacks::tryFindROOTSpecialInternal(LookupResult &R, Scope *S) {
 }
 
 bool TClingCallbacks::tryResolveAtRuntimeInternal(LookupResult &R, Scope *S) {
+   llvm::errs() << "tryResolveAtRuntimeInternal\n";
    if (!fROOTSpecialNamespace) {
       // init error or rootcling
       return false;
    }
 
-   if (!shouldResolveAtRuntime(R, S))
-      return false;
-
    DeclarationName Name = R.getLookupName();
+   llvm::errs() << "Name: " << Name << "\n";
+   if (!shouldResolveAtRuntime(R, S)) {
+      llvm::errs() << "should not ResolveAtRuntime\n";
+      return false;
+   }
+
    IdentifierInfo* II = Name.getAsIdentifierInfo();
+   llvm::errs() << "II: " << II << "\n";
    SourceLocation Loc = R.getNameLoc();
    Sema& SemaRef = R.getSema();
    ASTContext& C = SemaRef.getASTContext();
@@ -876,8 +881,12 @@ bool TClingCallbacks::tryResolveAtRuntimeInternal(LookupResult &R, Scope *S) {
 }
 
 bool TClingCallbacks::shouldResolveAtRuntime(LookupResult& R, Scope* S) {
-   if (m_IsRuntime)
+   llvm::errs() << "shouldResolveAtRuntime\n";
+   if (m_IsRuntime) {
+      llvm::errs() << "m_IsRuntime\n";
       return false;
+   }
+   llvm::errs() << R.getLookupKind() << "\n";
 
    if (R.getLookupKind() != Sema::LookupOrdinaryName)
       return false;
@@ -934,6 +943,7 @@ bool TClingCallbacks::shouldResolveAtRuntime(LookupResult& R, Scope* S) {
 }
 
 bool TClingCallbacks::tryInjectImplicitAutoKeyword(LookupResult &R, Scope *S) {
+   llvm::errs() << "tryInjectImplicitAutoKeyword\n";
    if (!fROOTSpecialNamespace) {
       // init error or rootcling
       return false;

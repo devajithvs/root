@@ -19,7 +19,6 @@
 #include <clang/Basic/TargetOptions.h>
 #include <clang/Frontend/CompilerInstance.h>
 
-#include <llvm/ADT/Triple.h>
 #include <llvm/ExecutionEngine/JITLink/EHFrameSupport.h>
 #include <llvm/ExecutionEngine/Orc/JITTargetMachineBuilder.h>
 #include <llvm/ExecutionEngine/Orc/ObjectLinkingLayer.h>
@@ -28,8 +27,9 @@
 #include <llvm/IR/LLVMContext.h>
 #include <llvm/MC/TargetRegistry.h>
 #include <llvm/Support/raw_ostream.h>
-#include <llvm/Support/Host.h>
 #include <llvm/Target/TargetMachine.h>
+#include <llvm/TargetParser/Host.h>
+#include <llvm/TargetParser/Triple.h>
 
 #include <optional>
 
@@ -369,13 +369,13 @@ static bool UseJITLink(const Triple& TT) {
 
 static std::unique_ptr<TargetMachine>
 CreateTargetMachine(const clang::CompilerInstance& CI, bool JITLink) {
-  CodeGenOpt::Level OptLevel = CodeGenOpt::Default;
+  CodeGenOptLevel OptLevel = CodeGenOptLevel::Default;
   switch (CI.getCodeGenOpts().OptimizationLevel) {
-    case 0: OptLevel = CodeGenOpt::None; break;
-    case 1: OptLevel = CodeGenOpt::Less; break;
-    case 2: OptLevel = CodeGenOpt::Default; break;
-    case 3: OptLevel = CodeGenOpt::Aggressive; break;
-    default: OptLevel = CodeGenOpt::Default;
+    case 0: OptLevel = CodeGenOptLevel::None; break;
+    case 1: OptLevel = CodeGenOptLevel::Less; break;
+    case 2: OptLevel = CodeGenOptLevel::Default; break;
+    case 3: OptLevel = CodeGenOptLevel::Aggressive; break;
+    default: OptLevel = CodeGenOptLevel::Default;
   }
 
   const Triple &TT = CI.getTarget().getTriple();

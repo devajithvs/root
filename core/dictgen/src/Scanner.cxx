@@ -24,6 +24,7 @@
 
 #include <iostream>
 #include <sstream> // class ostringstream
+#include "llvm/ADT/StringExtras.h"
 
 #include "SelectionRules.h"
 
@@ -152,7 +153,7 @@ inline long APIntToLong(const llvm::APInt& num)
 
 inline std::string APIntToStr(const llvm::APInt& num)
 {
-   return llvm::toString(num, /*radix*/10, /*signed*/true);
+   return toString(num, /*radix*/10, /*signed*/true);
 }
 
 ////////////////////////////////////////////////////////////////////////////////

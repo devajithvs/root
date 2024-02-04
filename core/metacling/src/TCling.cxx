@@ -3234,8 +3234,8 @@ Bool_t TCling::IsLoaded(const char* filename) const
                            clang::SourceLocation(),
                            /*isAngled*/ false,
                            /*FromDir*/ nullptr, CurDir,
-                           clang::ArrayRef<std::pair<const clang::FileEntry *,
-                           const clang::DirectoryEntry *>>(),
+                           clang::ArrayRef<std::pair<clang::OptionalFileEntryRef,
+                           clang::DirectoryEntryRef>>(),
                            /*SearchPath*/ nullptr,
                            /*RelativePath*/ nullptr,
                            /*RequestingModule*/ nullptr,
@@ -8876,7 +8876,7 @@ Long_t TCling::FuncTempInfo_Property(FuncTempInfo_t *ft_info) const
       if (md->isVirtual()) {
          property |= kIsVirtual;
       }
-      if (md->isPure()) {
+      if (md->isPureVirtual()) {
          property |= kIsPureVirtual;
       }
       if (const clang::CXXConstructorDecl *cd =

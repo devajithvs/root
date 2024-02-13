@@ -39,6 +39,9 @@
 
 #include "llvm/Support/Format.h"
 
+#if __cplusplus >= 201703L
+#include <filesystem>
+#endif
 #include <locale>
 #if __cplusplus >= 202002L
 #include <version>
@@ -192,6 +195,7 @@ namespace cling {
   // General fallback - prints the address
   CLING_LIB_EXPORT
   std::string printValue(const void *ptr) {
+    llvm::errs() << "Adress printing";
     return printAddress(ptr, '@');
   }
 
@@ -592,6 +596,16 @@ namespace cling {
   }
 #endif
 
+#if __cplusplus >= 201703L
+  CLING_LIB_EXPORT
+  std::string printValue(const std::filesystem::path* path) {
+    llvm::errs() << "Working??????";
+    cling::ostrstream strm;
+    strm << path->string();
+    return strm.str().str();
+  }
+#endif
+
 } // end namespace cling
 
 namespace {
@@ -979,6 +993,8 @@ namespace cling {
   // cling::Value
   CLING_LIB_EXPORT
   std::string printValue(const Value *value) {
+
+    llvm::errs() << "Printvalue working";
     cling::smallstream strm;
 
     if (value->isValid()) {

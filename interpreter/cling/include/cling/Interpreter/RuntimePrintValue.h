@@ -16,6 +16,9 @@
 
 #include <cling/Interpreter/Visibility.h>
 
+#if __cplusplus >= 201703L
+#include <filesystem>
+#endif
 #include <memory>
 #if __cplusplus >= 202002L
 #include <version>
@@ -152,6 +155,11 @@ namespace cling {
   std::string printValue(const std::source_location* location);
 #endif
 
+#if __cplusplus >= 201703L
+  CLING_LIB_EXPORT
+  std::string printValue(const std::filesystem::path* path);
+#endif
+
   // cling::Value
   CLING_LIB_EXPORT
   std::string printValue(const Value *value);
@@ -200,6 +208,8 @@ namespace cling {
         typename std::enable_if<
             std::is_reference<decltype(*std::begin(*obj))>::value>::type* = 0)
         -> decltype(std::end(*obj), std::string()) {
+      
+      llvm::errs() << "PrintValue_impl first";
       auto iter = obj->begin(), iterEnd = obj->end();
       if (iter == iterEnd) return valuePrinterInternal::kEmptyCollection;
 
@@ -221,6 +231,7 @@ namespace cling {
         typename std::enable_if<
             !std::is_reference<decltype(*(obj->begin()))>::value>::type* = 0)
         -> decltype(++(obj->begin()), obj->end(), std::string()) {
+      llvm::errs() << "PrintValue_impl second";
       auto iter = obj->begin(), iterEnd = obj->end();
       if (iter == iterEnd) return valuePrinterInternal::kEmptyCollection;
 
@@ -238,6 +249,7 @@ namespace cling {
   template<typename CollectionType>
   inline auto printValue(const CollectionType *obj)
   -> decltype(collectionPrinterInternal::printValue_impl(obj), std::string()) {
+    llvm::errs() << "PrintValue working";
     return collectionPrinterInternal::printValue_impl(obj);
   }
 

@@ -266,6 +266,7 @@ namespace cling {
 
   CLING_LIB_EXPORT
   std::string printValue(const int *val) {
+    llvm::errs() << "Int printing";
     cling::smallstream strm;
     strm << *val;
     return strm.str().str();
@@ -711,6 +712,7 @@ static const char* BuildAndEmitVPWrapperBody(cling::Interpreter &Interp,
 
 static std::string callPrintValue(const Value& V, const void* Val) {
   Interpreter *Interp = V.getInterpreter();
+  llvm::errs() << "callPrintValue";
   assert(Interp && "No cling::Interpreter!");
   Value printValueV;
 
@@ -724,6 +726,8 @@ static std::string callPrintValue(const Value& V, const void* Val) {
                              utils::Lookup::Namespace(&S, "std"));
     const auto* StdStringTD = clang::dyn_cast<clang::TypeDecl>(StdStringDecl);
     assert(StdStringTD && "Cannot find type of std::string.");
+
+    llvm::errs() << "callPrintValue mid";
 
     std::string name;
     Interp->createUniqueName(name);
@@ -756,9 +760,14 @@ static std::string callPrintValue(const Value& V, const void* Val) {
     if (void* addr = Interp->getAddressOfGlobal(WrapperGD)) {
        auto funptr = cling::utils::VoidToFunctionPtr<std::string(*)()>(addr);
       LockCompilationDuringUserCodeExecutionRAII LCDUCER(*Interp);
+      llvm::errs() << "callPrintValue mid3 WrapperFD" << WrapperFD << "\n";
+      llvm::errs() << "callPrintValue mid3 addr" << addr << "\n";
+      llvm::errs() << "callPrintValue mid3" << funptr() << "\n";
+
       return funptr();
     }
   }
+  llvm::errs() << "callPrintValue end";
 
   return "ERROR in cling's callPrintValue(): missing value string.";
 }

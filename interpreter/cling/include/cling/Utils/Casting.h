@@ -21,11 +21,9 @@ namespace cling {
     ///
     /// \return A void* of the functions address.
     ///
-    template <class T>
-    void* FunctionToVoidPtr(T *funptr) {
-      union { T *f; void *v; } tmp;
-      tmp.f = funptr;
-      return tmp.v;
+    template <typename T>
+    void* FunctionToVoidPtr(T* funptr) {
+        return reinterpret_cast<void*>(funptr);
     }
 
     ///\brief Legally cast a uintptr_t to a function.
@@ -34,11 +32,9 @@ namespace cling {
     ///
     /// \return The function's address.
     ///
-    template <class T>
+    template <typename T>
     T UIntToFunctionPtr(uintptr_t ptr) {
-      union { T f; uintptr_t v; } tmp;
-      tmp.v = ptr;
-      return tmp.f;
+        return reinterpret_cast<T>(ptr);
     }
 
     ///\brief Legally cast a void* to a function.
@@ -47,11 +43,9 @@ namespace cling {
     ///
     /// \return The function's address.
     ///
-    template <class T>
-    T VoidToFunctionPtr(void *ptr) {
-      union { T f; void *v; } tmp;
-      tmp.v = ptr;
-      return tmp.f;
+    template <typename T>
+    T VoidToFunctionPtr(void* ptr) {
+        return reinterpret_cast<T>(ptr);
     }
 
   } // namespace utils

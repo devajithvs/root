@@ -124,6 +124,8 @@ namespace cling {
   // cling_PrintValue(void* (ASTContext)C, void* (Expr)E, const void* (&i)
   Expr* ValuePrinterSynthesizer::SynthesizeVP(Expr* E) {
     QualType QT = E->getType();
+  llvm::errs() << "SynthesizeVP";
+
     // For now we skip void and function pointer types.
     if (!QT.isNull() && (QT->isVoidType() || QT->isFunctionType()))
       return 0;

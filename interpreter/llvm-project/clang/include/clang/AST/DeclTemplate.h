@@ -262,6 +262,9 @@ public:
   /// stack object. It does not own its template arguments.
   enum OnStackType { OnStack };
 
+  /// Create hash for the given arguments.
+  static unsigned ComputeODRHash(ArrayRef<TemplateArgument> Args);
+
   /// Create a new template argument list that copies the given set of
   /// template arguments.
   static TemplateArgumentList *CreateCopy(ASTContext &Context,
@@ -749,6 +752,26 @@ class RedeclarableTemplateDecl : public TemplateDecl,
   }
 
   void anchor() override;
+  struct LazySpecializationInfo {
+    uint32_t DeclID = ~0U;
+    unsigned ODRHash = ~0U;
+    bool IsPartial = false;
+    LazySpecializationInfo(uint32_t ID, unsigned Hash = ~0U,
+                           bool Partial = false)
+        : DeclID(ID), ODRHash(Hash), IsPartial(Partial) {}
+    LazySpecializationInfo() {}
+    bool operator<(const LazySpecializationInfo &Other) const {
+      return DeclID < Other.DeclID;
+    }
+    bool operator==(const LazySpecializationInfo &Other) const {
+      assert((DeclID != Other.DeclID || ODRHash == Other.ODRHash) &&
+             "Hashes differ!");
+      assert((DeclID != Other.DeclID || IsPartial == Other.IsPartial) &&
+             "Both must be the same kinds!");
+      return DeclID == Other.DeclID;
+    }
+  };
+
 protected:
   template <typename EntryType> struct SpecEntryTraits {
     using DeclType = EntryType;
@@ -789,7 +812,12 @@ protected:
     return SpecIterator<EntryType>(isEnd ? Specs.end() : Specs.begin());
   }
 
-  void loadLazySpecializationsImpl() const;
+  void loadLazySpecializationsImpl(bool OnlyPartial = false) const;
+
+  void loadLazySpecializationsImpl(llvm::ArrayRef<TemplateArgument> Args,
+                                   TemplateParameterList *TPL = nullptr) const;
+
+  Decl *loadLazySpecializationImpl(LazySpecializationInfo &LazySpecInfo) const;
 
   template <class EntryType, typename ...ProfileArguments>
   typename SpecEntryTraits<EntryType>::DeclType*
@@ -816,7 +844,7 @@ protected:
     ///
     /// The first value in the array is the number of specializations/partial
     /// specializations that follow.
-    uint32_t *LazySpecializations = nullptr;
+    LazySpecializationInfo *LazySpecializations = nullptr;
 
     /// The set of "injected" template arguments used within this
     /// template.
@@ -2301,7 +2329,7 @@ public:
   friend class TemplateDeclInstantiator;
 
   /// Load any lazily-loaded specializations from the external source.
-  void LoadLazySpecializations() const;
+  void LoadLazySpecializations(bool OnlyPartial = false) const;
 
   /// Get the underlying class declarations of the template.
   CXXRecordDecl *getTemplatedDecl() const {
@@ -3086,7 +3114,7 @@ public:
   friend class ASTDeclWriter;
 
   /// Load any lazily-loaded specializations from the external source.
-  void LoadLazySpecializations() const;
+  void LoadLazySpecializations(bool OnlyPartial = false) const;
 
   /// Get the underlying variable declarations of the template.
   VarDecl *getTemplatedDecl() const {

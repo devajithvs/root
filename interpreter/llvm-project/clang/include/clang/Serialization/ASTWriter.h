@@ -583,6 +583,7 @@ private:
   unsigned DeclDependentSpecializationCXXMethodAbbrev = 0;
   unsigned DeclTemplateTypeParmAbbrev = 0;
   unsigned DeclUsingShadowAbbrev = 0;
+  unsigned DeclSpecializationsAbbrev = 0;
 
   unsigned DeclRefExprAbbrev = 0;
   unsigned CharacterLiteralAbbrev = 0;

@@ -335,6 +335,13 @@ Non-comprehensive list of changes in this release
   the previous builtins, this new builtin is constexpr and may be used in
   constant expressions.
 
+- Lambda expressions are now accepted in C++03 mode as an extension.
+
+- Added ``__builtin_clzg`` and ``__builtin_ctzg`` as type-generic alternatives
+  to ``__builtin_clz{,s,l,ll}`` and ``__builtin_ctz{,s,l,ll}`` respectively,
+  with support for any unsigned integer type. Like the previous builtins, these
+  new builtins are constexpr and may be used in constant expressions.
+
 New Compiler Flags
 ------------------
 

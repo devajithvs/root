@@ -50,7 +50,7 @@ set(CMAKE_DISABLE_FIND_PACKAGE_CUDA ON)
 
 # will be set again in case NOT builtin_llvm
 set(LLVM_DIR "${CMAKE_BINARY_DIR}/interpreter/llvm-project/llvm")
-if (clad)
+if (adaptivecpp OR clad)
   set(CLING_BUILD_PLUGINS ON)
 endif()
 

@@ -118,6 +118,15 @@ if(clad AND NO_CONNECTION)
   endif()
 endif()
 
+if(adaptivecpp AND NO_CONNECTION)
+  if(fail-on-missing)
+    message(FATAL_ERROR "No internet connection. Please check your connection, or either disable the 'adaptivecpp' option or the 'fail-on-missing' to automatically disable options requiring internet access")
+  elseif(adaptivecpp)
+    message(STATUS "No internet connection, disabling the 'adaptivecpp' option")
+  endif()
+  set(adaptivecpp OFF CACHE BOOL "Disabled because there is no internet connection" FORCE)
+endif()
+
 # relatedrepo_GetClosestMatch(REPO_NAME <repo> ORIGIN_PREFIX <originp> UPSTREAM_PREFIX <upstreamp>
 #                             FETCHURL_VARIABLE <output_url> FETCHREF_VARIABLE <output_ref>)
 # Return the clone URL and head/tag of the closest match for `repo` (e.g. roottest), based on the
@@ -690,6 +699,12 @@ install(FILES ${CMAKE_BINARY_DIR}/etc/${root_kernel_dir}/${root_kernel_file} DES
 
 #---install clad header files-------------------------------------------------------------------
 if(clad)
+   install(DIRECTORY ${CMAKE_BINARY_DIR}/etc/cling/plugins/
+      DESTINATION ${CMAKE_INSTALL_SYSCONFDIR}/cling/plugins)
+endif()
+
+#---install adaptivecpp header files-------------------------------------------------------------------
+if(adaptivecpp)
    install(DIRECTORY ${CMAKE_BINARY_DIR}/etc/cling/plugins/
       DESTINATION ${CMAKE_INSTALL_SYSCONFDIR}/cling/plugins)
 endif()

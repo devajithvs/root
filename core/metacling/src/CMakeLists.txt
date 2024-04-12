@@ -44,6 +44,7 @@ target_include_directories(MetaCling SYSTEM PRIVATE
   ${CLANG_INCLUDE_DIRS}
   ${LLVM_INCLUDE_DIRS}
   ${CLAD_INCLUDE_DIRS}
+  ${ADAPTIVECPP_INCLUDE_DIRS}
 )
 
 target_include_directories(MetaCling PRIVATE
@@ -107,6 +108,16 @@ if (clad)
   # also be able to use clad out of the box.
   add_dependencies(clang clad)
   target_link_libraries(clang PUBLIC ${CLING_PLUGIN_LINK_LIBS})
+endif()
+if (adaptivecpp)
+  if (APPLE)
+    set(CLING_PLUGIN_LINK_LIBS -Wl,-force_load acpp-clang)
+  elseif(MSVC)
+    set(CLING_PLUGIN_LINK_LIBS acpp-clang)
+    set(CLAD_LIBS "-WHOLEARCHIVE:acpp-clang.lib")
+  else()
+    set(CLING_PLUGIN_LINK_LIBS -Wl,--whole-archive acpp-clang -Wl,--no-whole-archive)
+  endif()
 endif()
 
 ROOT_LINKER_LIBRARY(Cling

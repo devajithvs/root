@@ -175,12 +175,6 @@ namespace cling {
 
   private:
 
-    // The next available unique sourcelocation offset. Skip the system sloc 0
-    // and any offset that may actually exist in the virtual file.
-    unsigned m_VirtualFileLocOffset = 100;
-
-    unsigned InitPTUSize = 0;
-
     ///\brief Interpreter invocation options.
     ///
     InvocationOptions m_Opts;

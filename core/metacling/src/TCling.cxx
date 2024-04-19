@@ -7604,9 +7604,9 @@ void TCling::ReportDiagnosticsToErrorHandler(bool enable)
                ::Info("cling", "%s", Info.c_str());
             }
          });
-      // fInterpreter->replaceDiagnosticConsumer(consumer, /*Own=*/true);
+      fInterpreter->replaceDiagnosticConsumer(consumer, /*Own=*/true);
    } else {
-      // fInterpreter->replaceDiagnosticConsumer(nullptr);
+      fInterpreter->replaceDiagnosticConsumer(nullptr);
    }
 }
 

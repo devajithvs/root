@@ -155,7 +155,9 @@ namespace cling {
   }
 
   clang::SourceLocation Interpreter::getNextAvailableLoc() const {
-    return m_IncrParser->getNextAvailableUniqueSourceLoc();
+    const SourceManager& SM = m_IncrParser->getCI()->getSourceManager();
+    SourceLocation Result = SM.getLocForStartOfFile(SM.getMainFileID());
+    return Result.getLocWithOffset(m_VirtualFileLocOffset++);
   }
 
   bool Interpreter::isInSyntaxOnlyMode() const {
@@ -166,7 +168,8 @@ namespace cling {
   bool Interpreter::isValid() const {
     // Should we also check m_IncrParser->getFirstTransaction() ?
     // not much can be done without it (its the initializing transaction)
-    return m_IncrParser && m_IncrParser->isValid() && m_LookupHelper &&
+    bool validIncrParser = m_IncrParser && m_IncrParser->getCI() && m_IncrParser->getCI()->hasFileManager();
+    return validIncrParser && m_LookupHelper &&
            (isInSyntaxOnlyMode() || m_Executor);
   }
 
@@ -217,8 +220,18 @@ namespace cling {
 
     auto LLVMCtx = std::make_unique<llvm::LLVMContext>();
     TSCtx = std::make_unique<llvm::orc::ThreadSafeContext>(std::move(LLVMCtx));
-    m_IncrParser.reset(new IncrementalParser(this, llvmdir, moduleExtensions));
-    if (!m_IncrParser->isValid(false))
+
+    // compiler instance.
+    std::unique_ptr<clang::CompilerInstance> m_CI;
+    std::unique_ptr<cling::DeclCollector> consumer;
+    consumer.reset(new cling::DeclCollector());
+    m_CI.reset(CIFactory::createCI("\n", interp->getOptions(), llvmdir,
+                                   std::move(consumer), moduleExtensions));
+
+    llvm::Error Err = llvm::Error::success();
+    m_IncrParser = std::make_unique<IncrementalParser>(*this, std::move(m_CI),
+                                                   *TSCtx->getContext(), Err);
+    if (Err)
       return;
 
     // Load any requested plugins.
@@ -309,16 +322,17 @@ namespace cling {
        }
     }
 
-    llvm::SmallVector<IncrementalParser::ParseResultTransaction, 2>
-      IncrParserTransactions;
-    if (!m_IncrParser->Initialize(IncrParserTransactions, parentInterp)) {
-      // Initialization is not going well, but we still have to commit what
-      // we've been given. Don't clear the DiagnosticsConsumer so the caller
-      // can inspect any errors that have been generated.
-      for (auto&& I: IncrParserTransactions)
-        m_IncrParser->commitTransaction(I, false);
-      return;
-    }
+    InitPTUSize = m_IncrParser->getPTUs().size();
+    // llvm::SmallVector<IncrementalParser::ParseResultTransaction, 2>
+    //   IncrParserTransactions;
+    // if (!m_IncrParser->Initialize(IncrParserTransactions, parentInterp)) {
+    //   // Initialization is not going well, but we still have to commit what
+    //   // we've been given. Don't clear the DiagnosticsConsumer so the caller
+    //   // can inspect any errors that have been generated.
+    //   for (auto&& I: IncrParserTransactions)
+    //     m_IncrParser->commitTransaction(I, false);
+    //   return;
+    // }
 
     // When not using C++ modules, we now have a PCH and we can safely setup
     // our callbacks without fearing that they get overwritten by clang code.
@@ -330,11 +344,11 @@ namespace cling {
     llvm::SmallVector<llvm::StringRef, 6> Syms;
     Initialize(noRuntime || m_Opts.NoRuntime, isInSyntaxOnlyMode(), Syms);
 
-    // Commit the transactions, now that gCling is set up. It is needed for
-    // static initialization in these transactions through
-    // registerCxaAtExitHelper().
-    for (auto&& I: IncrParserTransactions)
-      m_IncrParser->commitTransaction(I);
+    // // Commit the transactions, now that gCling is set up. It is needed for
+    // // static initialization in these transactions through
+    // // registerCxaAtExitHelper().
+    // for (auto&& I: IncrParserTransactions)
+    //   m_IncrParser->commitTransaction(I);
 
     // Now that the transactions have been commited, force symbol emission
     // and overrides.
@@ -354,7 +368,7 @@ namespace cling {
       }
     }
 
-    m_IncrParser->SetTransformers(parentInterp);
+    // m_IncrParser->SetTransformers(parentInterp);
 
     if (!TSCtx->getContext()) {
       // Never true, but don't tell the compiler.
@@ -395,8 +409,8 @@ namespace cling {
       m_Executor->registerExternalIncrementalExecutor(
           *parentInterpreter.m_Executor);
 
-      if (auto C = parentInterpreter.m_IncrParser->getDiagnosticConsumer())
-        m_IncrParser->setDiagnosticConsumer(C, /*Own=*/false);
+      // if (auto C = parentInterpreter.m_IncrParser->getDiagnosticConsumer())
+      //   m_IncrParser->setDiagnosticConsumer(C, /*Own=*/false);
     }
   }
 
@@ -711,14 +725,14 @@ namespace cling {
       getSema().getASTContext().PrintStats();
     else if (what.equals("decl"))
       ClangInternalState::printLookupTables(where, getSema().getASTContext());
-    else if (what.equals("undo"))
-      m_IncrParser->printTransactionStructure();
+    // else if (what.equals("undo"))
+    //   m_IncrParser->printTransactionStructure();
   }
 
   void Interpreter::storeInterpreterState(const std::string& name) const {
     // This may induce deserialization
     PushTransactionRAII RAII(this);
-    CodeGenerator* CG = m_IncrParser->getCodeGenerator();
+    CodeGenerator* CG = m_IncrParser->getCodeGen();
     ClangInternalState* state = new ClangInternalState(
         getCI()->getASTContext(), getCI()->getPreprocessor(),
         getLastTransaction()->getCompiledModule(), CG, name);
@@ -785,21 +799,21 @@ namespace cling {
     return getCI()->getDiagnostics();
   }
 
-  void Interpreter::replaceDiagnosticConsumer(clang::DiagnosticConsumer* Consumer,
-					      bool Own) {
-    m_IncrParser->setDiagnosticConsumer(Consumer, Own);
-  }
+  // void Interpreter::replaceDiagnosticConsumer(clang::DiagnosticConsumer* Consumer,
+	// 				      bool Own) {
+  //   m_IncrParser->setDiagnosticConsumer(Consumer, Own);
+  // }
 
-  bool Interpreter::hasReplacedDiagnosticConsumer() const {
-    return m_IncrParser->getDiagnosticConsumer() != nullptr;
-  }
+  // bool Interpreter::hasReplacedDiagnosticConsumer() const {
+  //   return m_IncrParser->getDiagnosticConsumer() != nullptr;
+  // }
 
   CompilationOptions Interpreter::makeDefaultCompilationOpts() const {
     CompilationOptions CO;
     CO.DeclarationExtraction = 0;
     CO.EnableShadowing = 0;
     CO.ValuePrinting = CompilationOptions::VPDisabled;
-    CO.CodeGeneration = m_IncrParser->hasCodeGenerator();
+    CO.CodeGeneration = (bool)m_IncrParser->getCodeGen();
     CO.DynamicScoping = isDynamicLookupEnabled();
     CO.Debug = isPrintingDebug();
     CO.IgnorePromptDiags = 0;
@@ -1000,7 +1014,7 @@ namespace cling {
 
     // This triggers the FileEntry to be created and the completion
     // point to be set in clang.
-    m_IncrParser->Compile(Src, CO);
+    m_IncrParser->Parse(Src);
 
     return kSuccess;
   }
@@ -1823,21 +1837,21 @@ namespace cling {
     std::string includeFile = std::string("#include \"") + inFile.str() + "\"";
     IncrementalParser::ParseResultTransaction PRT
       = fwdGen.m_IncrParser->Compile(includeFile, CO);
-    cling::Transaction* T = PRT.getPointer();
+    
+    auto PTU = fwdGen.m_IncrParser->Parse(includeFile);
 
-    // If this was already #included we will get a T == 0.
-    if (PRT.getInt() == IncrementalParser::kFailed || !T)
-      return;
+    if (!PTU)
+      return PTU.takeError();
 
-    std::error_code EC;
-    llvm::raw_fd_ostream out(outFile.data(), EC,
-                             llvm::sys::fs::OpenFlags::OF_None);
-    llvm::raw_fd_ostream log((outFile + ".skipped").str().c_str(),
-                             EC, llvm::sys::fs::OpenFlags::OF_None);
-    log << "Generated for :" << inFile << "\n";
-    forwardDeclare(*T, fwdGenPP, fwdGen.getCI()->getSema().getASTContext(),
-                   out, enableMacros,
-                   &log);
+    // std::error_code EC;
+    // llvm::raw_fd_ostream out(outFile.data(), EC,
+    //                          llvm::sys::fs::OpenFlags::OF_None);
+    // llvm::raw_fd_ostream log((outFile + ".skipped").str().c_str(),
+    //                          EC, llvm::sys::fs::OpenFlags::OF_None);
+    // log << "Generated for :" << inFile << "\n";
+    // forwardDeclare(*T, fwdGenPP, fwdGen.getCI()->getSema().getASTContext(),
+    //                out, enableMacros,
+    //                &log);
   }
 
   void Interpreter::forwardDeclare(Transaction& T, Preprocessor& P,

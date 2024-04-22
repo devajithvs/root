@@ -10,8 +10,6 @@
 #ifndef CLING_INCREMENTAL_EXECUTOR_H
 #define CLING_INCREMENTAL_EXECUTOR_H
 
-#include "IncrementalJIT.h"
-
 #include "BackendPasses.h"
 #include "EnterUserCodeRAII.h"
 
@@ -32,6 +30,23 @@
 #include <unordered_set>
 #include <vector>
 
+#include "llvm/ADT/FunctionExtras.h"
+#include "llvm/ADT/StringRef.h"
+#include "llvm/ADT/StringSet.h"
+#include "llvm/IR/Module.h"
+#include "llvm/ExecutionEngine/Orc/Core.h"
+#include "llvm/ExecutionEngine/Orc/ExecutorProcessControl.h"
+#include "llvm/ExecutionEngine/Orc/LLJIT.h"
+#include "llvm/ExecutionEngine/Orc/ThreadSafeModule.h"
+#include "llvm/Support/Error.h"
+#include "llvm/Target/TargetMachine.h"
+
+#include <atomic>
+#include <cstdint>
+#include <memory>
+#include <string>
+#include <utility>
+
 namespace clang {
   class DiagnosticsEngine;
   class CodeGenOptions;
@@ -49,15 +64,28 @@ namespace llvm {
 
 namespace cling {
   class DynamicLibraryManager;
-  class IncrementalJIT;
   class Value;
+  class Transaction;
+
+  class SharedAtomicFlag {
+  public:
+    SharedAtomicFlag(bool UnlockedState)
+        : Lock(std::make_shared<std::atomic<bool>>(UnlockedState)),
+          LockedState(!UnlockedState) {}
+
+    // FIXME: We don't lock recursively. Can we assert it?
+    void lock() { Lock->store(LockedState); }
+    void unlock() { Lock->store(!LockedState); }
+
+    operator bool() const { return Lock->load(); }
+
+  private:
+    std::shared_ptr<std::atomic<bool>> Lock;
+    const bool LockedState;
+  };
 
   class IncrementalExecutor {
   private:
-    ///\brief Our JIT interface.
-    ///
-    std::unique_ptr<IncrementalJIT> m_JIT;
-
     // optimizer etc passes
     std::unique_ptr<BackendPasses> m_BackendPasses;
 
@@ -132,6 +160,31 @@ namespace cling {
     ///
     DynamicLibraryManager m_DyLibManager;
 
+  std::unique_ptr<llvm::orc::LLJIT> Jit;
+  llvm::orc::SymbolMap m_InjectedSymbols;
+  SharedAtomicFlag SkipHostProcessLookup;
+  llvm::StringSet<> m_ForbidDlSymbols;
+  llvm::orc::ResourceTrackerSP m_CurrentRT;
+
+  /// FIXME: If the relation between modules and transactions is a bijection, the
+  /// mapping via module pointers here is unnecessary. The transaction should
+  /// store the resource tracker directly and pass it to `remove()` for
+  /// unloading.
+  std::map<const Transaction*, llvm::orc::ResourceTrackerSP> m_ResourceTrackers;
+  std::map<const llvm::Module *, llvm::orc::ThreadSafeModule> m_CompiledModules;
+
+  bool m_JITLink;
+  // FIXME: Move TargetMachine ownership to BackendPasses
+  std::unique_ptr<llvm::TargetMachine> m_TM;
+
+  // TODO: We only need the context for materialization. Instead of defining it
+  // here we might want to pass one in on a per-module basis.
+  //
+  // FIXME: Using a single context for all modules prevents concurrent
+  // compilation.
+  //
+  llvm::orc::ThreadSafeContext SingleThreadedContext;
+
   public:
     enum ExecutionResult {
       kExeSuccess,
@@ -161,13 +214,9 @@ namespace cling {
       return m_DyLibManager;
     }
 
-    /// Register a DefinitionGenerator to dynamically provide symbols for
-    /// generated code that are not already available within the process.
-    void addGenerator(std::unique_ptr<llvm::orc::DefinitionGenerator> G);
-
     ///\brief Unload a set of JIT symbols.
-    llvm::Error unloadModule(const Transaction& T) const {
-      return m_JIT->removeModule(T);
+    llvm::Error unloadModule(const Transaction& T) {
+      return removeModule(T);
     }
 
     ///\brief Run the static initializers of all modules collected to far.
@@ -189,7 +238,7 @@ namespace cling {
     ///
     /// @param[in] Name - The name of the symbol as known by the IR.
     /// @param[in] Address - The function pointer to register
-    void replaceSymbol(const char* Name, void* Address) const;
+    void replaceSymbol(const char* Name, void* Address);
 
     ///\brief Tells the execution to run all registered atexit functions once.
     ///
@@ -232,12 +281,12 @@ namespace cling {
     ///
     /// @param[in] module - The module to pass to the execution engine.
     /// @param[in] optLevel - The optimization level to be used.
-    void emitModule(Transaction &T) const {
+    void emitModule(Transaction &T) {
       if (m_BackendPasses)
         m_BackendPasses->runOnModule(*T.getModule(),
                                      T.getCompilationOpts().OptLevel);
 
-      m_JIT->addModule(T);
+      addModule(T);
     }
 
     ///\brief Report and empty m_unresolvedSymbols.
@@ -246,9 +295,48 @@ namespace cling {
                                llvm::StringRef title = llvm::StringRef()) const;
 
   public:
+    /// Register a DefinitionGenerator to dynamically provide symbols for
+    /// generated code that are not already available within the process.
+    void addGenerator(std::unique_ptr<llvm::orc::DefinitionGenerator> G) {
+      Jit->getMainJITDylib().addGenerator(std::move(G));
+    }
+
     ///\brief Remember that the symbol could not be resolved by the JIT.
     void* HandleMissingFunction(const std::string& symbol) const;
 
+    /// Return a `DefinitionGenerator` that can provide addresses for symbols
+    /// reachable from this IncrementalExecutor object.  This function can be used in
+    /// conjunction with `addGenerator()` to provide symbol resolution across
+    /// diferent IncrementalExecutor instances.
+    std::unique_ptr<llvm::orc::DefinitionGenerator> getGenerator();
+
+      // FIXME: Accept a LLVMContext as well, e.g. the one that was used for the
+    // particular module in Interpreter, CIFactory or BackendPasses (would be
+    // more efficient)
+    void addModule(Transaction& T);
+  llvm::Error removeModule(const Transaction& T);
+
+  /// Get the address of a symbol based on its IR name (as coming from clang's
+  /// mangler). The IncludeHostSymbols parameter controls whether the lookup
+  /// should include symbols from the host process (via dlsym) or not.
+  void* getSymbolAddress(llvm::StringRef Name, bool IncludeHostSymbols) const;
+
+  /// @brief Check whether the JIT already has emitted or knows how to emit
+  /// a symbol based on its IR name (as coming from clang's mangler).
+  bool doesSymbolAlreadyExist(llvm::StringRef UnmangledName);
+
+  /// Inject a symbol with a known address. Name is not linker mangled, i.e.
+  /// as known by the IR.
+  llvm::JITTargetAddress addOrReplaceDefinition(llvm::StringRef Name,
+                                                llvm::JITTargetAddress KnownAddr);
+
+  llvm::Error runCtors() const {
+    return Jit->initialize(Jit->getMainJITDylib());
+  }
+
+  /// @brief Get the TargetMachine used by the JIT.
+  /// Non-const because BackendPasses need to update OptLevel.
+  llvm::TargetMachine &getTargetMachine() { return *m_TM; }
   private:
     ///\brief Runs an initializer function.
     ExecutionResult executeInit(llvm::StringRef function) const {
@@ -264,7 +352,7 @@ namespace cling {
 
     template <class T>
     ExecutionResult jitInitOrWrapper(llvm::StringRef funcname, T& fun) const {
-      void* fun_ptr = m_JIT->getSymbolAddress(funcname, false /*dlsym*/);
+      void* fun_ptr = getSymbolAddress(funcname, false /*dlsym*/);
 
       // check if there is any unresolved symbol in the list
       if (diagnoseUnresolvedSymbols(funcname, "function") || !fun_ptr)

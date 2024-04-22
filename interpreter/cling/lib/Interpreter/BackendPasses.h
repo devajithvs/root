@@ -23,6 +23,10 @@ namespace llvm {
   class LLVMContext;
   class Module;
   class TargetMachine;
+  namespace orc {
+    class LLJIT;
+    class ThreadSafeModule;
+  } // namespace orc
 }
 
 namespace clang {
@@ -32,14 +36,14 @@ namespace clang {
 }
 
 namespace cling {
-  class IncrementalJIT;
-
   ///\brief Runs passes on IR. Remove once we can migrate from ModuleBuilder to
   /// what's in clang's CodeGen/BackendUtil.
   class BackendPasses {
     llvm::TargetMachine& m_TM;
-    IncrementalJIT &m_JIT;
+    llvm::orc::LLJIT& m_JIT;
     const clang::CodeGenOptions &m_CGOpts;
+    std::map<const llvm::Module*, llvm::orc::ThreadSafeModule>&
+        m_CompiledModules;
 
     void CreatePasses(int OptLevel, llvm::ModulePassManager& MPM,
                       llvm::LoopAnalysisManager& LAM,
@@ -50,12 +54,14 @@ namespace cling {
                       llvm::StandardInstrumentations& SI);
 
   public:
-    BackendPasses(const clang::CodeGenOptions &CGOpts, IncrementalJIT &JIT,
+    BackendPasses(const clang::CodeGenOptions& CGOpts, llvm::orc::LLJIT& JIT,
+                  std::map<const llvm::Module*, llvm::orc::ThreadSafeModule>&
+                      CompiledModules,
                   llvm::TargetMachine& TM);
     ~BackendPasses();
 
     void runOnModule(llvm::Module& M, int OptLevel);
   };
-}
+} // namespace cling
 
 #endif // CLING_BACKENDPASSES_H

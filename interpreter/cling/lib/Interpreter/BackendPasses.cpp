@@ -9,7 +9,7 @@
 
 #include "BackendPasses.h"
 
-#include "IncrementalExecutor.h"
+#include "IncrementalJIT.h"
 
 #include "cling/Utils/Platform.h"
 
@@ -237,9 +237,7 @@ namespace {
   // declarations. This reduces the amount of emitted symbols.
   class ReuseExistingWeakSymbols
       : public PassInfoMixin<ReuseExistingWeakSymbols> {
-    llvm::orc::LLJIT& m_JIT;
-    std::map<const llvm::Module*, llvm::orc::ThreadSafeModule>&
-        m_CompiledModules;
+    cling::IncrementalJIT &m_JIT;
 
     bool shouldRemoveGlobalDefinition(GlobalValue& GV) {
       // Existing *weak* symbols can be re-used thanks to ODR.
@@ -248,11 +246,8 @@ namespace {
         return false;
 
       // Find the symbol as existing, previously compiled symbol in the JIT...
-      auto MangledName = m_JIT.mangle(GV.getName());
-      for (auto&& M : m_CompiledModules) {
-        if (M.first->getNamedValue(MangledName))
-          return true;
-      }
+      if (m_JIT.doesSymbolAlreadyExist(GV.getName()))
+        return true;
 
       // ...or in shared libraries (without auto-loading).
       std::string Name = GV.getName().str();
@@ -298,11 +293,7 @@ namespace {
     }
 
   public:
-    ReuseExistingWeakSymbols(
-        llvm::orc::LLJIT& JIT,
-        std::map<const llvm::Module*, llvm::orc::ThreadSafeModule>&
-            CompiledModules)
-        : m_JIT(JIT), m_CompiledModules(CompiledModules) {}
+    ReuseExistingWeakSymbols(IncrementalJIT& JIT) : m_JIT(JIT) {}
 
     PreservedAnalyses run(llvm::Module& M, ModuleAnalysisManager& AM) {
       bool changed = false;
@@ -340,12 +331,13 @@ static OptimizationLevel mapToLevel(const CodeGenOptions& Opts) {
   }
 }
 
-BackendPasses::BackendPasses(
-    const clang::CodeGenOptions& CGOpts, llvm::orc::LLJIT& JIT,
-    std::map<const llvm::Module*, llvm::orc::ThreadSafeModule>& CompiledModules,
-    llvm::TargetMachine& TM)
-    : m_TM(TM), m_JIT(JIT), m_CGOpts(CGOpts),
-      m_CompiledModules(CompiledModules) {}
+BackendPasses::BackendPasses(const clang::CodeGenOptions &CGOpts,
+                             IncrementalJIT &JIT, llvm::TargetMachine& TM):
+   m_TM(TM),
+   m_JIT(JIT),
+   m_CGOpts(CGOpts)
+{}
+
 
 BackendPasses::~BackendPasses() {
   //delete m_PMBuilder->Inliner;
@@ -362,7 +354,7 @@ void BackendPasses::CreatePasses(int OptLevel, llvm::ModulePassManager& MPM,
   MPM.addPass(KeepLocalGVPass());
   MPM.addPass(PreventLocalOptPass());
   MPM.addPass(WeakTypeinfoVTablePass());
-  MPM.addPass(ReuseExistingWeakSymbols(m_JIT, m_CompiledModules));
+  MPM.addPass(ReuseExistingWeakSymbols(m_JIT));
 
   // Run verifier after local passes to make sure that IR remains untouched.
   if (m_CGOpts.VerifyModule)
@@ -442,7 +434,7 @@ void BackendPasses::CreatePasses(int OptLevel, llvm::ModulePassManager& MPM,
   PB.crossRegisterProxies(LAM, FAM, CGAM, MAM);
 }
 
-void BackendPasses::runOnModule(llvm::Module& M, int OptLevel) {
+void BackendPasses::runOnModule(Module& M, int OptLevel) {
 
   if (OptLevel < 0)
     OptLevel = 0;

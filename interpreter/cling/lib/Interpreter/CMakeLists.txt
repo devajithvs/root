@@ -81,6 +81,7 @@ add_cling_library(clingInterpreter OBJECT
   ForwardDeclPrinter.cpp
   IncrementalCUDADeviceCompiler.cpp
   IncrementalExecutor.cpp
+  IncrementalJIT.cpp
   IncrementalParser.cpp
   Interpreter.cpp
   InterpreterCallbacks.cpp

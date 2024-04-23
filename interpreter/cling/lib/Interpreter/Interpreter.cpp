@@ -992,8 +992,7 @@ namespace cling {
 
     std::string wrapped = input;
     size_t wrapPos = utils::getWrapPoint(wrapped, getCI()->getLangOpts());
-    // const std::string& Src = WrapInput(wrapped, wrapped, wrapPos);
-    const std::string& Src = wrapped;
+    const std::string& Src = WrapInput(wrapped, wrapped, wrapPos);
 
     CO.CodeCompletionOffset = offset + wrapPos;
 
@@ -1404,8 +1403,7 @@ namespace cling {
 
     // Wrap the expression
     std::string WrapperBuffer;
-    // const std::string& Wrapper = WrapInput(input, WrapperBuffer, wrapPoint);
-    const std::string& Wrapper = input;
+    const std::string& Wrapper = WrapInput(input, WrapperBuffer, wrapPoint);
 
     // We have wrapped and need to disable warnings that are caused by
     // non-default C++ at the prompt:

@@ -873,7 +873,7 @@ namespace cling {
     PP.enableIncrementalProcessing();
 
     smallstream source_name;
-    source_name << "input_line_" << InputCount++;
+    source_name << "input_line_" << (m_MemoryBuffers.size() + 1);
 
     // Create an uninitialized memory buffer, copy code in and append "\n"
     size_t InputSize = input.size(); // don't include trailing 0
@@ -887,133 +887,105 @@ namespace cling {
 
     SourceManager& SM = getCI()->getSourceManager();
 
-    // FIXME: Create SourceLocation, which will allow clang to order the
-    // overload candidates for example
-    SourceLocation NewLoc = SM.getLocForStartOfFile(SM.getMainFileID());
+    // Create SourceLocation, which will allow clang to order the overload
+    // candidates for example
+    SourceLocation NewLoc = getNextAvailableUniqueSourceLoc();
+
+    llvm::MemoryBuffer* MBNonOwn = MB.get();
 
     // Create FileID for the current buffer.
-    FileID FID = SM.createFileID(std::move(MB), SrcMgr::C_User, /*LoadedID=*/0,
-                                 /*LoadedOffset=*/0, NewLoc);
+    FileID FID;
+    // Create FileEntry and FileID for the current buffer.
+    // Enabling the completion point only works on FileEntries.
+    const clang::FileEntry* FE
+      = SM.getFileManager().getVirtualFile(source_name.str(), InputSize,
+                                           0 /* mod time*/);
+    SM.overrideFileContents(FE, std::move(MB));
+    FID = SM.createFileID(FE, NewLoc, SrcMgr::C_User);
+    if (CO.CodeCompletionOffset != -1) {
+      // The completion point is set one a 1-based line/column numbering.
+      // It relies on the implementation to account for the wrapper extra line.
+      PP.SetCodeCompletionPoint(FE, 1/* start point 1-based line*/,
+                                CO.CodeCompletionOffset+1/* 1-based column*/);
+    }
+
+    m_MemoryBuffers.push_back(std::make_pair(MBNonOwn, FID));
 
     // NewLoc only used for diags.
-    if (PP.EnterSourceFile(FID, /*DirLookup=*/nullptr, NewLoc))
-      return kFailed;
-
-    // Don't worry about this for now.
-    // // Create FileEntry and FileID for the current buffer.
-    // // Enabling the completion point only works on FileEntries.
-    // SM.overrideFileContents(FE, std::move(MB));
-    // if (CO.CodeCompletionOffset != -1) {
-    //   // The completion point is set one a 1-based line/column numbering.
-    //   // It relies on the implementation to account for the wrapper extra
-    //   line. PP.SetCodeCompletionPoint(FE, 1/* start point 1-based line*/,
-    //                             CO.CodeCompletionOffset+1/* 1-based
-    //                             column*/);
-    // }
-
+    PP.EnterSourceFile(FID, /*DirLookup*/nullptr, NewLoc);
     m_Consumer->getTransaction()->setBufferFID(FID);
 
-    if (!ParseOrWrapTopLevelDecl())
-      return kFailed;
+    DiagnosticsEngine& Diags = getCI()->getDiagnostics();
 
-    if (PP.getLangOpts().DelayedTemplateParsing) {
-      // Microsoft-specific:
-      // Late parsed templates can leave unswallowed "macro"-like tokens.
-      // They will seriously confuse the Parser when entering the next
-      // source file. So lex until we are EOF.
-      Token Tok;
-      do {
-        PP.Lex(Tok);
-      } while (Tok.isNot(tok::eof));
-    }
+    FilteringDiagConsumer::RAAI RAAITmp(*m_DiagConsumer, CO.IgnorePromptDiags);
 
-    Token AssertTok;
-    PP.Lex(AssertTok);
-    assert(AssertTok.is(tok::eof) &&
-           "Lexer must be EOF when starting incremental parse!");
-
-    // if (CodeGenerator *CG = getCodeGen(Act.get())) {
-    //   std::unique_ptr<llvm::Module> M(CG->ReleaseModule());
-    //   CG->StartModule("incr_module_" + std::to_string(PTUs.size()),
-    //                   M->getContext());
-
-    //   PTU->TheModule = std::move(M);
-    // }
-
-    return kSuccess;
-  }
-
-  llvm::Expected<bool> IncrementalParser::ParseOrWrapTopLevelDecl() {
-    // Recover resources if we crash before exiting this method.
-    Sema& S = getCI()->getSema();
-    llvm::CrashRecoveryContextCleanupRegistrar<Sema> CleanupSema(&S);
-    Sema::GlobalEagerInstantiationScope GlobalInstantiations(S,
-                                                             /*Enabled=*/true);
+    DiagnosticErrorTrap Trap(Diags);
+    // FIXME: SavePendingInstantiationsRAII should be obsolvete as
+    // GlobalEagerInstantiationScope and LocalEagerInstantiationScope do the
+    // same thing.
+    Sema::SavePendingInstantiationsRAII SavedPendingInstantiations(S);
+    Sema::GlobalEagerInstantiationScope GlobalInstantiations(S, /*Enabled=*/true);
     Sema::LocalEagerInstantiationScope LocalInstantiations(S);
 
-    // Add a new PTU.
-    ASTContext& C = S.getASTContext();
-    C.addTranslationUnitDecl();
-
-    // Skip previous eof due to last incremental input.
-    if (m_Parser->getCurToken().is(tok::eof)) {
-      m_Parser->ConsumeToken();
-      // FIXME: Clang does not call ExitScope on finalizing the regular TU, we
-      // might want to do that around HandleEndOfTranslationUnit.
-      m_Parser->ExitScope();
-      S.CurContext = nullptr;
-      // Start a new PTU.
-      m_Parser->EnterScope(Scope::DeclScope);
-      S.ActOnTranslationUnitScope(m_Parser->getCurScope());
-    }
-
     Parser::DeclGroupPtrTy ADecl;
-    Sema::ModuleImportState ImportState;
-    for (bool AtEOF = m_Parser->ParseFirstTopLevelDecl(ADecl, ImportState);
-         !AtEOF; AtEOF = m_Parser->ParseTopLevelDecl(ADecl, ImportState)) {
-      if (ADecl && !m_Consumer->HandleTopLevelDecl(ADecl.get()))
-        return llvm::make_error<llvm::StringError>(
-            "Parsing failed. "
-            "The consumer rejected a decl",
-            std::error_code());
-    }
-
-    DiagnosticsEngine& Diags = getCI()->getDiagnostics();
-    if (Diags.hasErrorOccurred()) {
+    Sema::ModuleImportState IS = Sema::ModuleImportState::NotACXX20Module;
+    while (!m_Parser->ParseTopLevelDecl(ADecl, IS)) {
+      // If we got a null return and something *was* parsed, ignore it.  This
+      // is due to a top-level semicolon, an action override, or a parse error
+      // skipping something.
+      if (Trap.hasErrorOccurred())
+        m_Consumer->getTransaction()->setIssuedDiags(Transaction::kErrors);
+      if (ADecl)
+        m_Consumer->HandleTopLevelDecl(ADecl.get());
+    };
+    // If never entered the while block, there's a chance an error occured
+    if (Trap.hasErrorOccurred())
       m_Consumer->getTransaction()->setIssuedDiags(Transaction::kErrors);
 
-      Diags.Reset(/*soft=*/true);
-      Diags.getClient()->clear();
-      return llvm::make_error<llvm::StringError>("Parsing failed.",
-                                                 std::error_code());
+    if (CO.CodeCompletionOffset != -1) {
+      assert((int)SM.getFileOffset(PP.getCodeCompletionLoc())
+             == CO.CodeCompletionOffset
+             && "Completion point wrongly set!");
+      assert(PP.isCodeCompletionReached()
+             && "Code completion set but not reached!");
+
+      // Let's ignore this transaction:
+      m_Consumer->getTransaction()->setIssuedDiags(Transaction::kErrors);
+
+      return kSuccess;
     }
-
-    // // TODO: Handle later
-    // if (CO.CodeCompletionOffset != -1) {
-    //   assert((int)SM.getFileOffset(PP.getCodeCompletionLoc())
-    //           == CO.CodeCompletionOffset
-    //           && "Completion point wrongly set!");
-    //   assert(PP.isCodeCompletionReached()
-    //           && "Code completion set but not reached!");
-
-    //   // Let's ignore this transaction:
-    //   m_Consumer->getTransaction()->setIssuedDiags(Transaction::kErrors);
-
-    //   return kSuccess;
-    // }
-
-    // Process any TopLevelDecls generated by #pragma weak.
-    for (Decl* D : S.WeakTopLevelDecls()) {
-      DeclGroupRef DGR(D);
-      m_Consumer->HandleTopLevelDecl(DGR);
-    }
-
     LocalInstantiations.perform();
     GlobalInstantiations.perform();
+#ifdef _WIN32
+    // Microsoft-specific:
+    // Late parsed templates can leave unswallowed "macro"-like tokens.
+    // They will seriously confuse the Parser when entering the next
+    // source file. So lex until we are EOF.
+    Token Tok;
+    Tok.setKind(tok::eof);
+    do {
+      PP.Lex(Tok);
+    } while (Tok.isNot(tok::eof));
+#endif
 
-    m_Consumer->HandleTranslationUnit(C);
+#ifndef NDEBUG
+    Token AssertTok;
+    PP.Lex(AssertTok);
+    assert(AssertTok.is(tok::eof) && "Lexer must be EOF when starting incremental parse!");
+#endif
 
-    return true;
+    // Process any TopLevelDecls generated by #pragma weak.
+    for (llvm::SmallVector<Decl*,2>::iterator I = S.WeakTopLevelDecls().begin(),
+         E = S.WeakTopLevelDecls().end(); I != E; ++I) {
+      m_Consumer->HandleTopLevelDecl(DeclGroupRef(*I));
+    }
+
+    if (m_Consumer->getTransaction()->getIssuedDiags() == Transaction::kErrors)
+      return kFailed;
+    else if (Diags.getNumWarnings())
+      return kSuccessWithWarnings;
+
+    return kSuccess;
   }
 
   void IncrementalParser::printTransactionStructure() const {

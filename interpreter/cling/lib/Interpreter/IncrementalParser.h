@@ -64,8 +64,8 @@ namespace cling {
     // parser (incremental)
     std::unique_ptr<clang::Parser> m_Parser;
 
-    /// Counts the number of direct user input lines that have been parsed.
-    unsigned InputCount = 0;
+    // One buffer for each command line, owner by the source file manager
+    std::deque<std::pair<llvm::MemoryBuffer*, clang::FileID>> m_MemoryBuffers;
 
     // file ID of the memory buffer
     clang::FileID m_VirtualFileID;
@@ -252,8 +252,6 @@ namespace cling {
     ///\param[in] input - The incremental input that needs to be parsed.
     ///
     EParseResult ParseInternal(llvm::StringRef input);
-
-    llvm::Expected<bool> ParseOrWrapTopLevelDecl();
 
     ///\brief Create a unique name for the next llvm::Module
     ///

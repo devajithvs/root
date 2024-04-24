@@ -873,7 +873,8 @@ namespace cling {
     PP.enableIncrementalProcessing();
 
     smallstream source_name;
-    source_name << "input_line_" << InputCount++;
+    // FIXME: Pre-increment to avoid failing tests.
+    source_name << "input_line_" << ++InputCount;
 
     // Create an uninitialized memory buffer, copy code in and append "\n"
     size_t InputSize = input.size(); // don't include trailing 0

@@ -872,7 +872,7 @@ std::string JitBuildAction(const ColumnNames_t &cols, std::shared_ptr<RDFDetail:
    }
    createAction_str << "}, " << cols.size() << ", " << nSlots << ", reinterpret_cast<shared_ptr<" << helperArgTypeName
                     << ">*>(" << PrettyPrintAddr(helperArgOnHeap)
-                    << "), reinterpret_cast<std::shared_ptr<ROOT::Internal::RDF::RJittedAction>*>("
+                    << "), reinterpret_cast<std::weak_ptr<ROOT::Internal::RDF::RJittedAction>*>("
                     << PrettyPrintAddr(jittedActionOnHeap)
                     << "), reinterpret_cast<ROOT::Internal::RDF::RColumnRegister*>(" << definesAddr << "));";
    return createAction_str.str();

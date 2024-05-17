@@ -581,7 +581,7 @@ void JitVariationHelper(F &&f, const char **colsPtr, std::size_t colsSize, const
 template <typename ActionTag, typename... ColTypes, typename PrevNodeType, typename HelperArgType>
 void CallBuildAction(std::shared_ptr<PrevNodeType> *prevNodeOnHeap, const char **colsPtr, std::size_t colsSize,
                      const unsigned int nSlots, std::shared_ptr<HelperArgType> *helperArgOnHeap,
-                     std::weak_ptr<RJittedAction> *wkJittedActionOnHeap, RColumnRegister *colRegister) noexcept
+                     std::shared_ptr<RJittedAction> *wkJittedActionOnHeap, RColumnRegister *colRegister) noexcept
 {
    // a helper to delete objects allocated before jitting, so that the jitter can share data with lazily jitted code
    auto doDeletes = [&] {

@@ -581,19 +581,20 @@ void JitVariationHelper(F &&f, const char **colsPtr, std::size_t colsSize, const
 template <typename ActionTag, typename... ColTypes, typename PrevNodeType, typename HelperArgType>
 void CallBuildAction(std::shared_ptr<PrevNodeType> *prevNodeOnHeap, const char **colsPtr, std::size_t colsSize,
                      const unsigned int nSlots, std::shared_ptr<HelperArgType> *helperArgOnHeap,
-                     std::shared_ptr<RJittedAction> *jittedActionOnHeap, RColumnRegister *colRegister) noexcept
+                     std::weak_ptr<RJittedAction> *wkJittedActionOnHeap, RColumnRegister *colRegister) noexcept
 {
    // a helper to delete objects allocated before jitting, so that the jitter can share data with lazily jitted code
    auto doDeletes = [&] {
       delete[] colsPtr;
       delete helperArgOnHeap;
+      delete wkJittedActionOnHeap;
       // colRegister must be deleted before prevNodeOnHeap because their dtor needs the RLoopManager to be alive
       // and prevNodeOnHeap is what keeps it alive if the rest of the computation graph is already out of scope
       delete colRegister;
       delete prevNodeOnHeap;
    };
 
-   if (!*jittedActionOnHeap) {
+   if (wkJittedActionOnHeap->expired()) {
       // The branch of the computation graph that needed this jitted variation went out of scope between the type
       // jitting was booked and the time jitting actually happened. Nothing to do other than cleaning up.
       doDeletes();
@@ -601,6 +602,8 @@ void CallBuildAction(std::shared_ptr<PrevNodeType> *prevNodeOnHeap, const char *
    }
 
    const ColumnNames_t cols(colsPtr, colsPtr + colsSize);
+
+   auto jittedActionOnHeap = wkJittedActionOnHeap->lock();
 
    // if we are here it means we are jitting, if we are jitting the loop manager must be alive
    auto &prevNodePtr = *prevNodeOnHeap;
@@ -613,7 +616,7 @@ void CallBuildAction(std::shared_ptr<PrevNodeType> *prevNodeOnHeap, const char *
 
    auto actionPtr = BuildAction<ColTypes...>(cols, std::move(*helperArgOnHeap), nSlots, std::move(prevNodePtr),
                                              ActionTag{}, *colRegister);
-   (*jittedActionOnHeap)->SetAction(std::move(actionPtr));
+   jittedActionOnHeap->SetAction(std::move(actionPtr));
 
    doDeletes();
 }

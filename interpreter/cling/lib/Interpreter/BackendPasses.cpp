@@ -459,4 +459,5 @@ void BackendPasses::runOnModule(Module& M, int OptLevel) {
 
   // Now that we have all of the passes ready, run them.
   MPM.run(M, MAM);
+  M.dump();
 }

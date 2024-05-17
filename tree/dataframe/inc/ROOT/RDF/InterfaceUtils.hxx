@@ -585,38 +585,38 @@ void CallBuildAction(std::shared_ptr<PrevNodeType> *prevNodeOnHeap, const char *
 {
    // a helper to delete objects allocated before jitting, so that the jitter can share data with lazily jitted code
    auto doDeletes = [&] {
-      delete[] colsPtr;
-      delete helperArgOnHeap;
+      // delete[] colsPtr;
+      // delete helperArgOnHeap;
       delete wkJittedActionOnHeap;
-      // colRegister must be deleted before prevNodeOnHeap because their dtor needs the RLoopManager to be alive
-      // and prevNodeOnHeap is what keeps it alive if the rest of the computation graph is already out of scope
-      delete colRegister;
-      delete prevNodeOnHeap;
+      // // colRegister must be deleted before prevNodeOnHeap because their dtor needs the RLoopManager to be alive
+      // // and prevNodeOnHeap is what keeps it alive if the rest of the computation graph is already out of scope
+      // delete colRegister;
+      // delete prevNodeOnHeap;
    };
 
-   if (wkJittedActionOnHeap->expired()) {
-      // The branch of the computation graph that needed this jitted variation went out of scope between the type
-      // jitting was booked and the time jitting actually happened. Nothing to do other than cleaning up.
-      doDeletes();
-      return;
-   }
+   // if (wkJittedActionOnHeap->expired()) {
+   //    // The branch of the computation graph that needed this jitted variation went out of scope between the type
+   //    // jitting was booked and the time jitting actually happened. Nothing to do other than cleaning up.
+   //    doDeletes();
+   //    return;
+   // }
 
-   const ColumnNames_t cols(colsPtr, colsPtr + colsSize);
+   // const ColumnNames_t cols(colsPtr, colsPtr + colsSize);
 
-   auto jittedActionOnHeap = wkJittedActionOnHeap->lock();
+   // auto jittedActionOnHeap = wkJittedActionOnHeap->lock();
 
-   // if we are here it means we are jitting, if we are jitting the loop manager must be alive
-   auto &prevNodePtr = *prevNodeOnHeap;
-   auto &loopManager = *prevNodePtr->GetLoopManagerUnchecked();
-   using ColTypes_t = TypeList<ColTypes...>;
-   constexpr auto nColumns = ColTypes_t::list_size;
-   auto ds = loopManager.GetDataSource();
-   if (ds != nullptr)
-      AddDSColumns(cols, loopManager, *ds, ColTypes_t(), *colRegister);
+   // // if we are here it means we are jitting, if we are jitting the loop manager must be alive
+   // auto &prevNodePtr = *prevNodeOnHeap;
+   // auto &loopManager = *prevNodePtr->GetLoopManagerUnchecked();
+   // using ColTypes_t = TypeList<ColTypes...>;
+   // constexpr auto nColumns = ColTypes_t::list_size;
+   // auto ds = loopManager.GetDataSource();
+   // if (ds != nullptr)
+   //    AddDSColumns(cols, loopManager, *ds, ColTypes_t(), *colRegister);
 
-   auto actionPtr = BuildAction<ColTypes...>(cols, std::move(*helperArgOnHeap), nSlots, std::move(prevNodePtr),
-                                             ActionTag{}, *colRegister);
-   jittedActionOnHeap->SetAction(std::move(actionPtr));
+   // auto actionPtr = BuildAction<ColTypes...>(cols, std::move(*helperArgOnHeap), nSlots, std::move(prevNodePtr),
+   //                                           ActionTag{}, *colRegister);
+   // jittedActionOnHeap->SetAction(std::move(actionPtr));
 
    doDeletes();
 }

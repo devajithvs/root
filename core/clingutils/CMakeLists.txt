@@ -119,9 +119,43 @@ if (runtime_cxxmodules)
   set(custom_modulemaps ${custom_modulemaps} vc.modulemap)
 
   # We need to override the default modulemap because instead of producing a
-  # single std.pcm, produces hundreds of pcms. This changed with sdk 15.3.
-  if (CMAKE_SYSTEM_NAME MATCHES Darwin AND CMAKE_CXX_COMPILER_VERSION VERSION_GREATER_EQUAL 15.0.0.15000309)
-    set(custom_modulemaps ${custom_modulemaps} std_darwin.modulemap)
+  # single std.pcm, produces hundreds of pcms. This changed with MacOSX14.4.sdk
+  # To support macOS 13 with LLVM 18, we need to patch the modulemap from
+  # MacOSX14.2.sdk
+  if (APPLE)
+    set(MAC_SDK_PATH "/Library/Developer/CommandLineTools/SDKs/MacOSX.sdk/usr/include/c++/v1")
+    set(MODULEMAP_PATH "${MAC_SDK_PATH}/module.modulemap")
+    set(DEST_MODULEMAP_PATH "${CMAKE_BINARY_DIR}/etc/cling/std_darwin.modulemap")
+    if (EXISTS "${MODULEMAP_PATH}")
+      file(READ "${MODULEMAP_PATH}" MODULEMAP_CONTENTS)
+
+      if (CMAKE_CXX_COMPILER_VERSION VERSION_LESS 15.0.0.15000309)
+        # Just copy the file to the build directory
+        configure_file(${MODULEMAP_PATH} ${DEST_MODULEMAP_PATH} COPYONLY)
+      else()
+        # Put the contents inside "module std [system] { export * }"
+        file(WRITE "${DEST_MODULEMAP_PATH}" "module std \[system\] \{\n")
+        file(APPEND "${DEST_MODULEMAP_PATH}" "export *\n")
+        file(APPEND "${DEST_MODULEMAP_PATH}" "// Content from modulemap\n")
+        file(APPEND "${DEST_MODULEMAP_PATH}" "${MODULEMAP_CONTENTS}")
+        file(APPEND "${DEST_MODULEMAP_PATH}" "\}\n")
+      endif()
+
+      # Make sure the generated file is available to the rest of the build
+      add_custom_command(
+        OUTPUT ${DEST_MODULEMAP_PATH}
+        COMMAND ${CMAKE_COMMAND} -E make_directory "../../builddir/generated"
+        COMMAND ${CMAKE_COMMAND} -E touch ${DEST_MODULEMAP_PATH}
+        DEPENDS ${MODULEMAP_PATH}
+        COMMENT "Generating modulemap file at ${DEST_MODULEMAP_PATH}"
+      )
+
+      # Add the modulemap to the list of files to be copied
+      list(APPEND copy_commands COMMAND ${CMAKE_COMMAND} -E copy ${DEST_MODULEMAP_PATH} ${CMAKE_BINARY_DIR}/etc/cling/module.modulemap)
+      list(APPEND files_to_copy ${DEST_MODULEMAP_PATH})
+    else()
+      message(FATAL_ERROR "Modulemap file not found in the expected SDK path.")
+    endif()
   endif()
 
   if (NOT libcxx)

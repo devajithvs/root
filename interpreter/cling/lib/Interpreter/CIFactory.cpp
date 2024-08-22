@@ -669,11 +669,6 @@ namespace {
         llvm::SmallString<512> libcModuleMap(cIncLoc);
         llvm::sys::path::append(libcModuleMap, "module.modulemap");
         ModuleMapFiles.push_back(libcModuleMap.str().str());
-        if (CI.getTarget().getSDKVersion() < VersionTuple(14, 4)) {
-          llvm::SmallString<512> stdModuleMap(stdIncLoc);
-          llvm::sys::path::append(stdModuleMap, "module.modulemap");
-          ModuleMapFiles.push_back(stdModuleMap.str().str());
-        }
       }
     }
 
@@ -697,11 +692,14 @@ namespace {
                             /*RegisterModuleMap=*/ true,
                             /*AllowModulemapOverride=*/ false);
 #elif __APPLE__
-    if (Triple.isMacOSX() && CI.getTarget().getSDKVersion() >= VersionTuple(14, 4))
-      maybeAppendOverlayEntry(stdIncLoc.str(), "std_darwin.modulemap",
+    if (Triple.isMacOSX()) {
+      llvm::SmallString<512> MacSDKPath(
+          "/Users/sftnight/dvalapar/root/builddir/etc/cling");
+      maybeAppendOverlayEntry(MacSDKPath.str().str(), "std_darwin.modulemap",
                               clingIncLoc.str().str(), MOverlay,
-                              /*RegisterModuleMap=*/ true,
-                              /*AllowModulemapOverride=*/ false);
+                              /*RegisterModuleMap=*/true,
+                              /*AllowModulemapOverride=*/false);
+    }
 #else
     maybeAppendOverlayEntry(cIncLoc.str(), "libc.modulemap",
                             clingIncLoc.str().str(), MOverlay,

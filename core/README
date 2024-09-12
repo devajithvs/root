@@ -20,7 +20,6 @@ libCore does a dlopen of libCling and contains:
   - base
   - cont
   - meta
-  - textinput
 and depending on the platform
   - macosx
   - unix

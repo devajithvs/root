@@ -8,25 +8,14 @@
 # CMakeLists.txt file for building ROOT core/textinout package
 ############################################################################
 
+find_package(LLVM REQUIRED CONFIG NO_CMAKE_PACKAGE_REGISTRY)
+include_directories(SYSTEM ${LLVM_INCLUDE_DIRS})
+target_link_libraries(Core PRIVATE LLVMSupport LLVMLineEditor)
+
 set_property(TARGET Core APPEND PROPERTY DICT_HEADERS Getline.h)
 
 target_sources(Core PRIVATE
-  src/Getline_color.cxx
   src/Getline.cxx
-  src/textinput/Editor.cpp
-  src/textinput/History.cpp
-  src/textinput/KeyBinding.cpp
-  src/textinput/Range.cpp
-  src/textinput/SignalHandler.cpp
-  src/textinput/StreamReader.cpp
-  src/textinput/StreamReaderUnix.cpp
-  src/textinput/StreamReaderWin.cpp
-  src/textinput/TerminalConfigUnix.cpp
-  src/textinput/TerminalDisplay.cpp
-  src/textinput/TerminalDisplayUnix.cpp
-  src/textinput/TerminalDisplayWin.cpp
-  src/textinput/TextInputContext.cpp
-  src/textinput/TextInput.cpp
 )
 
 target_include_directories(Core

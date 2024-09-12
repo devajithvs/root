@@ -37,7 +37,7 @@ ROOT_KEEP = ['build', 'cmake', 'config', 'core', 'etc', 'interpreter',
              'builtins']
 ROOT_CORE_KEEP = ['CMakeLists.txt', 'base', 'clib', 'clingutils', 'cont',
                   'dictgen', 'foundation', 'macosx', 'meta',
-                  'metacling', 'metautils', 'rootcling_stage1',
+                  'metacling', 'metautils', 'rootcling_stage1', 'textinput',
                   'thread', 'unix', 'utils', 'winnt', 'zip']
 ROOT_BUILTINS_KEEP = ['openssl', 'pcre', 'xxhash', 'zlib']
 ROOT_IO_KEEP = ['CMakeLists.txt', 'io', 'rootpcm']

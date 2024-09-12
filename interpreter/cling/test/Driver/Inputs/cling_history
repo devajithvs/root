@@ -1,8 +1,27 @@
-/*
-comment
- * */
-static const int i = 37;
-};
-// another comment
-using std::cout;
-std::cout << "test\n";
+_HiStOrY_V2_
+//------------------------------------------------------------------------------\012
+//\040CLING\040-\040the\040C++\040LLVM-based\040InterpreterG\040:)\012
+//\012
+//\040This\040file\040is\040dual-licensed:\040you\040can\040choose\040to\040license\040it\040under\040the\040University\012
+//\040of\040Illinois\040Open\040Source\040License\040or\040the\040GNU\040Lesser\040General\040Public\040License.\040See\012
+//\040LICENSE.TXT\040for\040details.\012
+//------------------------------------------------------------------------------\012
+//\040clang-format\040off\012
+//\040RUN:\040%rm\040/tmp/__testing_cling_history\012
+//\040RUN:\040cat\040%s\040|\040env\040-u\040CLING_NOHISTORY\040CLING_HISTFILE="/tmp/__testing_cling_history"\040%cling\040-\0402>&1\012
+//\040RUN:\040diff\040/tmp/__testing_cling_history\040"%S/Inputs/cling_history"\012
+//\040UNSUPPORTED:\040system-windows\012
+#include\040<iostream>\012
+int\040i\040=\0408;\012
+template<class\040T>\012
+struct\040type_a\040{\012
+\011const\040T\040t;\012
+\011double\040d;\012
+/*\012
+\011\011comment\012
+\040*\040*/\012
+\011static\040const\040int\040i\040=\04037;\012
+};\012
+//\040another\040comment\012
+using\040std::cout;\012
+std::cout\040<<\040"test\134n";\012

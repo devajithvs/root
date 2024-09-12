@@ -75,7 +75,6 @@ echo "        ../../bindings/r/                \\" >> Doxyfile_INPUT
 # echo "        ../../core/clib/                 \\" >> Doxyfile_INPUT
 # echo "        ../../core/lzma/                 \\" >> Doxyfile_INPUT
 # echo "        ../../core/newdelete/            \\" >> Doxyfile_INPUT
-# echo "        ../../core/textinput/            \\" >> Doxyfile_INPUT
 # echo "        ../../graf2d/mathtext/           \\" >> Doxyfile_INPUT
 # echo "        ../../graf3d/ftgl/               \\" >> Doxyfile_INPUT
 # echo "        ../../graf3d/glew/               \\" >> Doxyfile_INPUT

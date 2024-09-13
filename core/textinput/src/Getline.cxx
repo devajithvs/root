@@ -18,81 +18,74 @@
 #include "TApplication.h"
 #include "TInterpreter.h"
 
+#include "llvm/LineEditor/LineEditor.h"
+
 extern "C" {
    int (* Gl_in_key)(int ch) = nullptr;
    int (* Gl_beep_hook)() = nullptr;
 }
 
-#include "llvm/LineEditor/LineEditor.h"
-
-// using namespace textinput;
-
 namespace {
    class ROOTTabCompletion {
    public:
-      std::vector<llvm::LineEditor::Completion> operator()(llvm::StringRef Buffer, size_t Pos) const {
-         char fLineBuf[16 * 1024]; // Buffer size
-         std::vector<std::string> displayCompletions;
-
-         // Invoke the application’s tab completion mechanism
-         std::stringstream sstr;
-         int cursorInt = (int)Pos;
-         size_t posFirstChange = gApplication->TabCompletionHook(fLineBuf, &cursorInt, sstr);
-
-         if (posFirstChange == (size_t)-1) {
-               return {};  // No completions available
-         }
-
-         std::string compLine;
-         while (std::getline(sstr, compLine)) {
-               displayCompletions.push_back(compLine);
-         }
-
-         std::vector<llvm::LineEditor::Completion> results;
-         for (const auto& comp : displayCompletions) {
-               results.emplace_back(comp, comp);
-         }
-
-         return results;
-      }
+      // Placeholder
    };
 
-
-   // Helper to define the lifetime of the TextInput singleton.
+   // Helper to define the lifetime of the LineEditor singleton.
    class LineEditorHolder {
    public:
-   LineEditorHolder(const std::string& historyFile)
-        : LE("root-repl", historyFile.c_str()), historyFile(historyFile) {
-   }
+      LineEditorHolder(const std::string &historyFile) : LE("root", historyFile.c_str()) {}
 
       ~LineEditorHolder() = default;
 
-      // Take input from the user, returns the input line
       const char* TakeInput(bool force = false) {
-         std::optional<std::string> Input = LE.readLine();
-         if (Input) {
-               fInputLine = *Input + "\n"; // ROOT wants trailing newline
-         } else {
-            fInputLine.clear();
-         }
+         TakeInput(fInputLine, force);
+         fInputLine += "\n"; // ROOT wants a trailing newline.
          return fInputLine.c_str();
+      }
+
+      void TakeInput(std::string &input, bool force)
+      {
+         static llvm::LineEditor &LE = getHolder().get(); // Get the LineEditor instance
+
+         // Read a line from the editor
+         std::optional<std::string> readLine = LE.readLine();
+
+         if (readLine) {
+            // Store the input
+            input = *readLine;
+
+            // Remove trailing carriage return characters if present
+            while (!input.empty() && input.back() == '\r') {
+               input.pop_back();
+            }
+
+            // Reset the state or signal that input was taken
+            LE.setPrompt(LE.getPrompt()); // Example: resetting the prompt (adapt as necessary)
+
+            // Reset internal states (if applicable) and continue with normal operation
+         } else {
+            // Handle EOF scenario if no input is retrieved
+            input.clear();
+            if (force) {
+               // If forcing input, prepare the editor for another input cycle
+               LE.setPrompt(LE.getPrompt());
+            }
+         }
       }
 
       void SetColors(const char* colorTab, const char* colorTabComp,
                      const char* colorBracket, const char* colorBadBracket,
                      const char* colorPrompt) {
-         // This part depends on whether you want to use any custom coloring in LineEditor
-         // Custom color support can be configured for prompts or completions here
-         // LE.setPromptColor(colorPrompt); // Example of setting prompt color
+         // LE.setPromptColor(colorPrompt); // Placeholder
       }
 
       static void SetHistoryFile(const char* hist) {
-         fgHistoryFile = hist;
+         // Placeholder
       }
 
       static void SetHistSize(int size, int save) {
-         fgSizeLines = size;
-         fgSaveLines = save;
+         // Placeholder
       }
 
       static LineEditorHolder& getHolder() {
@@ -106,17 +99,12 @@ namespace {
 
    private:
       llvm::LineEditor LE;  // LineEditor instance
-      std::string fInputLine;  // Stores the input line taken from user
-      std::string historyFile;  // Path to history file
+      std::string fInputLine; // Stores the input line taken from user
 
       static std::string fgHistoryFile;
-      static int fgSizeLines;
-      static int fgSaveLines;
    };
 
    std::string LineEditorHolder::fgHistoryFile;
-   int LineEditorHolder::fgSizeLines = 500;
-   int LineEditorHolder::fgSaveLines = -1;
 }
 
 /************************ extern "C" part *********************************/
@@ -125,90 +113,63 @@ namespace {
 #include <unistd.h>
 #include <iostream>
 
-void SetEcho(bool enableEcho) {
-    struct termios tty;
-    tcgetattr(STDIN_FILENO, &tty);
-    if (!enableEcho) {
-        tty.c_lflag &= ~ECHO;  // Disable echoing
-    } else {
-        tty.c_lflag |= ECHO;  // Enable echoing
-    }
-    tcsetattr(STDIN_FILENO, TCSANOW, &tty);  // Apply the settings
-}
-
 extern "C" {
 void
 Gl_config(const char* which, int value) {
-    if (strcmp(which, "noecho") == 0) {
-        SetEcho(value == 0);  // Disable echo if value == 0
-    } else {
-        printf("Gl_config unsupported: %s ?\n", which);
-    }
+   if (strcmp(which, "noecho") == 0) {
+      // Placeholder
+   } else {
+      // unsupported directive
+      printf("Gl_config unsupported: %s ?\n", which);
+   }
 }
 
-void Gl_histadd(const char* buf) {
+void Gl_histadd(const char *buf)
+{
    // llvm::LineEditor handles history automatically.
 }
 
 /* Wrapper around textinput.
  * Modes: -1 = init, 0 = line mode, 1 = one char at a time mode, 2 = cleanup, 3 = clear input line
  */
-const char* Getlinem(EGetLineMode mode, const char* prompt) {
-    static std::string inputLine;
+const char *Getlinem(EGetLineMode mode, const char *prompt)
+{
 
-    if (mode == kClear) {
-        inputLine.clear(); // Clear input buffer
-        return nullptr;
-    }
+   if (mode == kClear) {
+      LineEditorHolder::getHolder().TakeInput(true);
 
-    if (mode == kCleanUp) {
-        // Cleanup actions
-        return nullptr;
-    }
+      return nullptr;
+   }
 
-    if (mode == kInit || mode == kLine1) {
-        llvm::LineEditor& editor = LineEditorHolder::getHolder().get();
-        editor.setPrompt(prompt ? prompt : "");
+   if (mode == kCleanUp) {
+      // Placeholder
+      return nullptr;
+   }
 
-        std::optional<std::string> line = editor.readLine();
-        if (line) {
-            inputLine = *line + "\n";  // Add newline for ROOT
+   if (mode == kOneChar) {
+      // Placeholder
+      // mode = kLine1;
+   }
 
-            // If the command is '.q' or '.quit', exit
-            if (inputLine == ".q\n" || inputLine == ".quit\n") {
-                std::exit(0);  // Exit the program
-            }
+   if (mode == kInit || mode == kLine1) {
+      llvm::LineEditor &LE = LineEditorHolder::getHolder().get();
+      // Set the prompt
+      if (prompt) {
+         LE.setPrompt(prompt);
+      }
 
-            // Add the line to history if necessary
-            Gl_histadd(inputLine.c_str());
+      if (mode == kInit) {
+         return nullptr;
+      }
 
-            // **Process the input using the ROOT interpreter**
-            // This is important to ensure that the commands are executed.
-            gInterpreter->ProcessLine(inputLine.c_str());
-
-            return inputLine.c_str();  // Return the input line with a newline
-        }
-
-        return nullptr;
-    }
-
-    if (mode == kOneChar) {
-        // Implement single-character input reading
-        struct termios oldt, newt;
-        tcgetattr(STDIN_FILENO, &oldt);  // Get terminal attributes
-        newt = oldt;
-        newt.c_lflag &= ~(ICANON | ECHO);  // Disable canonical mode and echoing
-        tcsetattr(STDIN_FILENO, TCSANOW, &newt);
-
-        char ch;
-        read(STDIN_FILENO, &ch, 1);  // Read one character from stdin
-
-        tcsetattr(STDIN_FILENO, TCSANOW, &oldt);  // Restore terminal attributes
-        inputLine = ch;  // Store the single character input
-        return inputLine.c_str();
-    }
-
-    return nullptr;
+      // Read the input line using LineEditor
+      // std::optional<std::string> line = LE.readLine();
+      // if (line) {
+      //    // return line->c_str();
+      // }
+   } else
+      return LineEditorHolder::getHolder().TakeInput();
+   return nullptr;
 }
 
 const char*

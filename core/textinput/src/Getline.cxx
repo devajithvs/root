@@ -33,134 +33,52 @@ namespace {
 
    // Helper to define the lifetime of the LineEditor singleton.
    class LineEditorHolder {
-   public:
-      LineEditorHolder(const std::string &historyFile) : LE("root", historyFile.c_str()) {}
+    public:
+        LineEditorHolder(const std::string& historyFile) : LE("root", historyFile.c_str()) {}
+        ~LineEditorHolder() = default;
 
-      ~LineEditorHolder() = default;
+        const char* TakeInput(bool force = false) {
+            static llvm::LineEditor& LE = getHolder().get();
+            std::optional<std::string> readLine = LE.readLine();
 
-      // const char* TakeInput(bool force = false) {
-      //    TakeInput(fInputLine, force);
-      //    fInputLine += "\n"; // ROOT wants a trailing newline.
-      //    return fInputLine.c_str();
-      // }
+            if (readLine) {
+                fInputLine = *readLine;
+                fInputLine += "\n";  // Add trailing newline for ROOT
+                return fInputLine.c_str();
+            }
+            fInputLine.clear();  // Handle EOF
+            return nullptr;
+        }
 
-      const char* TakeInput(bool force = false) {
-         static llvm::LineEditor &LE = getHolder().get();
-         std::optional<std::string> readLine = LE.readLine();
-         
-         if (readLine) {
-            // Store the input
-            fInputLine = *readLine;
+        void SetColors(const char* colorTab, const char* colorTabComp, const char* colorBracket, const char* colorBadBracket, const char* colorPrompt) {
+            // Set prompt and editor colors (Placeholder)
+        }
 
-            // Strip trailing newlines or carriage returns
-            // fInputLine.erase(fInputLine.find_last_not_of("\r\n") + 1);
+        static void SetHistoryFile(const char* hist) {
+            // Placeholder for setting history file
+        }
 
-            // Return the input with a trailing newline as expected by ROOT
-            fInputLine += "\n";
-            return fInputLine.c_str();
-         }
+        static void SetHistSize(int size, int save) {
+            // Placeholder for setting history size
+        }
 
-         // Handle EOF
-         fInputLine.clear();
-         return nullptr;
-      }
+        static LineEditorHolder& getHolder() {
+            static LineEditorHolder sLEHolder(fgHistoryFile);
+            return sLEHolder;
+        }
 
-      // void TakeInput(std::string &input, bool force)
-      // {
-      //    static llvm::LineEditor &LE = getHolder().get(); // Get the LineEditor instance
+        llvm::LineEditor& get() {
+            return LE;
+        }
 
-      //    // Read a line from the editor
-      //    std::optional<std::string> readLine = LE.readLine();
+    private:
+        llvm::LineEditor LE;  // LineEditor instance
+        std::string fInputLine;  // Stores the input line from the user
 
-      //    if (readLine) {
-      //       // Store the input
-      //       input = *readLine;
-      //       llvm::StringRef L = input;
-      //       L = L.trim();
-      //       input = L;
+        static std::string fgHistoryFile;  // History file path
+    };
 
-      //       // // Remove trailing carriage return characters if present
-      //       // while (!input.empty() && input.back() == '\r') {
-      //       //    input.pop_back();
-      //       // }
-      //       while (!input.empty() && input[input.length() - 1] == 13) {
-      //          input.erase(input.length() - 1);
-      //       }
-
-      //       // Reset the state or signal that input was taken
-      //       // LE.setPrompt(LE.getPrompt()); // Example: resetting the prompt (adapt as necessary)
-
-      //       // Reset internal states (if applicable) and continue with normal operation
-      //    } else {
-      //       // Handle EOF scenario if no input is retrieved
-      //       input.clear();
-      //       if (force) {
-      //          // If forcing input, prepare the editor for another input cycle
-      //          LE.setPrompt(LE.getPrompt());
-      //       }
-      //    }
-      // }
-
-      // void
-      // TextInput::TakeInput(std::string &input, bool force) {
-      //    if (!force && fLastReadResult != kRRReadEOLDelimiter
-      //       && fLastReadResult != kRREOF) {
-      //       input.clear();
-      //       return;
-      //    }
-      //    input = fContext->GetLine().GetText();
-      //    while (!input.empty() && input[input.length() - 1] == 13) {
-      //       input.erase(input.length() - 1);
-      //    }
-      //    fContext->GetEditor()->ResetText();
-
-      //    // Signal displays that the input got taken.
-      //    std::for_each(fContext->GetDisplays().begin(), fContext->GetDisplays().end(),
-      //             [](Display *D) { return D->NotifyResetInput(); });
-
-      //    ReleaseInputOutput();
-
-      //    if (force || fLastReadResult == kRRReadEOLDelimiter) {
-      //       // Input has been taken, we can continue reading.
-      //       fLastReadResult = kRRNone;
-      //       // We will have to redraw the prompt, even if unchanged.
-      //       fNeedPromptRedraw = true;
-      //    } else {
-      //       fLastReadResult = kRREOF;
-      //    }
-      // }
-
-      void SetColors(const char* colorTab, const char* colorTabComp,
-                     const char* colorBracket, const char* colorBadBracket,
-                     const char* colorPrompt) {
-         // LE.setPromptColor(colorPrompt); // Placeholder
-      }
-
-      static void SetHistoryFile(const char* hist) {
-         // Placeholder
-      }
-
-      static void SetHistSize(int size, int save) {
-         // Placeholder
-      }
-
-      static LineEditorHolder& getHolder() {
-         static LineEditorHolder sLEHolder(fgHistoryFile);
-         return sLEHolder;
-      }
-
-      llvm::LineEditor& get() {
-         return LE;
-      }
-
-   private:
-      llvm::LineEditor LE;  // LineEditor instance
-      std::string fInputLine; // Stores the input line taken from user
-
-      static std::string fgHistoryFile;
-   };
-
-   std::string LineEditorHolder::fgHistoryFile;
+    std::string LineEditorHolder::fgHistoryFile;
 }
 
 /************************ extern "C" part *********************************/
@@ -168,9 +86,6 @@ namespace {
 #include <termios.h>
 #include <unistd.h>
 #include <iostream>
-
-#include <termios.h>
-#include <unistd.h>
 
 void DisableTerminalEcho() {
     struct termios tty;
@@ -194,7 +109,7 @@ Gl_config(const char* which, int value) {
       DisableTerminalEcho();
    } else {
       // unsupported directive
-      // printf("Gl_config unsupported: %s ?\n", which);
+      printf("Gl_config unsupported: %s ?\n", which);
    }
 }
 

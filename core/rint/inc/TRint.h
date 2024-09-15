@@ -24,6 +24,7 @@
 
 #include "TApplication.h"
 #include "TString.h"
+#include "llvm/LineEditor/LineEditor.h"
 
 class TFileHandler;
 
@@ -31,6 +32,7 @@ class TFileHandler;
 class TRint : public TApplication {
 
 private:
+   llvm::LineEditor LE;
    Int_t         fNcmd;               // command history number
    TString       fDefaultPrompt;      // default prompt: "root [%d] "
    TString       fNonContinuePrompt;  // default prompt before continue prompt was set

@@ -55,7 +55,7 @@
 
 static Int_t Key_Pressed(Int_t key)
 {
-   gApplication->KeyPressed(key);
+   // gApplication->KeyPressed(key);
    return 0;
 }
 
@@ -63,8 +63,8 @@ static Int_t Key_Pressed(Int_t key)
 
 static Int_t BeepHook()
 {
-   if (!gSystem) return 0;
-   gSystem->Beep();
+   // if (!gSystem) return 0;
+   // gSystem->Beep();
    return 1;
 }
 
@@ -73,7 +73,7 @@ static Int_t BeepHook()
 
 static void ResetTermAtExit()
 {
-   Getlinem(kCleanUp, nullptr);
+   // Getlinem(kCleanUp, nullptr);
 }
 
 
@@ -91,26 +91,26 @@ public:
 
 Bool_t TInterruptHandler::Notify()
 {
-   if (fDelay) {
-      fDelay++;
-      return kTRUE;
-   }
+//    if (fDelay) {
+//       fDelay++;
+//       return kTRUE;
+//    }
 
-   // make sure we use the sbrk heap (in case of mapped files)
-   ROOT::Internal::gMmallocDesc = nullptr;
+//    // make sure we use the sbrk heap (in case of mapped files)
+//    ROOT::Internal::gMmallocDesc = nullptr;
 
-   if (TROOT::Initialized() && gROOT->IsLineProcessing()) {
-      Break("TInterruptHandler::Notify", "keyboard interrupt");
-      Getlinem(kInit, "Root > ");
-      gCling->Reset();
-#ifndef WIN32
-   if (gException)
-      Throw(GetSignal());
-#endif
-   } else {
-      // Reset input.
-      Getlinem(kClear, ((TRint*)gApplication)->GetPrompt());
-   }
+//    if (TROOT::Initialized() && gROOT->IsLineProcessing()) {
+//       Break("TInterruptHandler::Notify", "keyboard interrupt");
+//       Getlinem(kInit, "Root > ");
+//       gCling->Reset();
+// #ifndef WIN32
+//    if (gException)
+//       Throw(GetSignal());
+// #endif
+//    } else {
+//       // Reset input.
+//       Getlinem(kClear, ((TRint*)gApplication)->GetPrompt());
+//    }
 
    return kTRUE;
 }
@@ -171,7 +171,7 @@ static int SetExtraClingArgsBeforeTAppCtor(Int_t *argc, char **argv)
 TRint::TRint(const char *appClassName, Int_t *argc, char **argv, void *options, Int_t numOptions, Bool_t noLogo,
              Bool_t exitOnUnknownArgs)
    : TApplication(appClassName, argc, argv, options, numOptions + SetExtraClingArgsBeforeTAppCtor(argc, argv)),
-     fCaughtSignal(-1)
+     fCaughtSignal(-1), LE("root [0]", "")
 {
 
    if (exitOnUnknownArgs && argc != nullptr && *argc > 1) {
@@ -383,127 +383,143 @@ void TRint::ExecLogon()
 
 void TRint::Run(Bool_t retrn)
 {
-   if (!QuitOpt()) {
-      // Prompt prompt only if we are expecting / allowing input.
-      Getlinem(kInit, GetPrompt());
+   std::string prompt = GetPrompt();
+   LE.setPrompt(prompt);
+   // TApplication::Run(retrn);
+
+   while (std::optional<std::string> Line = LE.readLine()) {
+      auto L = *Line;
+      // Process the input using Cling interpreter
+      // gApplication->HandleTermInput();
+      int res = ProcessLine(L.c_str(), kFALSE);
+
+
+      // Increment command count and update prompt
+      fNcmd++;
+      LE.setPrompt(GetPrompt());
    }
 
-   Longptr_t retval = 0;
-   Int_t  error = 0;
-   volatile Bool_t needGetlinemInit = kFALSE;
+   // if (!QuitOpt()) {
+   //    // Prompt prompt only if we are expecting / allowing input.
+   //    Getlinem(kInit, GetPrompt());
+   // }
 
-   if (strlen(WorkingDirectory())) {
-      // if directory specified as argument make it the working directory
-      gSystem->ChangeDirectory(WorkingDirectory());
-      TSystemDirectory *workdir = new TSystemDirectory("workdir", gSystem->WorkingDirectory());
-      TObject *w = gROOT->GetListOfBrowsables()->FindObject("workdir");
-      TObjLink *lnk = gROOT->GetListOfBrowsables()->FirstLink();
-      while (lnk) {
-         if (lnk->GetObject() == w) {
-            lnk->SetObject(workdir);
-            lnk->SetOption(gSystem->WorkingDirectory());
-            break;
-         }
-         lnk = lnk->Next();
-      }
-      delete w;
-   }
+   // Longptr_t retval = 0;
+   // Int_t  error = 0;
+   // volatile Bool_t needGetlinemInit = kFALSE;
 
-   // Process shell command line input files
-   if (InputFiles()) {
-      // Make sure that calls into the event loop
-      // ignore end-of-file on the terminal.
-      fInputHandler->DeActivate();
-      TIter next(InputFiles());
-      RETRY {
-         retval = 0; error = 0;
-         Int_t nfile = 0;
-         while (TObject *fileObj = next()) {
-            if (dynamic_cast<TNamed*>(fileObj)) {
-               // A file that TApplication did not find. Note the error.
-               retval = 1;
-               continue;
-            }
-            TObjString *file = (TObjString *)fileObj;
-            char cmd[kMAXPATHLEN+50];
-            if (!fNcmd)
-               printf("\n");
-            Bool_t rootfile = kFALSE;
+   // if (strlen(WorkingDirectory())) {
+   //    // if directory specified as argument make it the working directory
+   //    gSystem->ChangeDirectory(WorkingDirectory());
+   //    TSystemDirectory *workdir = new TSystemDirectory("workdir", gSystem->WorkingDirectory());
+   //    TObject *w = gROOT->GetListOfBrowsables()->FindObject("workdir");
+   //    TObjLink *lnk = gROOT->GetListOfBrowsables()->FirstLink();
+   //    while (lnk) {
+   //       if (lnk->GetObject() == w) {
+   //          lnk->SetObject(workdir);
+   //          lnk->SetOption(gSystem->WorkingDirectory());
+   //          break;
+   //       }
+   //       lnk = lnk->Next();
+   //    }
+   //    delete w;
+   // }
 
-            if (file->TestBit(kExpression)) {
-               snprintf(cmd, kMAXPATHLEN+50, "%s", (const char*)file->String());
-            } else {
-               if (file->String().EndsWith(".root") || file->String().BeginsWith("file:")) {
-                  rootfile = kTRUE;
-               } else {
-                  rootfile = gROOT->IsRootFile(file->String());
-               }
-               if (rootfile) {
-                  // special trick to be able to open files using UNC path names
-                  if (file->String().BeginsWith("\\\\"))
-                     file->String().Prepend("\\\\");
-                  file->String().ReplaceAll("\\","/");
-                  const char *rfile = (const char*)file->String();
-                  Printf("Attaching file %s as _file%d...", rfile, nfile);
-                  snprintf(cmd, kMAXPATHLEN+50, "TFile *_file%d = TFile::Open(\"%s\")", nfile++, rfile);
-               } else {
-                  Printf("Processing %s...", (const char*)file->String());
-                  snprintf(cmd, kMAXPATHLEN+50, ".x %s", (const char*)file->String());
-               }
-            }
-            Getlinem(kCleanUp, nullptr);
-            Gl_histadd(cmd);
+   // // Process shell command line input files
+   // if (InputFiles()) {
+   //    // Make sure that calls into the event loop
+   //    // ignore end-of-file on the terminal.
+   //    fInputHandler->DeActivate();
+   //    TIter next(InputFiles());
+   //    RETRY {
+   //       retval = 0; error = 0;
+   //       Int_t nfile = 0;
+   //       while (TObject *fileObj = next()) {
+   //          if (dynamic_cast<TNamed*>(fileObj)) {
+   //             // A file that TApplication did not find. Note the error.
+   //             retval = 1;
+   //             continue;
+   //          }
+   //          TObjString *file = (TObjString *)fileObj;
+   //          char cmd[kMAXPATHLEN+50];
+   //          if (!fNcmd)
+   //             printf("\n");
+   //          Bool_t rootfile = kFALSE;
 
-            // The ProcessLine might throw an 'exception'.  In this case,
-            // GetLinem(kInit,"Root >") is called and we are jump back
-            // to RETRY ... and we have to avoid the Getlinem(kInit, GetPrompt());
-            needGetlinemInit = kFALSE;
-            retval = ProcessLineNr("ROOT_cli_", cmd, &error);
-            gCling->EndOfLineAction();
-            fNcmd++;
+   //          if (file->TestBit(kExpression)) {
+   //             snprintf(cmd, kMAXPATHLEN+50, "%s", (const char*)file->String());
+   //          } else {
+   //             if (file->String().EndsWith(".root") || file->String().BeginsWith("file:")) {
+   //                rootfile = kTRUE;
+   //             } else {
+   //                rootfile = gROOT->IsRootFile(file->String());
+   //             }
+   //             if (rootfile) {
+   //                // special trick to be able to open files using UNC path names
+   //                if (file->String().BeginsWith("\\\\"))
+   //                   file->String().Prepend("\\\\");
+   //                file->String().ReplaceAll("\\","/");
+   //                const char *rfile = (const char*)file->String();
+   //                Printf("Attaching file %s as _file%d...", rfile, nfile);
+   //                snprintf(cmd, kMAXPATHLEN+50, "TFile *_file%d = TFile::Open(\"%s\")", nfile++, rfile);
+   //             } else {
+   //                Printf("Processing %s...", (const char*)file->String());
+   //                snprintf(cmd, kMAXPATHLEN+50, ".x %s", (const char*)file->String());
+   //             }
+   //          }
+   //          Getlinem(kCleanUp, nullptr);
+   //          Gl_histadd(cmd);
 
-            // The ProcessLine has successfully completed and we need
-            // to call Getlinem(kInit, GetPrompt());
-            needGetlinemInit = kTRUE;
+   //          // The ProcessLine might throw an 'exception'.  In this case,
+   //          // GetLinem(kInit,"Root >") is called and we are jump back
+   //          // to RETRY ... and we have to avoid the Getlinem(kInit, GetPrompt());
+   //          needGetlinemInit = kFALSE;
+   //          retval = ProcessLineNr("ROOT_cli_", cmd, &error);
+   //          gCling->EndOfLineAction();
+   //          fNcmd++;
 
-            if (error != 0 || fCaughtSignal != -1) break;
-         }
-      } ENDTRY;
+   //          // The ProcessLine has successfully completed and we need
+   //          // to call Getlinem(kInit, GetPrompt());
+   //          needGetlinemInit = kTRUE;
 
-      if (QuitOpt()) {
-         if (retrn) return;
-         if (error) {
-            retval = error;
-         } else if (fCaughtSignal != -1) {
-            retval = fCaughtSignal + 128;
-         }
-         // Bring retval into sensible range, 0..255.
-         if (retval < 0 || retval > 255)
-            retval = 255;
-         Terminate(retval);
-      }
+   //          if (error != 0 || fCaughtSignal != -1) break;
+   //       }
+   //    } ENDTRY;
 
-      // Allow end-of-file on the terminal to be noticed
-      // after we finish processing the command line input files.
-      fInputHandler->Activate();
+   //    if (QuitOpt()) {
+   //       if (retrn) return;
+   //       if (error) {
+   //          retval = error;
+   //       } else if (fCaughtSignal != -1) {
+   //          retval = fCaughtSignal + 128;
+   //       }
+   //       // Bring retval into sensible range, 0..255.
+   //       if (retval < 0 || retval > 255)
+   //          retval = 255;
+   //       Terminate(retval);
+   //    }
 
-      ClearInputFiles();
+   //    // Allow end-of-file on the terminal to be noticed
+   //    // after we finish processing the command line input files.
+   //    fInputHandler->Activate();
 
-      if (needGetlinemInit) Getlinem(kInit, GetPrompt());
-   }
+   //    ClearInputFiles();
 
-   if (QuitOpt()) {
-      printf("\n");
-      if (retrn) return;
-      Terminate(fCaughtSignal != -1 ? fCaughtSignal + 128 : 0);
-   }
+   //    if (needGetlinemInit) Getlinem(kInit, GetPrompt());
+   // }
 
-   TApplication::Run(retrn);
+   // if (QuitOpt()) {
+   //    printf("\n");
+   //    if (retrn) return;
+   //    Terminate(fCaughtSignal != -1 ? fCaughtSignal + 128 : 0);
+   // }
 
-   // Reset to happiness.
-   fCaughtSignal = -1;
+   // TApplication::Run(retrn);
 
-   Getlinem(kCleanUp, nullptr);
+   // // Reset to happiness.
+   // fCaughtSignal = -1;
+
+   // Getlinem(kCleanUp, nullptr);
 }
 
 ////////////////////////////////////////////////////////////////////////////////

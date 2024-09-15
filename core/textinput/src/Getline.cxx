@@ -38,41 +38,97 @@ namespace {
 
       ~LineEditorHolder() = default;
 
+      // const char* TakeInput(bool force = false) {
+      //    TakeInput(fInputLine, force);
+      //    fInputLine += "\n"; // ROOT wants a trailing newline.
+      //    return fInputLine.c_str();
+      // }
+
       const char* TakeInput(bool force = false) {
-         TakeInput(fInputLine, force);
-         fInputLine += "\n"; // ROOT wants a trailing newline.
-         return fInputLine.c_str();
-      }
-
-      void TakeInput(std::string &input, bool force)
-      {
-         static llvm::LineEditor &LE = getHolder().get(); // Get the LineEditor instance
-
-         // Read a line from the editor
+         static llvm::LineEditor &LE = getHolder().get();
          std::optional<std::string> readLine = LE.readLine();
-
+         
          if (readLine) {
             // Store the input
-            input = *readLine;
+            fInputLine = *readLine;
 
-            // Remove trailing carriage return characters if present
-            while (!input.empty() && input.back() == '\r') {
-               input.pop_back();
-            }
+            // Strip trailing newlines or carriage returns
+            // fInputLine.erase(fInputLine.find_last_not_of("\r\n") + 1);
 
-            // Reset the state or signal that input was taken
-            LE.setPrompt(LE.getPrompt()); // Example: resetting the prompt (adapt as necessary)
-
-            // Reset internal states (if applicable) and continue with normal operation
-         } else {
-            // Handle EOF scenario if no input is retrieved
-            input.clear();
-            if (force) {
-               // If forcing input, prepare the editor for another input cycle
-               LE.setPrompt(LE.getPrompt());
-            }
+            // Return the input with a trailing newline as expected by ROOT
+            fInputLine += "\n";
+            return fInputLine.c_str();
          }
+
+         // Handle EOF
+         fInputLine.clear();
+         return nullptr;
       }
+
+      // void TakeInput(std::string &input, bool force)
+      // {
+      //    static llvm::LineEditor &LE = getHolder().get(); // Get the LineEditor instance
+
+      //    // Read a line from the editor
+      //    std::optional<std::string> readLine = LE.readLine();
+
+      //    if (readLine) {
+      //       // Store the input
+      //       input = *readLine;
+      //       llvm::StringRef L = input;
+      //       L = L.trim();
+      //       input = L;
+
+      //       // // Remove trailing carriage return characters if present
+      //       // while (!input.empty() && input.back() == '\r') {
+      //       //    input.pop_back();
+      //       // }
+      //       while (!input.empty() && input[input.length() - 1] == 13) {
+      //          input.erase(input.length() - 1);
+      //       }
+
+      //       // Reset the state or signal that input was taken
+      //       // LE.setPrompt(LE.getPrompt()); // Example: resetting the prompt (adapt as necessary)
+
+      //       // Reset internal states (if applicable) and continue with normal operation
+      //    } else {
+      //       // Handle EOF scenario if no input is retrieved
+      //       input.clear();
+      //       if (force) {
+      //          // If forcing input, prepare the editor for another input cycle
+      //          LE.setPrompt(LE.getPrompt());
+      //       }
+      //    }
+      // }
+
+      // void
+      // TextInput::TakeInput(std::string &input, bool force) {
+      //    if (!force && fLastReadResult != kRRReadEOLDelimiter
+      //       && fLastReadResult != kRREOF) {
+      //       input.clear();
+      //       return;
+      //    }
+      //    input = fContext->GetLine().GetText();
+      //    while (!input.empty() && input[input.length() - 1] == 13) {
+      //       input.erase(input.length() - 1);
+      //    }
+      //    fContext->GetEditor()->ResetText();
+
+      //    // Signal displays that the input got taken.
+      //    std::for_each(fContext->GetDisplays().begin(), fContext->GetDisplays().end(),
+      //             [](Display *D) { return D->NotifyResetInput(); });
+
+      //    ReleaseInputOutput();
+
+      //    if (force || fLastReadResult == kRRReadEOLDelimiter) {
+      //       // Input has been taken, we can continue reading.
+      //       fLastReadResult = kRRNone;
+      //       // We will have to redraw the prompt, even if unchanged.
+      //       fNeedPromptRedraw = true;
+      //    } else {
+      //       fLastReadResult = kRREOF;
+      //    }
+      // }
 
       void SetColors(const char* colorTab, const char* colorTabComp,
                      const char* colorBracket, const char* colorBadBracket,
@@ -113,14 +169,32 @@ namespace {
 #include <unistd.h>
 #include <iostream>
 
+#include <termios.h>
+#include <unistd.h>
+
+void DisableTerminalEcho() {
+    struct termios tty;
+    tcgetattr(STDIN_FILENO, &tty);
+    tty.c_lflag &= ~ECHO;
+    tcsetattr(STDIN_FILENO, TCSANOW, &tty);
+}
+
+void EnableTerminalEcho() {
+    struct termios tty;
+    tcgetattr(STDIN_FILENO, &tty);
+    tty.c_lflag |= ECHO;
+    tcsetattr(STDIN_FILENO, TCSANOW, &tty);
+}
+
 extern "C" {
 void
 Gl_config(const char* which, int value) {
    if (strcmp(which, "noecho") == 0) {
       // Placeholder
+      DisableTerminalEcho();
    } else {
       // unsupported directive
-      printf("Gl_config unsupported: %s ?\n", which);
+      // printf("Gl_config unsupported: %s ?\n", which);
    }
 }
 
@@ -132,43 +206,43 @@ void Gl_histadd(const char *buf)
 /* Wrapper around textinput.
  * Modes: -1 = init, 0 = line mode, 1 = one char at a time mode, 2 = cleanup, 3 = clear input line
  */
-const char *Getlinem(EGetLineMode mode, const char *prompt)
-{
-
+const char *Getlinem(EGetLineMode mode, const char *prompt) {
    if (mode == kClear) {
-      LineEditorHolder::getHolder().TakeInput(true);
-
       return nullptr;
    }
 
    if (mode == kCleanUp) {
-      // Placeholder
       return nullptr;
    }
 
    if (mode == kOneChar) {
-      // Placeholder
-      // mode = kLine1;
+      // Placeholder for single character mode (optional)
+      mode = kLine1;
    }
 
    if (mode == kInit || mode == kLine1) {
       llvm::LineEditor &LE = LineEditorHolder::getHolder().get();
-      // Set the prompt
+
+      // Set the prompt only if provided
       if (prompt) {
          LE.setPrompt(prompt);
       }
 
+      // If in init mode, no input is expected, return
       if (mode == kInit) {
          return nullptr;
       }
 
-      // Read the input line using LineEditor
-      // std::optional<std::string> line = LE.readLine();
-      // if (line) {
-      //    // return line->c_str();
-      // }
-   } else
-      return LineEditorHolder::getHolder().TakeInput();
+      // Read input from the user using LineEditor
+      const char* input = LineEditorHolder::getHolder().TakeInput();
+      if (input && strlen(input) > 0) {
+         return input;  // Return the line of input
+      }
+
+      // If no input or EOF, return nullptr
+      return nullptr;
+   }
+
    return nullptr;
 }
 
@@ -202,15 +276,10 @@ Gl_histinit(const char* file) {
 }
 
 int Gl_eof() {
-    // Check for EOF using std::optional from LineEditor
     llvm::LineEditor& editor = LineEditorHolder::getHolder().get();
     std::optional<std::string> line = editor.readLine();
-    if (!line) {
-        return 1;  // EOF detected
-    }
-    return 0;
+    return line ? 0 : 1;  // Return 1 if EOF is detected
 }
-
 
 void
 Gl_setColors(const char* colorTab, const char* colorTabComp, const char* colorBracket,

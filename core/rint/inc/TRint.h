@@ -62,7 +62,6 @@ public:
            void        Run(Bool_t retrn = kFALSE) override;
    virtual void        Terminate(int status) override;
            void        Interrupt() { fInterrupt = kTRUE; }
-           Int_t       TabCompletionHook(char *buf, int *pLoc, std::ostream& out) override;
 
    TFileHandler       *GetInputHandler() { return fInputHandler; }
 

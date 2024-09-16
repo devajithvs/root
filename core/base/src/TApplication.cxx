@@ -1942,16 +1942,6 @@ void TApplication::StopIdleing()
 }
 
 ////////////////////////////////////////////////////////////////////////////////
-/// What to do when tab is pressed. Re-implemented by TRint.
-/// See TTabCom::Hook() for meaning of return values.
-
-Int_t TApplication::TabCompletionHook(char* /*buf*/, int* /*pLoc*/, std::ostream& /*out*/)
-{
-   return -1;
-}
-
-
-////////////////////////////////////////////////////////////////////////////////
 /// Terminate the application by call TSystem::Exit() unless application has
 /// been told to return from Run(), by a call to SetReturnFromRun().
 

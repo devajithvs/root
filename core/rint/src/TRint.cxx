@@ -796,15 +796,3 @@ Longptr_t  TRint::ProcessLineNr(const char* filestem, const char *line, Int_t *e
    }
    return ProcessLine(line, kFALSE, error);
 }
-
-
-////////////////////////////////////////////////////////////////////////////////
-/// Forward tab completion request to our TTabCom::Hook().
-
-Int_t TRint::TabCompletionHook(char *buf, int *pLoc, std::ostream& out)
-{
-   if (gTabCom)
-      return gTabCom->Hook(buf, pLoc, out);
-
-   return -1;
-}

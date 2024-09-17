@@ -88,25 +88,6 @@ Bool_t TInterruptHandler::Notify()
    return kTRUE;
 }
 
-//----- Terminal Input file handler --------------------------------------------
-////////////////////////////////////////////////////////////////////////////////
-
-class TTermInputHandler : public TFileHandler {
-public:
-   TTermInputHandler(Int_t fd) : TFileHandler(fd, 1) { }
-   Bool_t Notify() override;
-   Bool_t ReadNotify() override { return Notify(); }
-};
-
-////////////////////////////////////////////////////////////////////////////////
-/// Notify implementation.  Call the application interupt handler.
-
-Bool_t TTermInputHandler::Notify()
-{
-   return kTRUE;
-}
-
-
 ClassImp(TRint);
 
 
@@ -217,14 +198,10 @@ TRint::TRint(const char *appClassName, Int_t *argc, char **argv, void *options, 
    gCling->SaveContext();
    gCling->SaveGlobalsContext();
 
-   // Install interrupt and terminal input handlers
+   // Install interrupt handlers
    TInterruptHandler *ih = new TInterruptHandler();
    ih->Add();
    SetSignalHandler(ih);
-
-   // Handle stdin events
-   fInputHandler = new TTermInputHandler(0);
-   fInputHandler->Add();
 
    // Goto into raw terminal input mode
    char defhist[kMAXPATHLEN];
@@ -281,8 +258,6 @@ TRint::TRint(const char *appClassName, Int_t *argc, char **argv, void *options, 
 
 TRint::~TRint()
 {
-   fInputHandler->Remove();
-   delete fInputHandler;
    // We can't know where the signal handler was changed since we started ...
    // so for now let's not delete it.
 //   TSignalHandler *ih  = GetSignalHandler();

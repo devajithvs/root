@@ -39,7 +39,6 @@ private:
    char          fPrompt[64];         // interpreter prompt
    Bool_t        fInterrupt;          // if true macro execution will be stopped
    Int_t         fCaughtSignal;       // TRint just caught a signal
-   TFileHandler *fInputHandler;       // terminal input handler
    Bool_t        fBackslashContinue{};// whether the last line ended with '\'
 
    TRint(const TRint&) = delete;
@@ -60,8 +59,6 @@ public:
            void        Run(Bool_t retrn = kFALSE) override;
    virtual void        Terminate(int status) override;
            void        Interrupt() { fInterrupt = kTRUE; }
-
-   TFileHandler       *GetInputHandler() { return fInputHandler; }
 
    ClassDefOverride(TRint,0);  //ROOT Interactive Application Interface
 };

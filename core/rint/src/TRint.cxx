@@ -684,8 +684,8 @@ void TRint::HandleException(Int_t sig)
    fCaughtSignal = sig;
    if (TROOT::Initialized()) {
       if (gException) {
-         Getlinem(kCleanUp, nullptr);
-         Getlinem(kInit, "Root > ");
+         SetPrompt("Root > ");
+         LE.setPrompt(GetPrompt());
       }
    }
    TApplication::HandleException(sig);

@@ -15,6 +15,5 @@
 #pragma link off all functions;
 
 #pragma link C++ class TRint;
-#pragma link C++ class TTabCom;
 
 #endif

@@ -17,7 +17,7 @@
 #include "ROOT/TestSupport.hxx"
 #include <ROOT/RConfig.hxx>
 
-#include "TTabCom.h"
+#include "TTabCom.h" // TODO: Replace with lineeditor tab tests.
 
 #include <string>
 

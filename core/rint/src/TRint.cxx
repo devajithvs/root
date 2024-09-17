@@ -38,7 +38,6 @@
 #include "TObjArray.h"
 #include "TStorage.h" // ROOT::Internal::gMmallocDesc
 #include "ThreadLocalStorage.h"
-#include "TTabCom.h"
 #include <cstdlib>
 #include <algorithm>
 #include <iostream>
@@ -302,7 +301,6 @@ TRint::TRint(const char *appClassName, Int_t *argc, char **argv, void *options, 
    atexit(ResetTermAtExit);
 
    // Setup for tab completion
-   gTabCom      = new TTabCom;
    Gl_in_key    = &Key_Pressed;
    Gl_beep_hook = &BeepHook;
 
@@ -315,8 +313,6 @@ TRint::TRint(const char *appClassName, Int_t *argc, char **argv, void *options, 
 
 TRint::~TRint()
 {
-   delete gTabCom;
-   gTabCom = nullptr;
    Gl_in_key = nullptr;
    Gl_beep_hook = nullptr;
    fInputHandler->Remove();
@@ -667,7 +663,6 @@ Bool_t TRint::HandleTermInput()
       if (!sline.BeginsWith(".reset"))
          gCling->EndOfLineAction();
 
-      gTabCom->ClearAll();
       Getlinem(kInit, GetPrompt());
    }
    return kTRUE;
@@ -703,9 +698,6 @@ void TRint::Terminate(Int_t status)
    if (ReturnFromRun()) {
       gSystem->ExitLoop();
    } else {
-      delete gTabCom;
-      gTabCom = nullptr;
-
       //Execute logoff macro
       const char *logoff;
       logoff = gEnv->GetValue("Rint.Logoff", (char*)nullptr);

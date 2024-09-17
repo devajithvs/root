@@ -458,6 +458,12 @@ void TRint::Run(Bool_t retrn)
       ClearInputFiles();
    }
 
+   if (QuitOpt()) {
+      if (retrn)
+         return;
+      Terminate(0); // FIXME: Return proper error codes.
+   }
+
    LE.setPrompt(GetPrompt());
    while (std::optional<std::string> Line = LE.readLine()) {
       // Process the input
@@ -693,8 +699,6 @@ void TRint::HandleException(Int_t sig)
 
 void TRint::Terminate(Int_t status)
 {
-   Getlinem(kCleanUp, nullptr);
-
    if (ReturnFromRun()) {
       gSystem->ExitLoop();
    } else {

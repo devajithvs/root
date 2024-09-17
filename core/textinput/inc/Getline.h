@@ -32,9 +32,6 @@ int  Gl_eof();
 void Gl_setColors(const char* colorTab, const char* colorTabComp, const char* colorBracket,
                   const char* colorBadBracket, const char* colorPrompt);
 
-R__EXTERN int (*Gl_beep_hook)();
-R__EXTERN int (*Gl_in_key)(int key);
-
 #ifdef __cplusplus
 }
 #endif

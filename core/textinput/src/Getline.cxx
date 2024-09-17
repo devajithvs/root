@@ -20,11 +20,6 @@
 
 #include "llvm/LineEditor/LineEditor.h"
 
-extern "C" {
-   int (* Gl_in_key)(int ch) = nullptr;
-   int (* Gl_beep_hook)() = nullptr;
-}
-
 namespace {
    class ROOTTabCompletion {
    public:

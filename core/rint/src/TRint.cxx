@@ -50,32 +50,6 @@
 #include <unistd.h>
 #endif
 
-////////////////////////////////////////////////////////////////////////////////
-
-static Int_t Key_Pressed(Int_t key)
-{
-   // gApplication->KeyPressed(key);
-   return 0;
-}
-
-////////////////////////////////////////////////////////////////////////////////
-
-static Int_t BeepHook()
-{
-   // if (!gSystem) return 0;
-   // gSystem->Beep();
-   return 1;
-}
-
-////////////////////////////////////////////////////////////////////////////////
-/// Restore terminal to non-raw mode.
-
-static void ResetTermAtExit()
-{
-   // Getlinem(kCleanUp, nullptr);
-}
-
-
 //----- Interrupt signal handler -----------------------------------------------
 ////////////////////////////////////////////////////////////////////////////////
 
@@ -298,12 +272,6 @@ TRint::TRint(const char *appClassName, Int_t *argc, char **argv, void *options, 
 
    Gl_windowchanged();
 
-   atexit(ResetTermAtExit);
-
-   // Setup for tab completion
-   Gl_in_key    = &Key_Pressed;
-   Gl_beep_hook = &BeepHook;
-
    // tell Cling to use our getline
    gCling->SetGetline(Getline, Gl_histadd);
 }
@@ -313,8 +281,6 @@ TRint::TRint(const char *appClassName, Int_t *argc, char **argv, void *options, 
 
 TRint::~TRint()
 {
-   Gl_in_key = nullptr;
-   Gl_beep_hook = nullptr;
    fInputHandler->Remove();
    delete fInputHandler;
    // We can't know where the signal handler was changed since we started ...

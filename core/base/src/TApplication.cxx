@@ -1981,16 +1981,6 @@ void TApplication::ReturnPressed(char *text )
 }
 
 ////////////////////////////////////////////////////////////////////////////////
-/// Set console echo mode:
-///
-///  - mode = kTRUE  - echo input symbols
-///  - mode = kFALSE - noecho input symbols
-
-void TApplication::SetEchoMode(Bool_t)
-{
-}
-
-////////////////////////////////////////////////////////////////////////////////
 /// Static function used to create a default application environment.
 
 void TApplication::CreateApplication()

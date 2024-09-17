@@ -105,7 +105,6 @@ public:
    void            InitializeGraphics(Bool_t only_web = kFALSE);
    virtual void    GetOptions(Int_t *argc, char **argv);
    TSignalHandler *GetSignalHandler() const { return fSigHandler; }
-   virtual void    SetEchoMode(Bool_t mode);
    TString GetSetup();
    void OpenForumTopic(const TString & type);
    void OpenGitHubIssue(const TString & type);

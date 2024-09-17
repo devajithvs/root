@@ -713,17 +713,6 @@ void TRint::Terminate(Int_t status)
 }
 
 ////////////////////////////////////////////////////////////////////////////////
-/// Set console mode:
-///
-///  mode = kTRUE  - echo input symbols
-///  mode = kFALSE - noecho input symbols
-
-void TRint::SetEchoMode(Bool_t mode)
-{
-   Gl_config("noecho", mode ? 0 : 1);
-}
-
-////////////////////////////////////////////////////////////////////////////////
 /// Process the content of a line starting with ".R" (already stripped-off)
 /// The format is
 ///      [user@]host[:dir] [-l user] [-d dbg] [script]

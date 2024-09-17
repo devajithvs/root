@@ -55,7 +55,6 @@ public:
    virtual             ~TRint();
    virtual char       *GetPrompt();
    virtual const char *SetPrompt(const char *newPrompt);
-           void        SetEchoMode(Bool_t mode) override;
            void        HandleException(Int_t sig) override;
            Bool_t      HandleTermInput() override;
    virtual void        PrintLogo(Bool_t lite = kFALSE);

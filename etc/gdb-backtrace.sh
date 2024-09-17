@@ -171,6 +171,7 @@ if ! test "x$OUTFILE" = "x/dev/stdout"; then
                skip="yes"
                ;;
             *::ProcessLine* | TRint::HandleTermInput* )
+               # FIXME: Remove this
                # frames to ignore (upper end)
                if test "x$ininterp" = "xcheck this"; then
                   ininterp="no"

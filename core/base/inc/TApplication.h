@@ -112,7 +112,6 @@ public:
    void OpenReferenceGuideFor(const TString & strippedClass);
    virtual void    HandleException(Int_t sig);
    virtual void    HandleIdleTimer();   //*SIGNAL*
-   virtual Bool_t  HandleTermInput() { return kFALSE; }
    virtual void    Init() { fAppImp->Init(); }
    virtual Longptr_t ProcessLine(const char *line, Bool_t sync = kFALSE, Int_t *error = nullptr);
    virtual Longptr_t ProcessFile(const char *file, Int_t *error = nullptr, Bool_t keep = kFALSE);

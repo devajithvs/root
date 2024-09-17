@@ -1627,7 +1627,7 @@ void TWinNTSystem::DispatchOneEvent(Bool_t pendingOnly)
    while (1) {
       if (_kbhit()) {
          if (gROOT->GetApplication()) {
-            gApplication->HandleTermInput();
+            // gApplication->HandleTermInput(); // FIXME: Look into this again.
             if (gSplash) {    // terminate splash window after first key press
                delete gSplash;
                gSplash = 0;

@@ -56,7 +56,6 @@ public:
    virtual char       *GetPrompt();
    virtual const char *SetPrompt(const char *newPrompt);
            void        HandleException(Int_t sig) override;
-           Bool_t      HandleTermInput() override;
    virtual void        PrintLogo(Bool_t lite = kFALSE);
            void        Run(Bool_t retrn = kFALSE) override;
    virtual void        Terminate(int status) override;

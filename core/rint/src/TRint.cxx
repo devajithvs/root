@@ -129,7 +129,7 @@ public:
 
 Bool_t TTermInputHandler::Notify()
 {
-   return gApplication->HandleTermInput();
+   return kTRUE;
 }
 
 
@@ -582,96 +582,6 @@ const char *TRint::SetPrompt(const char *newPrompt)
       Error("SetPrompt", "newPrompt too long (> 55 characters)");
 
    return op.Data();
-}
-
-////////////////////////////////////////////////////////////////////////////////
-/// Handle input coming from terminal.
-
-Bool_t TRint::HandleTermInput()
-{
-   static TStopwatch timer;
-   const char *line;
-
-   if ((line = Getlinem(kOneChar, nullptr))) {
-      if (line[0] == 0 && Gl_eof())
-         Terminate(0);
-
-      gVirtualX->SetKeyAutoRepeat(kTRUE);
-
-      Gl_histadd(line);
-
-      TString sline = line;
-
-      // strip off '\n' and leading and trailing blanks
-      sline = sline.Chop();
-      sline = sline.Strip(TString::kBoth);
-      ReturnPressed((char*)sline.Data());
-
-      fInterrupt = kFALSE;
-
-      // prevent recursive calling of this input handler
-      fInputHandler->DeActivate();
-
-      if (gROOT->Timer()) timer.Start();
-
-      TTHREAD_TLS(Bool_t) added;
-      added = kFALSE; // reset on each call.
-
-      // This is needed when working with remote sessions
-      SetBit(kProcessRemotely);
-
-      try {
-         TRY {
-            if (!sline.IsNull())
-               LineProcessed(sline);
-            ProcessLineNr("ROOT_prompt_", sline);
-         } CATCH(excode) {
-            // enable again input handler
-            fInputHandler->Activate();
-            added = kTRUE;
-            Throw(excode);
-         } ENDTRY;
-      }
-      // handle every exception
-      catch (std::exception& e) {
-         // enable again intput handler
-         if (!added) fInputHandler->Activate();
-
-         int err;
-         char *demangledType_c = TClassEdit::DemangleTypeIdName(typeid(e), err);
-         const char* demangledType = demangledType_c;
-         if (err) {
-            demangledType_c = nullptr;
-            demangledType = "<UNKNOWN>";
-         }
-         Error("HandleTermInput()", "%s caught: %s", demangledType, e.what());
-         free(demangledType_c);
-      }
-      catch (...) {
-         // enable again intput handler
-         if (!added) fInputHandler->Activate();
-         Error("HandleTermInput()", "Exception caught!");
-      }
-
-      // `ProcessLineNr()` only prepends a `#line` directive if the previous
-      // input line was not terminated by a '\' (backslash-newline).
-      // Thus, to match source locations included in cling diagnostics, we only
-      // increment `fNcmd` if the next call to `ProcessLineNr()` will issue
-      // a new `#line`.
-      if (!fBackslashContinue && !sline.IsNull())
-         fNcmd++;
-
-      if (gROOT->Timer()) timer.Print("u");
-
-      // enable again intput handler
-      fInputHandler->Activate();
-
-      if (!sline.BeginsWith(".reset"))
-         gCling->EndOfLineAction();
-
-      Getlinem(kInit, GetPrompt());
-   }
-   return kTRUE;
 }
 
 ////////////////////////////////////////////////////////////////////////////////

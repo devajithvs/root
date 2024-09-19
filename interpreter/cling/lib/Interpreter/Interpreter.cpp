@@ -66,6 +66,7 @@
 #include <sstream>
 #include <string>
 #include <vector>
+#include <iostream>
 
 using namespace clang;
 
@@ -332,6 +333,7 @@ namespace cling {
       m_IncrParser->commitTransaction(I);
 
     m_IncrParser->SetTransformers(parentInterp);
+    m_IncrParser->SetSynthesizer(parentInterp);
 
     if (!TSCtx->getContext()) {
       // Never true, but don't tell the compiler.
@@ -1373,7 +1375,7 @@ namespace cling {
     CO.IgnorePromptDiags = 1;
 
     IncrementalParser::ParseResultTransaction PRT
-      = m_IncrParser->Compile(Wrapper, CO);
+      = m_IncrParser->Compile(input, CO);
     Transaction* lastT = PRT.getPointer();
     if (lastT && lastT->getState() != Transaction::kCommitted) {
       assert((lastT->getState() == Transaction::kCommitted
@@ -1399,27 +1401,21 @@ namespace cling {
       return kSuccess;
     }
 
-    Value resultV;
-    if (!V)
-      V = &resultV;
-    if (m_Opts.CompilerOpts.CUDADevice ||
-        !lastT->getWrapperFD()) // no wrapper to run
-      return Interpreter::kSuccess;
-    else {
-      bool WantValuePrinting = lastT->getCompilationOpts().ValuePrinting
-        != CompilationOptions::VPDisabled;
-      ExecutionResult res = RunFunction(lastT->getWrapperFD(), V);
-      if (res < kExeFirstError) {
-         if (WantValuePrinting && V->isValid()
-            // the !V->needsManagedAllocation() case is handled by
-            // dumpIfNoStorage.
-            && V->needsManagedAllocation())
-         V->dump();
-         return Interpreter::kSuccess;
-      } else {
-        return Interpreter::kFailure;
-      }
+    bool WantValuePrinting = lastT->getCompilationOpts().ValuePrinting
+      != CompilationOptions::VPDisabled;
+    
+    if (LastValue.isValid()) {
+      if (!V && WantValuePrinting) {
+        LastValue.dump();
+        LastValue.clear();
+      } else
+        *V = std::move(LastValue);
     }
+
+    // Force-flush as we might be printing on screen with printf.
+    std::cout.flush();
+    fflush(stdout);
+
     return Interpreter::kSuccess;
   }
 

@@ -10,6 +10,7 @@
 #include "DeclCollector.h"
 
 #include "IncrementalParser.h"
+#include "cling/Interpreter/Interpreter.h"
 #include "cling/Interpreter/Transaction.h"
 #include "cling/Utils/AST.h"
 
@@ -205,6 +206,12 @@ namespace cling {
 
     if (getTransaction()->getIssuedDiags() == Transaction::kErrors)
       return true;
+
+    for (Decl* D : DGR)
+      if (auto* TSD = llvm::dyn_cast<TopLevelStmtDecl>(D);
+          TSD && TSD->isSemiMissing())
+        TSD->setStmt(m_IncrParser->getInterpreter()->SynthesizeExpr(
+            cast<Expr>(TSD->getStmt())));
 
     if (comesFromASTReader(DGR)) {
       for (DeclGroupRef::iterator DI = DGR.begin(), DE = DGR.end();

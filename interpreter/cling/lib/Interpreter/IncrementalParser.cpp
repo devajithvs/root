@@ -342,6 +342,11 @@ namespace cling {
     initializeVirtualFile();
   }
 
+  llvm::StringRef
+  IncrementalParser::GetMangledName(clang::GlobalDecl GD) const {
+    return m_CodeGen->GetMangledName(GD);
+  }
+
   bool
   IncrementalParser::Initialize(llvm::SmallVectorImpl<ParseResultTransaction>&
                                 result, bool isChildInterpreter) {

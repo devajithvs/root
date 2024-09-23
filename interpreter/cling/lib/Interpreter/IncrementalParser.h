@@ -10,6 +10,7 @@
 #ifndef CLING_INCREMENTAL_PARSER_H
 #define CLING_INCREMENTAL_PARSER_H
 
+#include "clang/AST/GlobalDecl.h"
 #include "clang/Basic/SourceLocation.h"
 
 #include "llvm/ADT/PointerIntPair.h"
@@ -119,6 +120,8 @@ namespace cling {
     IncrementalParser(Interpreter* interp, const char* llvmdir,
                       const ModuleFileExtensions& moduleExtensions);
     ~IncrementalParser();
+
+    Interpreter* getInterpreter() { return m_Interpreter; }
 
     ///\brief Whether the IncrementalParser is valid.
     ///
@@ -239,6 +242,8 @@ namespace cling {
     ///\brief Add the trnasformers to the Incremental Parser.
     ///
     void SetTransformers(bool isChildInterpreter);
+
+    llvm::StringRef GetMangledName(clang::GlobalDecl GD) const;
 
   private:
     ///\brief Finalizes the consumers (e.g. CodeGen) on a transaction.

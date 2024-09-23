@@ -249,21 +249,33 @@ namespace cling {
   void Value::ManagedAllocate() {
     assert(needsManagedAllocation() && "Does not need managed allocation");
     void* dtorFunc = 0;
+    size_t ElementsSize = 1;
     clang::QualType DtorType = getType();
     // For arrays we destruct the elements.
     if (const clang::ConstantArrayType* ArrTy
         = llvm::dyn_cast<clang::ConstantArrayType>(DtorType.getTypePtr())) {
       DtorType = ArrTy->getElementType();
+      llvm::APInt ArrSize(sizeof(size_t) * 8, 1);
+      do {
+        ArrSize *= ArrTy->getSize();
+        ArrTy = llvm::dyn_cast<clang::ConstantArrayType>(
+            ArrTy->getElementType().getTypePtr());
+      } while (ArrTy);
+      ElementsSize = static_cast<size_t>(ArrSize.getZExtValue());
     }
-    if (const clang::RecordType* RTy = DtorType->getAs<clang::RecordType>()) {
-      LockCompilationDuringUserCodeExecutionRAII LCDUCER(*m_Interpreter);
-      dtorFunc = m_Interpreter->compileDtorCallFor(RTy->getDecl());
+
+    if (const auto* RT = DtorType->getAs<clang::RecordType>()) {
+      if (clang::CXXRecordDecl* CXXRD =
+              llvm::dyn_cast<clang::CXXRecordDecl>(RT->getDecl())) {
+        if (void* Addr = m_Interpreter->CompileDtorCall(CXXRD))
+          dtorFunc = reinterpret_cast<void*>(Addr);
+      }
     }
 
     const clang::ASTContext& ctx = getASTContext();
     unsigned payloadSize = ctx.getTypeSizeInChars(getType()).getQuantity();
-    m_Storage.m_Ptr = AllocatedValue::CreatePayload(payloadSize, dtorFunc,
-                                                GetNumberOfElements(getType()));
+    m_Storage.m_Ptr =
+        AllocatedValue::CreatePayload(payloadSize, dtorFunc, ElementsSize);
   }
 
   void Value::AssertTypeMismatch(const char* Type) const {

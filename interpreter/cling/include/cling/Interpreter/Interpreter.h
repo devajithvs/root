@@ -201,7 +201,7 @@ namespace cling {
     std::unique_ptr<LookupHelper> m_LookupHelper;
 
     ///\brief Cache of compiled destructors wrappers.
-    std::unordered_map<const clang::RecordDecl*, void*> m_DtorWrappers;
+    std::unordered_map<const clang::CXXRecordDecl*, void*> m_DtorWrappers;
 
     ///\brief Counter used when we need unique names.
     ///
@@ -808,7 +808,7 @@ namespace cling {
 
     ///\brief Compile (and cache) destructor calls for a record decl. Used by ~Value.
     /// They are of type extern "C" void()(void* pObj).
-    void* compileDtorCallFor(clang::RecordDecl* RD);
+    void* CompileDtorCall(clang::CXXRecordDecl *CXXRD);
 
     ///\brief Gets the address of an existing global and whether it was JITted.
     ///
@@ -889,8 +889,6 @@ namespace cling {
     Value LastValue;
 
     friend class runtime::internal::LifetimeHandler;
-
-    llvm::DenseMap<clang::CXXRecordDecl*, llvm::orc::ExecutorAddr> Dtors;
   };
 } // namespace cling
 

@@ -1350,27 +1350,22 @@ namespace cling {
     return m_Executor->getPointerToGlobalFromJIT(name);
   }
 
-  void* Interpreter::compileDtorCallFor(clang::RecordDecl* RD) {
-    void* &addr = m_DtorWrappers[RD];
-    if (addr)
-      return addr;
+  void* Interpreter::CompileDtorCall(clang::CXXRecordDecl *CXXRD) {
+    assert(CXXRD && "Cannot compile a destructor for a nullptr");
+    if (auto Dtor = m_DtorWrappers.find(CXXRD); Dtor != m_DtorWrappers.end())
+      return Dtor->second;
 
-    if (clang::CXXRecordDecl* CXXRD =
-            llvm::dyn_cast<clang::CXXRecordDecl>(RD)) {
-      // Don't generate a stub for a destructor that does nothing
-      // This also fixes printing of lambdas and C structures as they
-      // have no dtor test/ValuePrinter/Destruction.C
-      if (CXXRD->hasIrrelevantDestructor())
-        return nullptr;
+    if (CXXRD->hasIrrelevantDestructor())
+      return nullptr;
 
-      CXXDestructorDecl* DtorRD = getCI()->getSema().LookupDestructor(CXXRD);
+    clang::CXXDestructorDecl *DtorRD =
+        getCI()->getSema().LookupDestructor(CXXRD);
 
-      llvm::StringRef Name =
-          m_IncrParser->GetMangledName(clang::GlobalDecl(DtorRD, Dtor_Base));
-      return getAddressOfGlobal(Name);
-    }
-
-    return nullptr;
+    auto Name =
+        m_IncrParser->GetMangledName(clang::GlobalDecl(DtorRD, Dtor_Base));
+    void* AddrOrErr = getAddressOfGlobal(Name);
+    m_DtorWrappers[CXXRD] = AddrOrErr;
+    return AddrOrErr;
   }
 
   static constexpr llvm::StringRef MagicRuntimeInterface[] = {

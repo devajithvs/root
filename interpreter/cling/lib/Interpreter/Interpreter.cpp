@@ -439,27 +439,29 @@ namespace cling {
     // itself? One could use a macro (simillar to __dso_handle) to block
     // assignemnt and get around the mangling issue.
     const char* Linkage = LangOpts.CPlusPlus ? "extern \"C\"" : "";
+
+    Strm << "#ifdef __cplusplus\n"
+            "void* operator new(__SIZE_TYPE__, void* __p) noexcept;\n"
+            "void *__clang_Interpreter_SetValueWithAlloc(void*, void*, void*);\n"
+            "void __clang_Interpreter_SetValueNoAlloc(void*, void*, void*);\n"
+            "void __clang_Interpreter_SetValueNoAlloc(void*, void*, void*, void*);\n"
+            "void __clang_Interpreter_SetValueNoAlloc(void*, void*, void*, float);\n"
+            "void __clang_Interpreter_SetValueNoAlloc(void*, void*, void*, double);\n"
+            "void __clang_Interpreter_SetValueNoAlloc(void*, void*, void*, long double);\n"
+            "void __clang_Interpreter_SetValueNoAlloc(void*,void*,void*,unsigned long long);\n"
+            "template <class T, class = T (*)() /*disable for arrays*/>\n"
+            "void __clang_Interpreter_SetValueCopyArr(T* Src, void* Placement, unsigned long Size) {\n"
+              "for (auto Idx = 0; Idx < Size; ++Idx)\n"
+                "new ((void*)(((T*)Placement) + Idx)) T(Src[Idx]);\n"
+            "}\n"
+            "template <class T, unsigned long N>\n"
+            "void __clang_Interpreter_SetValueCopyArr(const T (*Src)[N], void* Placement, unsigned long Size) {\n"
+              "__clang_Interpreter_SetValueCopyArr(Src[0], Placement, Size);\n"
+            "}\n"
+            "#endif // __cplusplus\n";
+
     if (!NoRuntime) {
       if (LangOpts.CPlusPlus) {
-        
-        Strm << "void *__clang_Interpreter_SetValueWithAlloc(void*, void*, void*);\n"
-                "void __clang_Interpreter_SetValueNoAlloc(void*, void*, void*);\n"
-                "void __clang_Interpreter_SetValueNoAlloc(void*, void*, void*, void*);\n"
-                "void __clang_Interpreter_SetValueNoAlloc(void*, void*, void*, float);\n"
-                "void __clang_Interpreter_SetValueNoAlloc(void*, void*, void*, double);\n"
-                "void __clang_Interpreter_SetValueNoAlloc(void*, void*, void*, long double);\n"
-                "void __clang_Interpreter_SetValueNoAlloc(void*,void*,void*,unsigned long long);\n"
-                "struct __clang_Interpreter_NewTag{} __ci_newtag;\n"
-                "void* operator new(__SIZE_TYPE__, void* __p, __clang_Interpreter_NewTag) noexcept;\n"
-                "template <class T, class = T (*)() /*disable for arrays*/>\n"
-                "void __clang_Interpreter_SetValueCopyArr(T* Src, void* Placement, unsigned long Size) {\n"
-                  "for (auto Idx = 0; Idx < Size; ++Idx)\n"
-                    "new ((void*)(((T*)Placement) + Idx), __ci_newtag) T(Src[Idx]);\n"
-                "}\n"
-                "template <class T, unsigned long N>\n"
-                "void __clang_Interpreter_SetValueCopyArr(const T (*Src)[N], void* Placement, unsigned long Size) {\n"
-                  "__clang_Interpreter_SetValueCopyArr(Src[0], Placement, Size);\n"
-                "}\n";
         Strm << "#include <cling/Interpreter/RuntimeUniverse.h>\n";
         if (EmitDefinitions)
           Strm << "namespace cling { class Interpreter; namespace runtime { "
@@ -1374,7 +1376,7 @@ namespace cling {
   static constexpr llvm::StringRef MagicRuntimeInterface[] = {
       "__clang_Interpreter_SetValueNoAlloc",
       "__clang_Interpreter_SetValueWithAlloc",
-      "__clang_Interpreter_SetValueCopyArr", "__ci_newtag"};
+      "__clang_Interpreter_SetValueCopyArr"};
 
   bool Interpreter::FindRuntimeInterface() {
     if (llvm::all_of(ValuePrintingInfo, [](Expr *E) { return E != nullptr; }))
@@ -1403,9 +1405,6 @@ namespace cling {
       return false;
     if (!LookupInterface(ValuePrintingInfo[CopyArray],
                         MagicRuntimeInterface[CopyArray]))
-      return false;
-    if (!LookupInterface(ValuePrintingInfo[NewTag],
-                        MagicRuntimeInterface[NewTag]))
       return false;
     return true;
   }
@@ -1484,9 +1483,6 @@ public:
                 .getValuePrintingInfo()[Interpreter::InterfaceKind::CopyArray],
             SourceLocation(), Args, SourceLocation());
       }
-      Expr *Args[] = {
-          AllocCall.get(),
-          Interp.getValuePrintingInfo()[Interpreter::InterfaceKind::NewTag]};
       ExprResult CXXNewCall = S.BuildCXXNew(
           E->getSourceRange(),
           /*UseGlobal=*/true, /*PlacementLParen=*/SourceLocation(), Args,
@@ -2217,15 +2213,3 @@ namespace runtime {
   }  // namespace runtime
 
 } //end namespace cling
-
-// A trampoline to work around the fact that operator placement new cannot
-// really be forward declared due to libc++ and libstdc++ declaration mismatch.
-// FIXME: __clang_Interpreter_NewTag is ODR violation because we get the same
-// definition in the interpreter runtime. We should move it in a runtime header
-// which gets included by the interpreter and here.
-struct __clang_Interpreter_NewTag {};
-CLING_LIB_EXPORT void *
-operator new(size_t __sz, void *__p, __clang_Interpreter_NewTag) noexcept {
-  // Just forward to the standard operator placement new.
-  return operator new(__sz, __p);
-}

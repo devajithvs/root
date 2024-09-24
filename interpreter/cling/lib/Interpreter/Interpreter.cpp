@@ -442,21 +442,21 @@ namespace cling {
 
     Strm << "#ifdef __cplusplus\n"
             "void* operator new(__SIZE_TYPE__, void* __p) noexcept;\n"
-            "void *__clang_Interpreter_SetValueWithAlloc(void*, void*, void*);\n"
-            "void __clang_Interpreter_SetValueNoAlloc(void*, void*, void*);\n"
-            "void __clang_Interpreter_SetValueNoAlloc(void*, void*, void*, void*);\n"
-            "void __clang_Interpreter_SetValueNoAlloc(void*, void*, void*, float);\n"
-            "void __clang_Interpreter_SetValueNoAlloc(void*, void*, void*, double);\n"
-            "void __clang_Interpreter_SetValueNoAlloc(void*, void*, void*, long double);\n"
-            "void __clang_Interpreter_SetValueNoAlloc(void*,void*,void*,unsigned long long);\n"
+            "void *__cling_Interpreter_SetValueWithAlloc(void*, void*, void*);\n"
+            "void __cling_Interpreter_SetValueNoAlloc(void*, void*, void*);\n"
+            "void __cling_Interpreter_SetValueNoAlloc(void*, void*, void*, void*);\n"
+            "void __cling_Interpreter_SetValueNoAlloc(void*, void*, void*, float);\n"
+            "void __cling_Interpreter_SetValueNoAlloc(void*, void*, void*, double);\n"
+            "void __cling_Interpreter_SetValueNoAlloc(void*, void*, void*, long double);\n"
+            "void __cling_Interpreter_SetValueNoAlloc(void*,void*,void*,unsigned long long);\n"
             "template <class T, class = T (*)() /*disable for arrays*/>\n"
-            "void __clang_Interpreter_SetValueCopyArr(T* Src, void* Placement, unsigned long Size) {\n"
+            "void __cling_Interpreter_SetValueCopyArr(T* Src, void* Placement, unsigned long Size) {\n"
               "for (auto Idx = 0; Idx < Size; ++Idx)\n"
                 "new ((void*)(((T*)Placement) + Idx)) T(Src[Idx]);\n"
             "}\n"
             "template <class T, unsigned long N>\n"
-            "void __clang_Interpreter_SetValueCopyArr(const T (*Src)[N], void* Placement, unsigned long Size) {\n"
-              "__clang_Interpreter_SetValueCopyArr(Src[0], Placement, Size);\n"
+            "void __cling_Interpreter_SetValueCopyArr(const T (*Src)[N], void* Placement, unsigned long Size) {\n"
+              "__cling_Interpreter_SetValueCopyArr(Src[0], Placement, Size);\n"
             "}\n"
             "#endif // __cplusplus\n";
 
@@ -1369,9 +1369,9 @@ namespace cling {
   }
 
   static constexpr llvm::StringRef MagicRuntimeInterface[] = {
-      "__clang_Interpreter_SetValueNoAlloc",
-      "__clang_Interpreter_SetValueWithAlloc",
-      "__clang_Interpreter_SetValueCopyArr"};
+      "__cling_Interpreter_SetValueNoAlloc",
+      "__cling_Interpreter_SetValueWithAlloc",
+      "__cling_Interpreter_SetValueCopyArr"};
 
   bool Interpreter::FindRuntimeInterface() {
     if (llvm::all_of(ValuePrintingInfo, [](Expr *E) { return E != nullptr; }))
@@ -1448,7 +1448,7 @@ public:
     switch (Kind) {
     case Interpreter::InterfaceKind::WithAlloc:
     case Interpreter::InterfaceKind::CopyArray: {
-      // __clang_Interpreter_SetValueWithAlloc.
+      // __cling_Interpreter_SetValueWithAlloc.
       ExprResult AllocCall = S.ActOnCallExpr(
           /*Scope=*/nullptr,
           Interp.getValuePrintingInfo()[Interpreter::InterfaceKind::WithAlloc],
@@ -1465,7 +1465,7 @@ public:
             DeclGroupRef(Dtor));
       }
 
-      // __clang_Interpreter_SetValueCopyArr.
+      // __cling_Interpreter_SetValueCopyArr.
       if (Kind == Interpreter::InterfaceKind::CopyArray) {
         const auto *ConstantArrTy =
             cast<ConstantArrayType>(DesugaredTy.getTypePtr());
@@ -1491,7 +1491,7 @@ public:
       return S.ActOnFinishFullExpr(CXXNewCall.get(),
                                    /*DiscardedValue=*/false);
     }
-      // __clang_Interpreter_SetValueNoAlloc.
+      // __cling_Interpreter_SetValueNoAlloc.
     case Interpreter::InterfaceKind::NoAlloc: {
       return S.ActOnCallExpr(
           /*Scope=*/nullptr,
@@ -1556,7 +1556,7 @@ public:
 
 private:
   // Force cast these types to uint64 to reduce the number of overloads of
-  // `__clang_Interpreter_SetValueNoAlloc`.
+  // `__cling_Interpreter_SetValueNoAlloc`.
   void HandleIntegralOrEnumType(const Type *Ty) {
     TypeSourceInfo *TSI = Ctx.getTrivialTypeSourceInfo(Ctx.UnsignedLongLongTy);
     ExprResult CastedExpr =
@@ -2073,12 +2073,12 @@ private:
 //   clang-repl> x
 // To:
 //   // 1. If x is a built-in type like int, float.
-//   __clang_Interpreter_SetValueNoAlloc(ThisInterp, OpaqueValue, xQualType, x);
+//   __cling_Interpreter_SetValueNoAlloc(ThisInterp, OpaqueValue, xQualType, x);
 //   // 2. If x is a struct, and a lvalue.
-//   __clang_Interpreter_SetValueNoAlloc(ThisInterp, OpaqueValue, xQualType,
+//   __cling_Interpreter_SetValueNoAlloc(ThisInterp, OpaqueValue, xQualType,
 //   &x);
 //   // 3. If x is a struct, but a rvalue.
-//   new (__clang_Interpreter_SetValueWithAlloc(ThisInterp, OpaqueValue,
+//   new (__cling_Interpreter_SetValueWithAlloc(ThisInterp, OpaqueValue,
 //   xQualType)) (x);
 
 Expr *Interpreter::SynthesizeExpr(Expr *E) {
@@ -2095,7 +2095,7 @@ Expr *Interpreter::SynthesizeExpr(Expr *E) {
   // Create parameter `OutVal`.
   auto *OutValue = cling::utils::Synthesize::CStyleCastPtrExpr(&S, Ctx.VoidPtrTy, (uintptr_t)&LastValue);
 
-  // Build `__clang_Interpreter_SetValue*` call.
+  // Build `__cling_Interpreter_SetValue*` call.
   RuntimeInterfaceBuilder Builder(*this, Ctx, S, E, {ThisInterp, OutValue});
 
   ExprResult Result = Builder.getCall();
@@ -2107,7 +2107,7 @@ Expr *Interpreter::SynthesizeExpr(Expr *E) {
 
 // Temporary rvalue struct that need special care.
 CLING_LIB_EXPORT void *
-__clang_Interpreter_SetValueWithAlloc(void *This, void *OutVal,
+__cling_Interpreter_SetValueWithAlloc(void *This, void *OutVal,
                                       void *OpaqueType) {
   Value &VRef = *(Value *)OutVal;
   VRef = Value(clang::QualType::getFromOpaquePtr(OpaqueType),
@@ -2117,7 +2117,7 @@ __clang_Interpreter_SetValueWithAlloc(void *This, void *OutVal,
 
 // Pointers, lvalue struct that can take as a reference.
 CLING_LIB_EXPORT void
-__clang_Interpreter_SetValueNoAlloc(void *This, void *OutVal, void *OpaqueType,
+__cling_Interpreter_SetValueNoAlloc(void *This, void *OutVal, void *OpaqueType,
                                     void *Val) {
   Value &VRef = *(Value *)OutVal;
   VRef = Value(clang::QualType::getFromOpaquePtr(OpaqueType),
@@ -2126,7 +2126,7 @@ __clang_Interpreter_SetValueNoAlloc(void *This, void *OutVal, void *OpaqueType,
 }
 
 CLING_LIB_EXPORT void
-__clang_Interpreter_SetValueNoAlloc(void *This, void *OutVal,
+__cling_Interpreter_SetValueNoAlloc(void *This, void *OutVal,
                                     void *OpaqueType) {
   Value &VRef = *(Value *)OutVal;
   VRef = Value(clang::QualType::getFromOpaquePtr(OpaqueType),
@@ -2151,7 +2151,7 @@ static void SetValueDataBasedOnQualType(Value &V, unsigned long long Data) {
 }
 
 CLING_LIB_EXPORT void
-__clang_Interpreter_SetValueNoAlloc(void *This, void *OutVal, void *OpaqueType,
+__cling_Interpreter_SetValueNoAlloc(void *This, void *OutVal, void *OpaqueType,
                                     unsigned long long Val) {
   Value &VRef = *(Value *)OutVal;
   VRef = Value(clang::QualType::getFromOpaquePtr(OpaqueType),
@@ -2160,7 +2160,7 @@ __clang_Interpreter_SetValueNoAlloc(void *This, void *OutVal, void *OpaqueType,
 }
 
 CLING_LIB_EXPORT void
-__clang_Interpreter_SetValueNoAlloc(void *This, void *OutVal, void *OpaqueType,
+__cling_Interpreter_SetValueNoAlloc(void *This, void *OutVal, void *OpaqueType,
                                     float Val) {
   Value &VRef = *(Value *)OutVal;
   VRef = Value(clang::QualType::getFromOpaquePtr(OpaqueType),
@@ -2169,7 +2169,7 @@ __clang_Interpreter_SetValueNoAlloc(void *This, void *OutVal, void *OpaqueType,
 }
 
 CLING_LIB_EXPORT void
-__clang_Interpreter_SetValueNoAlloc(void *This, void *OutVal, void *OpaqueType,
+__cling_Interpreter_SetValueNoAlloc(void *This, void *OutVal, void *OpaqueType,
                                     double Val) {
   Value &VRef = *(Value *)OutVal;
   VRef = Value(clang::QualType::getFromOpaquePtr(OpaqueType),
@@ -2178,7 +2178,7 @@ __clang_Interpreter_SetValueNoAlloc(void *This, void *OutVal, void *OpaqueType,
 }
 
 CLING_LIB_EXPORT void
-__clang_Interpreter_SetValueNoAlloc(void *This, void *OutVal, void *OpaqueType,
+__cling_Interpreter_SetValueNoAlloc(void *This, void *OutVal, void *OpaqueType,
                                     long double Val) {
   Value &VRef = *(Value *)OutVal;
   VRef = Value(clang::QualType::getFromOpaquePtr(OpaqueType),

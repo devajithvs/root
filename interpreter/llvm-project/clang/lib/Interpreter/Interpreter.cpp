@@ -631,6 +631,7 @@ public:
     }
       // __clang_Interpreter_SetValueNoAlloc.
     case Interpreter::InterfaceKind::NoAlloc: {
+      Interp.getValuePrintingInfo()[Interpreter::InterfaceKind::NoAlloc]->dump();
       return S.ActOnCallExpr(
           /*Scope=*/nullptr,
           Interp.getValuePrintingInfo()[Interpreter::InterfaceKind::NoAlloc],

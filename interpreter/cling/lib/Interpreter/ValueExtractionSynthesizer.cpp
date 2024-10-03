@@ -25,11 +25,11 @@
 using namespace clang;
 
 namespace cling {
-  ValueExtractionSynthesizer::ValueExtractionSynthesizer(clang::Sema* S,
+  ValueExtractionSynthesizer::ValueExtractionSynthesizer(clang::Sema* S, Interpreter* m_Interpreter,
                                                          bool isChildInterpreter)
     : WrapperTransformer(S), m_Context(&S->getASTContext()), m_gClingVD(0),
       m_UnresolvedNoAlloc(0), m_UnresolvedWithAlloc(0),
-      m_UnresolvedCopyArray(0), m_isChildInterpreter(isChildInterpreter) { }
+      m_UnresolvedCopyArray(0), m_isChildInterpreter(isChildInterpreter), m_Interpreter(m_Interpreter) { }
 
   // pin the vtable here.
   ValueExtractionSynthesizer::~ValueExtractionSynthesizer() { }
@@ -207,10 +207,6 @@ namespace {
     if (!m_gClingVD && !FindAndCacheRuntimeDecls(E))
       return nullptr;
 
-    // Build a reference to gCling
-    ExprResult gClingDRE
-      = m_Sema->BuildDeclRefExpr(m_gClingVD, m_Context->VoidPtrTy,
-                                 VK_PRValue, SourceLocation());
     // We have the wrapper as Sema's CurContext
     FunctionDecl* FD = cast<FunctionDecl>(m_Sema->CurContext);
 
@@ -220,14 +216,12 @@ namespace {
       Cleanups = cast<ExprWithCleanups>(E);
       E = Cleanups->getSubExpr();
     }
-
+    llvm::errs() << "working0\n" << E->getType();
+    E->dump();
     // Build a reference to Value* in the wrapper, should be
     // the only argument of the wrapper.
     SourceLocation locStart = (E) ? E->getBeginLoc() : FD->getBeginLoc();
     SourceLocation locEnd = (E) ? E->getEndLoc() : FD->getEndLoc();
-    ExprResult wrapperSVRDRE
-      = m_Sema->BuildDeclRefExpr(FD->getParamDecl(0), m_Context->VoidPtrTy,
-                                 VK_PRValue, locStart);
     QualType ETy = (E) ? E->getType() : m_Context->VoidTy;
     QualType desugaredTy = ETy.getDesugaredType(*m_Context);
 
@@ -240,21 +234,36 @@ namespace {
       desugaredTy = m_Context->getLValueReferenceType(desugaredTy);
       ETy = m_Context->getLValueReferenceType(ETy);
     }
+
+    llvm::errs() << "working1\n";
+
+
+    // Create parameter `ThisInterp`.
+    auto *ThisInterp = utils::Synthesize::CStyleCastPtrExpr(m_Sema, m_Context->VoidPtrTy, (uintptr_t)m_Interpreter);
+    
+    llvm::errs() << "working1.1\n";
+    // Create parameter `OutVal`.
+    auto *OutValue = utils::Synthesize::CStyleCastPtrExpr(m_Sema, m_Context->VoidPtrTy, (uintptr_t)&(m_Interpreter->LastValue));
+    llvm::errs() << "working1.2\n";
+
     Expr* ETyVP
       = utils::Synthesize::CStyleCastPtrExpr(m_Sema, m_Context->VoidPtrTy,
                                              (uintptr_t)ETy.getAsOpaquePtr());
 
+    llvm::errs() << "working1.3\n";
     // Pass whether to Value::dump() or not:
-    Expr* EVPOn =
-        new (*m_Context) CharacterLiteral(getCompilationOpts().ValuePrinting,
-                                          CharacterLiteralKind::Ascii,
-                                          m_Context->CharTy, SourceLocation());
+    // Expr* EVPOn =
+    //     new (*m_Context) CharacterLiteral(getCompilationOpts().ValuePrinting,
+    //                                       CharacterLiteralKind::Ascii,
+    //                                       m_Context->CharTy, SourceLocation());
 
-    llvm::SmallVector<Expr*, 6> CallArgs;
-    CallArgs.push_back(gClingDRE.get());
-    CallArgs.push_back(wrapperSVRDRE.get());
+    llvm::errs() << "working2\n";
+
+    llvm::SmallVector<Expr*, 5> CallArgs;
+    CallArgs.push_back(ThisInterp);
+    CallArgs.push_back(OutValue);
     CallArgs.push_back(ETyVP);
-    CallArgs.push_back(EVPOn);
+    // CallArgs.push_back(EVPOn);
 
     ExprResult Call;
     SourceLocation noLoc = locStart;
@@ -263,6 +272,7 @@ namespace {
       // previous settings to void.
       // We need to synthesize setValueNoAlloc(...), E, because we still need
       // to run E.
+      llvm::errs() << "desugaredTy->isVoidType()\n";
 
       // FIXME: Suboptimal: this discards the already created AST nodes.
       QualType vpQT = m_Context->VoidPtrTy;
@@ -284,6 +294,7 @@ namespace {
              || desugaredTy->isMemberPointerType()) {
       // 2) object types :
       // check existence of copy constructor before call
+      llvm::errs() << "2) object types :\n";
       if (!desugaredTy->isMemberPointerType()
           && !availableCopyConstructor(desugaredTy, m_Sema))
         return E;
@@ -316,6 +327,7 @@ namespace {
 
       }
       else {
+      llvm::errs() << "2) object types - else\n";
         if (!E->getSourceRange().isValid()) {
           // We cannot do CXXNewExpr::CallInit (see Sema::BuildCXXNew) but
           // that's what we want. Fail...
@@ -351,7 +363,9 @@ namespace {
     else {
       // Mark the current number of arguemnts
       const size_t nArgs = CallArgs.size();
+      llvm::errs() << "Pre isIntegralOrEnumerationType\n";
       if (desugaredTy->isIntegralOrEnumerationType()) {
+      llvm::errs() << "in isIntegralOrEnumerationType\n\n";
         // 1)  enum, integral, float, double, referece, pointer types :
         //      call to cling::internal::setValueNoAlloc(...);
 
@@ -361,15 +375,18 @@ namespace {
           = m_Context->getTrivialTypeSourceInfo(UInt64Ty, noLoc);
         Expr* castedE
           = m_Sema->BuildCStyleCastExpr(noLoc, TSI, noLoc, E).get();
+        castedE->dump();
         CallArgs.push_back(castedE);
       }
       else if (desugaredTy->isReferenceType()) {
+      llvm::errs() << "in isReferenceType\n\n";
         // we need to get the address of the references
         Expr* AddrOfE  = m_Sema->CreateBuiltinUnaryOp(noLoc, UO_AddrOf, E).get();
         CallArgs.push_back(AddrOfE);
       }
       else if (desugaredTy->isAnyPointerType()) {
         // function pointers need explicit void* cast.
+      llvm::errs() << "in isAnyPointerType\n\n";
         QualType VoidPtrTy = m_Context->VoidPtrTy;
         TypeSourceInfo* TSI
           = m_Context->getTrivialTypeSourceInfo(VoidPtrTy, noLoc);
@@ -378,22 +395,29 @@ namespace {
         CallArgs.push_back(castedE);
       }
       else if (desugaredTy->isNullPtrType()) {
+      llvm::errs() << "in isNullPtrType\n\n";
         // nullptr should decay to void* just fine.
         CallArgs.push_back(E);
       }
       else if (desugaredTy->isFloatingType()) {
+      llvm::errs() << "in isFloatingType\n\n";
         // floats and double will fall naturally in the correct
         // case, because of the overload resolution.
+        E->dump();
         CallArgs.push_back(E);
       }
 
       // Test CallArgs.size to make sure an additional argument (the value)
       // has been pushed on, if not than we didn't know how to handle the type
       if (CallArgs.size() > nArgs) {
+      llvm::errs() << "in nArgs\n\n";
+      m_UnresolvedNoAlloc->dump();
         Call = m_Sema->ActOnCallExpr(/*Scope*/0, m_UnresolvedNoAlloc,
                                    locStart, CallArgs, locEnd);
+      m_UnresolvedNoAlloc->dump();
       }
       else {
+      llvm::errs() << "in <nArgs\n\n";
         m_Sema->Diag(locStart, diag::err_unsupported_unknown_any_decl) <<
           utils::TypeName::GetFullyQualifiedName(desugaredTy, *m_Context) <<
           SourceRange(locStart, locEnd);
@@ -402,6 +426,7 @@ namespace {
 
     assert(!Call.isInvalid() && "Invalid Call");
 
+    llvm::errs() << "working3\n";
     // Extend the scope of the temporary cleaner if applicable.
     if (Cleanups && !Call.isInvalid()) {
       Cleanups->setSubExpr(Call.get());
@@ -486,20 +511,20 @@ namespace {
 // Provide implementation of the functions that ValueExtractionSynthesizer calls
 namespace {
 
-  static void dumpIfNoStorage(void* vpV, char vpOn) {
-    const cling::Value& V = *(cling::Value*)vpV;
-    // If the value copies over the temporary we must delay the printing until
-    // the temporary gets copied over. For the rest of the temporaries we *must*
-    // dump here because their lifetime will be gone otherwise. Eg.
-    //
-    // std::string f(); f().c_str() // have to dump during the same stmt.
-    //
-    assert(!V.needsManagedAllocation() && "Must contain non managed temporary");
-    assert(vpOn != (char)cling::CompilationOptions::VPAuto
-           && "VPAuto must have been expanded earlier.");
-    if (vpOn == (char)cling::CompilationOptions::VPEnabled)
-      V.dump();
-  }
+  // static void dumpIfNoStorage(void* vpV, char vpOn) {
+  //   const cling::Value& V = *(cling::Value*)vpV;
+  //   // If the value copies over the temporary we must delay the printing until
+  //   // the temporary gets copied over. For the rest of the temporaries we *must*
+  //   // dump here because their lifetime will be gone otherwise. Eg.
+  //   //
+  //   // std::string f(); f().c_str() // have to dump during the same stmt.
+  //   //
+  //   assert(!V.needsManagedAllocation() && "Must contain non managed temporary");
+  //   assert(vpOn != (char)cling::CompilationOptions::VPAuto
+  //          && "VPAuto must have been expanded earlier.");
+  //   if (vpOn == (char)cling::CompilationOptions::VPEnabled)
+  //     V.dump();
+  // }
 
   ///\brief Allocate the Value and return the Value
   /// for an expression evaluated at the prompt.
@@ -512,6 +537,7 @@ namespace {
     cling::Interpreter* i = (cling::Interpreter*)vpI;
     clang::QualType QT = clang::QualType::getFromOpaquePtr(vpQT);
     cling::Value& SVR = *(cling::Value*)vpSVR;
+    // if (vpSVR) SVR.dump();
     // Here the copy keeps the refcounted value alive.
     SVR = cling::Value(QT, *i);
     return SVR;
@@ -521,49 +547,50 @@ namespace cling {
 namespace runtime {
   namespace internal {
     CLING_LIB_EXPORT
-    void setValueNoAlloc(void* vpI, void* vpSVR, void* vpQT, char vpOn) {
+    void setValueNoAlloc(void* vpI, void* vpSVR, void* vpQT) {
       // In cases of void we 'just' need to change the type of the value.
       allocateStoredRefValueAndGetGV(vpI, vpSVR, vpQT);
     }
 
     CLING_LIB_EXPORT
-    void setValueNoAlloc(void* vpI, void* vpSVR, void* vpQT, char vpOn,
+    void setValueNoAlloc(void* vpI, void* vpSVR, void* vpQT,
                          float value) {
+      llvm::errs() << "setValueNoAlloc\n";
       allocateStoredRefValueAndGetGV(vpI, vpSVR, vpQT).setFloat(value);
-      dumpIfNoStorage(vpSVR, vpOn);
+      // dumpIfNoStorage(vpSVR, vpOn);
     }
 
     CLING_LIB_EXPORT
-    void setValueNoAlloc(void* vpI, void* vpSVR, void* vpQT, char vpOn,
+    void setValueNoAlloc(void* vpI, void* vpSVR, void* vpQT,
                          double value) {
       allocateStoredRefValueAndGetGV(vpI, vpSVR, vpQT).setDouble(value);
-      dumpIfNoStorage(vpSVR, vpOn);
+      // dumpIfNoStorage(vpSVR, vpOn);
     }
 
     CLING_LIB_EXPORT
-    void setValueNoAlloc(void* vpI, void* vpSVR, void* vpQT, char vpOn,
+    void setValueNoAlloc(void* vpI, void* vpSVR, void* vpQT,
                          long double value) {
       allocateStoredRefValueAndGetGV(vpI, vpSVR, vpQT).setLongDouble(value);
-      dumpIfNoStorage(vpSVR, vpOn);
+      // dumpIfNoStorage(vpSVR, vpOn);
     }
 
     CLING_LIB_EXPORT
-    void setValueNoAlloc(void* vpI, void* vpSVR, void* vpQT, char vpOn,
+    void setValueNoAlloc(void* vpI, void* vpSVR, void* vpQT,
                          unsigned long long value) {
       allocateStoredRefValueAndGetGV(vpI, vpSVR, vpQT).setULongLong(value);
-      dumpIfNoStorage(vpSVR, vpOn);
+      // dumpIfNoStorage(vpSVR, vpOn);
     }
 
     CLING_LIB_EXPORT
-    void setValueNoAlloc(void* vpI, void* vpSVR, void* vpQT, char vpOn,
+    void setValueNoAlloc(void* vpI, void* vpSVR, void* vpQT,
                          const void* value){
       allocateStoredRefValueAndGetGV(vpI, vpSVR, vpQT)
         .setPtr(const_cast<void*>(value));
-      dumpIfNoStorage(vpSVR, vpOn);
+      // dumpIfNoStorage(vpSVR, vpOn);
     }
 
     CLING_LIB_EXPORT
-    void* setValueWithAlloc(void* vpI, void* vpSVR, void* vpQT, char vpOn) {
+    void* setValueWithAlloc(void* vpI, void* vpSVR, void* vpQT) {
       return allocateStoredRefValueAndGetGV(vpI, vpSVR, vpQT).getPtr();
     }
   } // end namespace internal

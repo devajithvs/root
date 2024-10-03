@@ -333,6 +333,7 @@ namespace cling {
       m_IncrParser->commitTransaction(I);
 
     m_IncrParser->SetTransformers(parentInterp);
+    m_IncrParser->SetSynthesizer(parentInterp);
 
     if (!TSCtx->getContext()) {
       // Never true, but don't tell the compiler.
@@ -1420,20 +1421,13 @@ namespace cling {
 
     Value resultV;
     if (!V)
-      V = &resultV;
+      V = &LastValue;
     bool WantValuePrinting = lastT->getCompilationOpts().ValuePrinting
       != CompilationOptions::VPDisabled;
-    auto res = executeTransaction(*lastT);
 
-    if (res < kExeFirstError) {
-        if (WantValuePrinting && V->isValid()
-          // the !V->needsManagedAllocation() case is handled by
-          // dumpIfNoStorage.
-          && V->needsManagedAllocation())
-        V->dump();
-        return Interpreter::kSuccess;
-    } else {
-      return Interpreter::kFailure;
+    if (LastValue.isValid()) {
+      LastValue.dump();
+      LastValue.clear();
     }
     return Interpreter::kSuccess;
   }

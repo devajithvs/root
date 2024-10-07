@@ -615,9 +615,10 @@ namespace cling {
       m_Interpreter->unload(*T);
 
       // Create a new module if necessary.
-      if (MustStartNewModule)
-        GenModule();
-
+      if (MustStartNewModule) {
+        std::unique_ptr<llvm::Module> M = GenModule();
+        T->setModule(std::move(M));
+      }
       return;
     }
 
@@ -761,7 +762,8 @@ namespace cling {
         callbacks->TransactionCodeGenFinished(*T);
 
       // Create a new module.
-      GenModule();
+      if (std::unique_ptr<llvm::Module> M = GenModule())
+        T->setModule(std::move(M));
     }
   }
 
@@ -942,6 +944,9 @@ namespace cling {
     else if (Diags.getNumWarnings())
       return kSuccessWithWarnings;
 
+    if (std::unique_ptr<llvm::Module> M = GenModule())
+      m_Consumer->getTransaction()->setModule(std::move(M));
+
     return kSuccess;
   }
 
@@ -1033,6 +1038,8 @@ namespace cling {
 
     LocalInstantiations.perform();
     GlobalInstantiations.perform();
+
+    m_Consumer->HandleTranslationUnit(getCI()->getASTContext());
 
     return llvm::Error::success();
   }

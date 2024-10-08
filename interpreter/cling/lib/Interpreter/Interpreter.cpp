@@ -64,6 +64,7 @@
 #include "llvm/Support/Path.h"
 
 #include <sstream>
+#include <iostream>
 #include <string>
 #include <vector>
 
@@ -1629,10 +1630,14 @@ namespace cling {
     // We have wrapped and need to disable warnings that are caused by
     // non-default C++ at the prompt:
     CO.IgnorePromptDiags = 1;
-
+    
+    llvm::errs() << "Pre compile\n";
     IncrementalParser::ParseResultTransaction PRT
       = m_IncrParser->Compile(input, CO);
+    llvm::errs() << "Post compile\n";
     Transaction* lastT = PRT.getPointer();
+    if (lastT->getModule()) llvm::errs() << "Module exist\n";
+    else llvm::errs() << "Module doesn't exist\n";
     if (lastT && lastT->getState() != Transaction::kCommitted) {
       assert((lastT->getState() == Transaction::kCommitted
               || lastT->getState() == Transaction::kRolledBack
@@ -1657,26 +1662,45 @@ namespace cling {
       return kSuccess;
     }
 
-    Value resultV;
-    if (!V)
-      V = &resultV;
+    // Value resultV;
+    // if (!V)
+    //   V = &resultV;
+    if (lastT->getModule()) llvm::errs() << "Module exist\n";
+    else llvm::errs() << "Module doesn't exist\n";
     bool WantValuePrinting = lastT->getCompilationOpts().ValuePrinting
       != CompilationOptions::VPDisabled;
     auto res = executeTransaction(*lastT);
 
+    if (lastT->getModule()) llvm::errs() << "Module exist\n";
+    else llvm::errs() << "Module doesn't exist\n";
+
+    // Force-flush as we might be printing on screen with printf.
+    std::cout.flush();
+    fflush(stdout);
+
+    llvm::errs() << "LastValue.isValid()" << LastValue.isValid() << "\n";
     if (LastValue.isValid()) {
       LastValue.dump();
       *V = std::move(LastValue);
     }
 
+    
     if (res < kExeFirstError) {
+      llvm::errs() << "WantValuePrinting" << WantValuePrinting << "\n";
+      llvm::errs() << "V->isValid()" << V->isValid() << "\n";
+      llvm::errs() << "V->needsManagedAllocation()" << V->needsManagedAllocation() << "\n";
         if (WantValuePrinting && V->isValid()
           // the !V->needsManagedAllocation() case is handled by
           // dumpIfNoStorage.
-          && V->needsManagedAllocation())
+          && V->needsManagedAllocation()){
+        llvm::errs() << "Dumping\n";
         V->dump();
+        llvm::errs() << "Post Dumping\n";}
         return Interpreter::kSuccess;
     } else {
+      llvm::errs() << "Not Working\n";
+      llvm::errs() << res << "\n";
+      llvm::errs() << kExeNoModule << "\n";
       return Interpreter::kFailure;
     }
     return Interpreter::kSuccess;
@@ -2102,6 +2126,8 @@ namespace cling {
   //   xQualType)) (x);
 
   Expr* Interpreter::SynthesizeExpr(Expr* E) {
+    llvm::errs() << "Type of expression: " << E->getType().getAsString() << "\n";
+
     Sema& S = getCI()->getSema();
     ASTContext& Ctx = S.getASTContext();
 
@@ -2122,6 +2148,8 @@ namespace cling {
     RuntimeInterfaceBuilder Builder(*this, Ctx, S, E, {ThisInterp, OutValue});
 
     ExprResult Result = Builder.getCall();
+
+    llvm::errs() << "LastValue.isValid(): " << (bool)LastValue.isValid() << "\n";
     // It could fail, like printing an array type in C. (not supported)
     if (Result.isInvalid())
       return E;

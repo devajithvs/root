@@ -336,8 +336,6 @@ namespace cling {
     // Get the value string representation, by printValue() method overloading
     const std::string Val
       = cling::valuePrinterInternal::printValueInternal(*this);
-    llvm::errs() << Val << ": Print is working\n";
-    llvm::errs() << this << ": Print is working\n";
     if (Escape) {
       const char* Data = Val.data();
       const size_t N = Val.size();
@@ -363,7 +361,6 @@ namespace cling {
   }
 
   void Value::dump(bool Escape) const {
-    llvm::errs() << "Comes from dump\n";
     print(cling::outs(), Escape);
   }
 } // end namespace cling

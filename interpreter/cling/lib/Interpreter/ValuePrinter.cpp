@@ -763,7 +763,6 @@ public:
 template <typename T> static
 typename std::enable_if<!HasExplicitPrintValue<const T>::value, std::string>::type
 executePrintValue(const Value& V, const T& val) {
-  llvm::errs() << "Running executePrintValue\n";
   return callPrintValue(V, &val);
 }
 
@@ -972,7 +971,6 @@ static std::string printUnpackedClingValue(const Value &V) {
   // Print all the other cases by calling into runtime 'cling::printValue()'.
   // Ty->isPointerType() || Ty->isReferenceType() || Ty->isArrayType()
   // Ty->isObjCObjectPointerType()
-  llvm::errs() << "Running printUnpackedClingValue\n";
   return callPrintValue(V, V.getPtr());
 }
 
@@ -982,7 +980,6 @@ namespace cling {
   // cling::Value
   CLING_LIB_EXPORT
   std::string printValue(const Value *value) {
-  llvm::errs() << "Running printValue\n";
     cling::smallstream strm;
 
     if (value->isValid()) {
@@ -1017,7 +1014,6 @@ namespace cling {
     }
 
     std::string printValueInternal(const Value &V) {
-  llvm::errs() << "Running printValueInternal\n";
       Interpreter* Interp = V.getInterpreter();
       LockCompilationDuringUserCodeExecutionRAII LCDUCER(*Interp);
       declarePrintValue(*Interp);

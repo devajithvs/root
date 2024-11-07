@@ -209,12 +209,14 @@ namespace cling {
 
     for (Decl* D : DGR) {
       D->dump();
+      llvm::errs() << "D just dumped\n\n";
       if (auto* TSD = llvm::dyn_cast<TopLevelStmtDecl>(D);
           TSD && TSD->isSemiMissing()) {
         llvm::errs() << "Setting statement\n";
         TSD->setStmt(m_IncrParser->getInterpreter()->SynthesizeExpr(
             cast<Expr>(TSD->getStmt())));
         llvm::errs() << "Setting statement done\n";
+    llvm::errs() << "LastValue.isValid(10) " << m_IncrParser->getInterpreter()->LastValue.isValid() << "\n";
       }
     }
     if (comesFromASTReader(DGR)) {

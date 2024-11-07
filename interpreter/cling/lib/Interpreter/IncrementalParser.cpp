@@ -570,6 +570,7 @@ namespace cling {
 
   void IncrementalParser::commitTransaction(ParseResultTransaction& PRT,
                                             bool ClearDiagClient) {
+    llvm::errs() << "LastValue.isValid(15) " << m_Interpreter->LastValue.isValid() << "\n";
     Transaction* T = PRT.getPointer();
     if (!T) {
       if (PRT.getInt() != kSuccess) {
@@ -582,6 +583,7 @@ namespace cling {
       return;
     }
 
+    llvm::errs() << "LastValue.isValid(16) " << m_Interpreter->LastValue.isValid() << "\n";
     assert(T->isCompleted() && "Transaction not ended!?");
     assert(T->getState() != Transaction::kCommitted
            && "Committing an already committed transaction.");
@@ -593,6 +595,7 @@ namespace cling {
     if (T->isNestedTransaction())
       m_Consumer->setTransaction(T->getParent());
 
+    llvm::errs() << "LastValue.isValid(17) " << m_Interpreter->LastValue.isValid() << "\n";
     // Check for errors...
     if (T->getIssuedDiags() == Transaction::kErrors) {
       // Make module visible to TransactionUnloader.
@@ -620,6 +623,7 @@ namespace cling {
 
       return;
     }
+    llvm::errs() << "LastValue.isValid(18) " << m_Interpreter->LastValue.isValid() << "\n";
 
     if (T->hasNestedTransactions()) {
       Transaction* TopmostParent = T->getTopmostParent();
@@ -636,6 +640,7 @@ namespace cling {
           commitTransaction(PRT);
         }
     }
+    llvm::errs() << "LastValue.isValid(19) " << m_Interpreter->LastValue.isValid() << "\n";
 
     // If there was an error coming from the transformers.
     if (T->getIssuedDiags() == Transaction::kErrors) {
@@ -643,6 +648,7 @@ namespace cling {
       return;
     }
 
+    llvm::errs() << "LastValue.isValid(20) " << m_Interpreter->LastValue.isValid() << "\n";
     // Here we expect a template instantiation. We need to open the transaction
     // that we are currently work with.
     {
@@ -670,6 +676,7 @@ namespace cling {
       m_Consumer->setTransaction(prevConsumerT);
     }
 
+    llvm::errs() << "LastValue.isValid(21) " << m_Interpreter->LastValue.isValid() << "\n";
 
     // The static initializers might run anything and can thus cause more
     // decls that need to end up in a transaction. But this one is done
@@ -678,29 +685,38 @@ namespace cling {
       Transaction* prevConsumerT = m_Consumer->getTransaction();
       m_Consumer->setTransaction(T);
       codeGenTransaction(T);
+    llvm::errs() << "LastValue.isValid(21.1) " << m_Interpreter->LastValue.isValid() << "\n";
       T->setState(Transaction::kCommitted);
-      if (!T->getParent()) {
-        if (m_Interpreter->executeTransaction(*T)
-            >= Interpreter::kExeFirstError) {
-          // Roll back on error in initializers.
-          // T maybe pointing to freed memory after this call:
-          // Interpreter::unload
-          //   IncrementalParser::deregisterTransaction
-          //     TransactionPool::releaseTransaction
-          m_Interpreter->unload(*T);
-          return;
-        }
-      }
+    llvm::errs() << "LastValue.isValid(21.34) " << m_Interpreter->LastValue.isValid() << "\n";
+      // if (!T->getParent()) {
+      //   llvm::errs() << "LastValue.isValid(21.33) " << m_Interpreter->LastValue.isValid() << "\n";
+      //   if (m_Interpreter->executeTransaction(*T)
+      //       >= Interpreter::kExeFirstError) {
+      //     llvm::errs() << "LastValue.isValid(21.2) " << m_Interpreter->LastValue.isValid() << "\n";
+      //     // Roll back on error in initializers.
+      //     // T maybe pointing to freed memory after this call:
+      //     // Interpreter::unload
+      //     //   IncrementalParser::deregisterTransaction
+      //     //     TransactionPool::releaseTransaction
+      //     m_Interpreter->unload(*T);
+      //     return;
+      //   }
+      // }
+    llvm::errs() << "LastValue.isValid(21.32) " << m_Interpreter->LastValue.isValid() << "\n";
       m_Consumer->setTransaction(prevConsumerT);
+    llvm::errs() << "LastValue.isValid(21.31) " << m_Interpreter->LastValue.isValid() << "\n";
     }
+    llvm::errs() << "LastValue.isValid(21.5) " << m_Interpreter->LastValue.isValid() << "\n";
     T->setState(Transaction::kCommitted);
 
+    llvm::errs() << "LastValue.isValid(22) " << m_Interpreter->LastValue.isValid() << "\n";
     {
       Transaction* prevConsumerT = m_Consumer->getTransaction();
       if (InterpreterCallbacks* callbacks = m_Interpreter->getCallbacks())
         callbacks->TransactionCommitted(*T);
       m_Consumer->setTransaction(prevConsumerT);
     }
+    llvm::errs() << "LastValue.isValid(23) " << m_Interpreter->LastValue.isValid() << "\n";
   }
 
   void IncrementalParser::emitTransaction(Transaction* T) {
@@ -841,6 +857,9 @@ namespace cling {
   IncrementalParser::Compile(llvm::StringRef input,
                              const CompilationOptions& Opts) {
     Transaction* CurT = beginTransaction(Opts);
+    if (CurT->getModule()) llvm::errs() << "beginTransaction Module exist\n";
+    else  llvm::errs() << "beginTransaction Module doesn't exist\n";
+    llvm::errs() << "LastValue.isValid(12) " << m_Interpreter->LastValue.isValid() << "\n";
     EParseResult ParseRes = ParseInternal(input);
 
     if (ParseRes == kSuccessWithWarnings)
@@ -848,8 +867,17 @@ namespace cling {
     else if (ParseRes == kFailed)
       CurT->setIssuedDiags(Transaction::kErrors);
 
+    if (CurT->getModule()) llvm::errs() << "setIssuedDiags Module exist\n";
+    else  llvm::errs() << "setIssuedDiags Module doesn't exist\n";
+    llvm::errs() << "LastValue.isValid(13) " << m_Interpreter->LastValue.isValid() << "\n";
     ParseResultTransaction PRT = endTransaction(CurT);
+    if (CurT->getModule()) llvm::errs() << "endTransaction Module exist\n";
+    else  llvm::errs() << "endTransaction Module doesn't exist\n";
+    llvm::errs() << "LastValue.isValid(14) " << m_Interpreter->LastValue.isValid() << "\n";
     commitTransaction(PRT);
+    if (CurT->getModule()) llvm::errs() << "commitTransaction Module exist\n";
+    else  llvm::errs() << "commitTransaction Module doesn't exist\n";
+    llvm::errs() << "LastValue.isValid(11) " << m_Interpreter->LastValue.isValid() << "\n";
 
     return PRT;
   }

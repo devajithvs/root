@@ -607,6 +607,7 @@ namespace cling {
       cling::errs() << Strm.str().str();
 
     Transaction *T;
+    llvm::errs() << "This is the culprit\n";
     declare(Strm.str().str(), &T);
     return T;
   }
@@ -1017,6 +1018,8 @@ namespace cling {
 
     // This triggers the FileEntry to be created and the completion
     // point to be set in clang.
+    llvm::errs() << "m_IncrParser->Compile is running3\n"; 
+    llvm::errs() << "m_IncrParser->Compile(" << Src << ")\n"; 
     m_IncrParser->Compile(Src, CO);
 
     return kSuccess;
@@ -1439,6 +1442,7 @@ namespace cling {
       }
 
       ExprResult getCall() {
+        llvm::errs() << "Getcall working\n";
         QualType Ty = E->getType();
         QualType DesugaredTy = Ty.getDesugaredType(Ctx);
 
@@ -1509,6 +1513,7 @@ namespace cling {
           }
             // __cling_Interpreter_SetValueNoAlloc.
           case Interpreter::InterfaceKind::NoAlloc: {
+            llvm::errs() << "Interpreter::InterfaceKind::NoAlloc working\n";
             return S.ActOnCallExpr(
                 /*Scope=*/nullptr,
                 Interp.getValuePrintingInfo()
@@ -1605,6 +1610,8 @@ namespace cling {
 
     StateDebuggerRAII stateDebugger(this);
 
+    llvm::errs() << "m_IncrParser->Compile is running2\n"; 
+    llvm::errs() << "m_IncrParser->Compile(" << input << ")\n"; 
     IncrementalParser::ParseResultTransaction PRT
       = m_IncrParser->Compile(input, CO);
     if (PRT.getInt() == IncrementalParser::kFailed)
@@ -1631,13 +1638,17 @@ namespace cling {
     // non-default C++ at the prompt:
     CO.IgnorePromptDiags = 1;
     
-    llvm::errs() << "Pre compile\n";
+    llvm::errs() << "m_IncrParser->Compile is running1\n"; 
+    llvm::errs() << "m_IncrParser->Compile(" << input << ")\n"; 
+    llvm::errs() << "LastValue.isValid(3) " << LastValue.isValid() << "\n";
     IncrementalParser::ParseResultTransaction PRT
       = m_IncrParser->Compile(input, CO);
     llvm::errs() << "Post compile\n";
+    llvm::errs() << "LastValue.isValid(0) " << LastValue.isValid() << "\n";
     Transaction* lastT = PRT.getPointer();
-    if (lastT->getModule()) llvm::errs() << "Module exist\n";
-    else llvm::errs() << "Module doesn't exist\n";
+    if (lastT->getModule()) llvm::errs() << "Module exist1\n";
+    else llvm::errs() << "Module doesn't exist1\n";
+    llvm::errs() << "LastValue.isValid(0) " << LastValue.isValid() << "\n";
     if (lastT && lastT->getState() != Transaction::kCommitted) {
       assert((lastT->getState() == Transaction::kCommitted
               || lastT->getState() == Transaction::kRolledBack
@@ -1647,6 +1658,7 @@ namespace cling {
         *V = Value();
       return kFailure;
     }
+    llvm::errs() << "LastValue.isValid(2) " << LastValue.isValid() << "\n";
 
     // Might not have a Transaction
     if (PRT.getInt() == IncrementalParser::kFailed) {
@@ -1654,6 +1666,7 @@ namespace cling {
         *V = Value();
       return kFailure;
     }
+    llvm::errs() << "LastValue.isValid(1.2) " << LastValue.isValid() << "\n";
 
     if (!lastT) {
       // Empty transactions are good, too!
@@ -1662,23 +1675,26 @@ namespace cling {
       return kSuccess;
     }
 
+    llvm::errs() << "LastValue.isValid(1) " << LastValue.isValid() << "\n";
     // Value resultV;
     // if (!V)
     //   V = &resultV;
-    if (lastT->getModule()) llvm::errs() << "Module exist\n";
-    else llvm::errs() << "Module doesn't exist\n";
+    if (lastT->getModule()) llvm::errs() << "Module exist2\n";
+    else llvm::errs() << "Module doesn't exist2\n";
     bool WantValuePrinting = lastT->getCompilationOpts().ValuePrinting
       != CompilationOptions::VPDisabled;
     auto res = executeTransaction(*lastT);
 
-    if (lastT->getModule()) llvm::errs() << "Module exist\n";
-    else llvm::errs() << "Module doesn't exist\n";
+    if (lastT->getModule()) llvm::errs() << "Module exist3\n";
+    else llvm::errs() << "Module doesn't exist3\n";
 
     // Force-flush as we might be printing on screen with printf.
     std::cout.flush();
     fflush(stdout);
 
-    llvm::errs() << "LastValue.isValid()" << LastValue.isValid() << "\n";
+    llvm::errs() << "LastValue.isValid() " << LastValue.isValid() << "\n";
+    llvm::errs() << "LastValue.getType().getAsString()" << LastValue.getType().getAsString() << "\n";
+    
     if (LastValue.isValid()) {
       LastValue.dump();
       *V = std::move(LastValue);
@@ -1988,6 +2004,8 @@ namespace cling {
     assert(!isInSyntaxOnlyMode() && "Running on what?");
     assert(T.getState() == Transaction::kCommitted && "Must be committed");
 
+    if (T.getModule()) llvm::errs() << "lastT->getModule() exist10\n";
+    else llvm::errs() << "lastT->getModule() doesn't exist10\n";
     if (!T.getModule())
       return Interpreter::kExeNoModule;
 
@@ -1996,11 +2014,15 @@ namespace cling {
 
     // CUDA device code is not direct executable
     // the code is executed by a CUDA library function in the host code
-    if (!m_Opts.CompilerOpts.CUDADevice)
+    if (!m_Opts.CompilerOpts.CUDADevice) {
       // Forward to IncrementalExecutor; should not be called by
       // anyone except for IncrementalParser.
       ExeRes = m_Executor->runStaticInitializersOnce(T);
-
+      // ExeRes = m_Executor->emitModule(T);
+      // m_Executor->runCtors(T);
+    }
+    if (T.getModule()) llvm::errs() << "lastT->getModule() exist11\n";
+    else llvm::errs() << "lastT->getModule() doesn't exist11\n";
     return ConvertExecutionResult(ExeRes);
   }
 
@@ -2074,6 +2096,8 @@ namespace cling {
 
 
     std::string includeFile = std::string("#include \"") + inFile.str() + "\"";
+    llvm::errs() << "m_IncrParser->Compile is running0\n"; 
+    llvm::errs() << "m_IncrParser->Compile(" << includeFile << ")\n"; 
     IncrementalParser::ParseResultTransaction PRT
       = fwdGen.m_IncrParser->Compile(includeFile, CO);
     cling::Transaction* T = PRT.getPointer();
@@ -2110,6 +2134,16 @@ namespace cling {
     T.setState(Transaction::kCommitted);
   }
 
+#include "clang/AST/Expr.h"
+#include "clang/AST/ASTContext.h"
+#include "clang/Frontend/CompilerInstance.h" // To set up printing options
+
+void PrintExpr(Expr* E, ASTContext& Context) {
+    PrintingPolicy Policy(Context.getLangOpts());
+    E->printPretty(llvm::errs(), nullptr, Policy);
+    llvm::errs() << "\n"; // Print a newline after the expression
+}
+
   // This synthesizes a call expression to a speciall
   // function that is responsible for generating the Value.
   // In general, we transform:
@@ -2127,6 +2161,9 @@ namespace cling {
 
   Expr* Interpreter::SynthesizeExpr(Expr* E) {
     llvm::errs() << "Type of expression: " << E->getType().getAsString() << "\n";
+    llvm::errs() << "LastValue.getType().getAsString()" << LastValue.getType().getAsString() << "\n";
+    LastValue = Value();
+    llvm::errs() << "LastValue.getType().getAsString()" << LastValue.getType().getAsString() << "\n";
 
     Sema& S = getCI()->getSema();
     ASTContext& Ctx = S.getASTContext();
@@ -2139,21 +2176,36 @@ namespace cling {
         cling::utils::Synthesize::CStyleCastPtrExpr(&S, Ctx.VoidPtrTy,
                                                     (uintptr_t)this);
 
+    llvm::errs() << "LastValue.getType().getAsString()" << LastValue.getType().getAsString() << "\n";
     // Create parameter `OutVal`.
     auto* OutValue =
         cling::utils::Synthesize::CStyleCastPtrExpr(&S, Ctx.VoidPtrTy,
                                                     (uintptr_t)&LastValue);
-
+llvm::errs() << OutValue << ": OutValue\n";
+llvm::errs() << (uintptr_t)&LastValue << ": OutValue\n";
+llvm::errs() << &LastValue << ": OutValue\n";
+llvm::errs() << "Type of OutValue expression: " << OutValue->getType().getAsString() << "\n";
+PrintExpr(OutValue, Ctx);
+    llvm::errs() << "LastValue.getType().getAsString()" << LastValue.getType().getAsString() << "\n";
     // Build `__cling_Interpreter_SetValue*` call.
     RuntimeInterfaceBuilder Builder(*this, Ctx, S, E, {ThisInterp, OutValue});
 
     ExprResult Result = Builder.getCall();
 
+    llvm::errs() << "LastValue.getType().getAsString()" << LastValue.getType().getAsString() << "\n";
     llvm::errs() << "LastValue.isValid(): " << (bool)LastValue.isValid() << "\n";
+    llvm::errs() << OutValue << ": OutValue\n";
+    llvm::errs() << (uintptr_t)&LastValue << ": OutValue\n";
+    llvm::errs() << &LastValue << ": OutValue\n";
+llvm::errs() << "Type of OutValue expression: " << OutValue->getType().getAsString() << "\n";
+    PrintExpr(OutValue, Ctx);
     // It could fail, like printing an array type in C. (not supported)
     if (Result.isInvalid())
       return E;
-    return Result.get();
+    auto* result = Result.get();
+    llvm::errs() << "Type of result expression: " << result->getType().getAsString() << "\n";
+    llvm::errs() << "LastValue.getType().getAsString()" << LastValue.getType().getAsString() << "\n";
+    return result;
   }
 
   namespace runtime {

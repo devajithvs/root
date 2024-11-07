@@ -162,6 +162,8 @@ IncrementalExecutor::runStaticInitializersOnce(Transaction& T) {
 
   emitModule(T);
 
+  if (T.getModule()) llvm::errs() << "emitModule exist2\n";
+    else llvm::errs() << "emitModule doesn't exist2\n";
   // We don't care whether something was unresolved before.
   m_unresolvedSymbols.clear();
 
@@ -173,6 +175,8 @@ IncrementalExecutor::runStaticInitializersOnce(Transaction& T) {
     llvm::logAllUnhandledErrors(std::move(Err), llvm::errs(),
                                 "[runStaticInitializersOnce]: ");
   }
+  if (T.getModule()) llvm::errs() << "runCtors exist2\n";
+    else llvm::errs() << "runCtors doesn't exist2\n";
   return kExeSuccess;
 }
 

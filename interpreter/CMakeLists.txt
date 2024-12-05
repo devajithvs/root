@@ -46,7 +46,10 @@ set(LLVM_FORCE_USE_OLD_TOOLCHAIN ON CACHE BOOL "")
 # found before (because the user turned on cuda or tmva-gpu), this will not have
 # an effect, which is fine.
 # (Note that the option is very counter-intuitive: We turn *on* disabling it...)
-set(CMAKE_DISABLE_FIND_PACKAGE_CUDA ON)
+# Special case when we want to build cling with adaptiveCpp
+if(NOT experimental_adaptivecpp)
+  set(CMAKE_DISABLE_FIND_PACKAGE_CUDA ON)
+endif()
 
 # will be set again in case NOT builtin_llvm
 set(LLVM_DIR "${CMAKE_BINARY_DIR}/interpreter/llvm-project/llvm")
@@ -135,7 +138,7 @@ if(clingtest)
   endif()
   ROOT_ADD_TEST(clingtest-check-cling COMMAND ${CMAKE_COMMAND} --build ${CMAKE_BINARY_DIR} --target check-cling
                                        ENVIRONMENT ${CLINGTEST_EXECUTABLE})
-else()
+elseif()
   #---Build LLVM/Clang with symbol visibility=hidden--------------------------------------------------
   set(CMAKE_CXX_VISIBILITY_PRESET hidden)
   set(CMAKE_C_VISIBILITY_PRESET hidden)
@@ -468,6 +471,10 @@ if (builtin_clang)
     ${CMAKE_SOURCE_DIR}/interpreter/llvm-project/clang/include
     ${CMAKE_BINARY_DIR}/interpreter/llvm-project/llvm/tools/clang/include
     CACHE STRING "Clang include directories.")
+  set(CLANG_CMAKE_DIR "${CMAKE_BINARY_DIR}/lib/cmake/clang/")
+  set(CLANG_EXECUTABLE_PATH
+    "${LLVM_BINARY_DIR}/bin/clang${CMAKE_EXECUTABLE_SUFFIX}"
+    CACHE STRING "Path to just‐built clang (if builtin_clang).")
 else()
   set(Clang_DIR "${LLVM_BINARY_DIR}/lib/cmake/clang/")
 endif()

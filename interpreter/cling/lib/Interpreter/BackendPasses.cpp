@@ -41,6 +41,34 @@ using namespace clang;
 using namespace llvm;
 
 namespace {
+  // Reset the sections of all functions so that they end up in the same text
+  // section. This is important for TCling on macOS to catch exceptions raised
+  // by constructors, which requires unwinding information. The addresses in
+  // the __eh_frame table are relocated against a single __text section when
+  // loading the MachO binary, which breaks if the call sites of constructors
+  // end up in a separate init section.
+  // (see clang::TargetInfo::getStaticInitSectionSpecifier())
+  class ResetFunctionSectionPass : public PassInfoMixin<ResetFunctionSectionPass> {
+  public:
+    PreservedAnalyses run(Module &M, ModuleAnalysisManager &AM) {
+      bool changed = false;
+      for (Function &Fn : M) {
+        if (!Fn.isDeclaration() && Fn.hasSection()) {
+          // dbgs() << "Resetting section '" << Fn.getSection() << "' of function "
+          //        << Fn.getName() << "\n";
+
+          llvm::errs() << "Resetting section2 '" << Fn.getSection() << "' of function "
+                       << Fn.getName() << "\n";
+          Fn.setSection("");
+          changed = true;
+        }
+      }
+      return changed ? PreservedAnalyses::none() : PreservedAnalyses::all();
+    }
+  };
+} // namespace
+
+namespace {
   class WorkAroundConstructorPriorityBugPass
       : public PassInfoMixin<WorkAroundConstructorPriorityBugPass> {
   public:
@@ -421,6 +449,7 @@ void BackendPasses::CreatePasses(int OptLevel, llvm::ModulePassManager& MPM,
 
   // TODO: Remove this pass once we upgrade past LLVM 19 that includes the fix.
   MPM.addPass(WorkAroundConstructorPriorityBugPass());
+  MPM.addPass(ResetFunctionSectionPass());
   MPM.addPass(KeepLocalGVPass());
   MPM.addPass(WeakTypeinfoVTablePass());
   MPM.addPass(ReuseExistingWeakSymbols(m_JIT));

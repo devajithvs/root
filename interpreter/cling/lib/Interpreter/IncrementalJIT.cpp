@@ -629,8 +629,8 @@ void IncrementalJIT::addModule(Transaction& T) {
   // (see clang::TargetInfo::getStaticInitSectionSpecifier())
   for (auto &Fn : module->functions()) {
     if (Fn.hasSection()) {
-      // dbgs() << "Resetting section '" << Fn.getSection() << "' of function "
-      //        << Fn.getName() << "\n";
+      errs() << "Resetting section1 '" << Fn.getSection() << "' of function "
+             << Fn.getName() << "\n";
       Fn.setSection("");
     }
   }

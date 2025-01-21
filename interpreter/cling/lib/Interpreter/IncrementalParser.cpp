@@ -597,13 +597,13 @@ namespace cling {
     if (T->getIssuedDiags() == Transaction::kErrors) {
       // Make module visible to TransactionUnloader.
       bool MustStartNewModule = false;
-      // if (!T->isNestedTransaction() && hasCodeGenerator()) {
-      //   MustStartNewModule = true;
+      if (!T->isNestedTransaction() && hasCodeGenerator()) {
+        MustStartNewModule = true;
 
-      //   // if (std::unique_ptr<llvm::Module> M = GenModule()) {
-      //   //   T->setModule(std::move(M));
-      //   // }
-      // }
+        if (std::unique_ptr<llvm::Module> M = GenModule()) {
+          T->setModule(std::move(M));
+        }
+      }
       // Module has been released from Codegen, reset the Diags now.
       DiagnosticsEngine& Diags = getCI()->getSema().getDiagnostics();
       Diags.Reset(/*soft=*/true);
@@ -671,28 +671,28 @@ namespace cling {
     }
 
 
-    // // The static initializers might run anything and can thus cause more
-    // // decls that need to end up in a transaction. But this one is done
-    // // with CodeGen...
-    // if (T->getCompilationOpts().CodeGeneration && hasCodeGenerator()) {
-    //   Transaction* prevConsumerT = m_Consumer->getTransaction();
-    //   m_Consumer->setTransaction(T);
-    //   codeGenTransaction(T);
-    //   T->setState(Transaction::kCommitted);
-    //   if (!T->getParent()) {
-    //     if (m_Interpreter->executeTransaction(*T)
-    //         >= Interpreter::kExeFirstError) {
-    //       // Roll back on error in initializers.
-    //       // T maybe pointing to freed memory after this call:
-    //       // Interpreter::unload
-    //       //   IncrementalParser::deregisterTransaction
-    //       //     TransactionPool::releaseTransaction
-    //       m_Interpreter->unload(*T);
-    //       return;
-    //     }
-    //   }
-    //   m_Consumer->setTransaction(prevConsumerT);
-    // }
+    // The static initializers might run anything and can thus cause more
+    // decls that need to end up in a transaction. But this one is done
+    // with CodeGen...
+    if (T->getCompilationOpts().CodeGeneration && hasCodeGenerator()) {
+      Transaction* prevConsumerT = m_Consumer->getTransaction();
+      m_Consumer->setTransaction(T);
+      codeGenTransaction(T);
+      T->setState(Transaction::kCommitted);
+      if (!T->getParent()) {
+        if (m_Interpreter->executeTransaction(*T)
+            >= Interpreter::kExeFirstError) {
+          // Roll back on error in initializers.
+          // T maybe pointing to freed memory after this call:
+          // Interpreter::unload
+          //   IncrementalParser::deregisterTransaction
+          //     TransactionPool::releaseTransaction
+          m_Interpreter->unload(*T);
+          return;
+        }
+      }
+      m_Consumer->setTransaction(prevConsumerT);
+    }
     T->setState(Transaction::kCommitted);
 
     {
@@ -849,10 +849,6 @@ namespace cling {
       CurT->setIssuedDiags(Transaction::kErrors);
 
     ParseResultTransaction PRT = endTransaction(CurT);
-    Transaction* T = PRT.getPointer();
-    if (std::unique_ptr<llvm::Module> M = GenModule()) {
-      T->setModule(std::move(M));
-    }
     commitTransaction(PRT);
 
     return PRT;
@@ -1038,7 +1034,7 @@ namespace cling {
     LocalInstantiations.perform();
     GlobalInstantiations.perform();
 
-    // m_Consumer->HandleTranslationUnit(getCI()->getASTContext());
+    m_Consumer->HandleTranslationUnit(getCI()->getASTContext());
 
     return llvm::Error::success();
   }

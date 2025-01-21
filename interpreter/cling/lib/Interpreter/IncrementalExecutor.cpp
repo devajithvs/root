@@ -157,12 +157,10 @@ IncrementalExecutor::runStaticInitializersOnce(Transaction& T) {
   llvm::Module* m = T.getModule();
   assert(m && "Module must not be null");
 
-  // if (isPracticallyEmptyModule(m))
-  //   return kExeSuccess;
+  if (isPracticallyEmptyModule(m))
+    return kExeSuccess;
 
   emitModule(T);
-if (T.getModule()) llvm::errs() << "Module exist after emitModule\n";
-  else llvm::errs() << "Module doesn't exist after emitModule\n";
 
   // We don't care whether something was unresolved before.
   m_unresolvedSymbols.clear();
@@ -175,10 +173,6 @@ if (T.getModule()) llvm::errs() << "Module exist after emitModule\n";
     llvm::logAllUnhandledErrors(std::move(Err), llvm::errs(),
                                 "[runStaticInitializersOnce]: ");
   }
-if (T.getModule()) llvm::errs() << "Module exist after runCtors\n";
-  else llvm::errs() << "Module doesn't exist after runCtors\n";
-
-  
   return kExeSuccess;
 }
 

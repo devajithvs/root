@@ -1678,32 +1678,31 @@ namespace cling {
     std::cout.flush();
     fflush(stdout);
 
-    llvm::errs() << "LastValue.isValid()??" << LastValue.isValid() << "\n";
+    llvm::errs() << "LastValue.isValid()" << LastValue.isValid() << "\n";
     if (LastValue.isValid()) {
       LastValue.dump();
-      // *V = std::move(LastValue);
-      LastValue.clear();
+      *V = std::move(LastValue);
     }
 
     
-    // if (res < kExeFirstError) {
-    //   llvm::errs() << "WantValuePrinting" << WantValuePrinting << "\n";
-    //   llvm::errs() << "V->isValid()" << V->isValid() << "\n";
-    //   llvm::errs() << "V->needsManagedAllocation()" << V->needsManagedAllocation() << "\n";
-    //     if (WantValuePrinting && V->isValid()
-    //       // the !V->needsManagedAllocation() case is handled by
-    //       // dumpIfNoStorage.
-    //       && V->needsManagedAllocation()){
-    //     llvm::errs() << "Dumping\n";
-    //     V->dump();
-    //     llvm::errs() << "Post Dumping\n";}
-    //     return Interpreter::kSuccess;
-    // } else {
-    //   llvm::errs() << "Not Working\n";
-    //   llvm::errs() << res << "\n";
-    //   llvm::errs() << kExeNoModule << "\n";
-    //   return Interpreter::kFailure;
-    // }
+    if (res < kExeFirstError) {
+      llvm::errs() << "WantValuePrinting" << WantValuePrinting << "\n";
+      llvm::errs() << "V->isValid()" << V->isValid() << "\n";
+      llvm::errs() << "V->needsManagedAllocation()" << V->needsManagedAllocation() << "\n";
+        if (WantValuePrinting && V->isValid()
+          // the !V->needsManagedAllocation() case is handled by
+          // dumpIfNoStorage.
+          && V->needsManagedAllocation()){
+        llvm::errs() << "Dumping\n";
+        V->dump();
+        llvm::errs() << "Post Dumping\n";}
+        return Interpreter::kSuccess;
+    } else {
+      llvm::errs() << "Not Working\n";
+      llvm::errs() << res << "\n";
+      llvm::errs() << kExeNoModule << "\n";
+      return Interpreter::kFailure;
+    }
     return Interpreter::kSuccess;
   }
 

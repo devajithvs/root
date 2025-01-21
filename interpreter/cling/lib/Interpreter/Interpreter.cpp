@@ -1635,6 +1635,15 @@ namespace cling {
     IncrementalParser::ParseResultTransaction PRT
       = m_IncrParser->Compile(input, CO);
     llvm::errs() << "Post compile\n";
+    if (auto* T = PRT.getPointer()) {
+      if (!T->getParent()) {
+        if (executeTransaction(*T) >=
+            Interpreter::kExeFirstError) {
+          unload(*T);
+        }
+      }
+    }
+
     Transaction* lastT = PRT.getPointer();
     if (lastT->getModule()) llvm::errs() << "Module exist\n";
     else llvm::errs() << "Module doesn't exist\n";

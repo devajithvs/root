@@ -164,7 +164,8 @@ namespace cling {
     ///\param[in] ClearDiagClient - Reset the DiagnosticsEngine client or not
     ///
     void commitTransaction(ParseResultTransaction& PRT,
-                           bool ClearDiagClient = true);
+                           bool ClearDiagClient = true,
+                           bool ExecuteandUnload = true);
 
     ///\brief Runs the consumers (e.g. CodeGen) on a non-parsed transaction.
     ///

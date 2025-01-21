@@ -678,7 +678,7 @@ namespace cling {
     if (T->getCompilationOpts().CodeGeneration && hasCodeGenerator()) {
       Transaction* prevConsumerT = m_Consumer->getTransaction();
       m_Consumer->setTransaction(T);
-      codeGenTransaction(T);
+      if (ExecuteandUnload) codeGenTransaction(T);
       T->setState(Transaction::kCommitted);
       if (ExecuteandUnload && !T->getParent()) {
         if (m_Interpreter->executeTransaction(*T)
@@ -850,7 +850,15 @@ namespace cling {
       CurT->setIssuedDiags(Transaction::kErrors);
 
     ParseResultTransaction PRT = endTransaction(CurT);
+    Transaction* T = PRT.getPointer();
+    llvm::errs() << "Compiling\n"; 
+    if (std::unique_ptr<llvm::Module> M = GenModule()) {
+      T->setModule(std::move(M));
+    }
+    T->getModule()->print(llvm::errs(), nullptr);
     commitTransaction(PRT, true, false);
+    llvm::errs() << "commitTransaction\n"; 
+    T->getModule()->print(llvm::errs(), nullptr);
 
     return PRT;
   }

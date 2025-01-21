@@ -47,8 +47,11 @@ public:
 
     for (Decl *D : DGR)
       if (auto *TSD = llvm::dyn_cast<TopLevelStmtDecl>(D);
-          TSD && TSD->isSemiMissing())
+          TSD && TSD->isSemiMissing()) {
+        llvm::errs() << "Setting statement\n";
         TSD->setStmt(Interp.SynthesizeExpr(cast<Expr>(TSD->getStmt())));
+        llvm::errs() << "Setting statement done\n";
+          }
 
     return Consumer->HandleTopLevelDecl(DGR);
   }

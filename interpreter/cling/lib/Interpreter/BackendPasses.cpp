@@ -469,43 +469,47 @@ void BackendPasses::CreatePasses(int OptLevel, llvm::ModulePassManager& MPM,
   MPM.addPass(ReuseExistingWeakSymbols(m_JIT));
   MPM.addPass(PreventLocalOptPass());
 
-  // Run verifier after local passes to make sure that IR remains untouched.
-  if (m_CGOpts.VerifyModule)
-    MPM.addPass(VerifierPass());
+  // // Run verifier after local passes to make sure that IR remains untouched.
+  // if (m_CGOpts.VerifyModule)
+  //   MPM.addPass(VerifierPass());
 
-  // Handle disabling of LLVM optimization, where we want to preserve the
-  // internal module before any optimization.
-  if (m_CGOpts.DisableLLVMPasses) {
-    // Always keep at least ForceInline - NoInlining is deadly for libc++.
-    // Inlining = CGOpts.NoInlining;
-    MPM.addPass(AlwaysInlinerPass());
-  } else if (OptLevel <= 1) {
-    // At O0 and O1 we only run the always inliner which is more efficient. At
-    // higher optimization levels we run the normal inliner.
-    MPM.addPass(AlwaysInlinerPass());
+  // // Handle disabling of LLVM optimization, where we want to preserve the
+  // // internal module before any optimization.
+  // if (m_CGOpts.DisableLLVMPasses) {
+  //   // Always keep at least ForceInline - NoInlining is deadly for libc++.
+  //   // Inlining = CGOpts.NoInlining;
+  //   // MPM.addPass(AlwaysInlinerPass());
+  // } else if (OptLevel <= 1) {
+  //   // At O0 and O1 we only run the always inliner which is more efficient. At
+  //   // higher optimization levels we run the normal inliner.
+  //   // MPM.addPass(AlwaysInlinerPass());
 
-    // Register a callback for disabling all other inliner passes.
+  //   // Register a callback for disabling all other inliner passes.
+  //   PIC.registerShouldRunOptionalPassCallback([](StringRef P, Any) {
+  //     if (P.equals("ModuleInlinerWrapperPass") ||
+  //         P.equals("InlineAdvisorAnalysisPrinterPass") ||
+  //         P.equals("PartialInlinerPass") || P.equals("buildInlinerPipeline") ||
+  //         P.equals("ModuleInlinerPass") || P.equals("InlinerPass") || P.equals("AlwaysInlinerPass") ||
+  //         P.equals("InlineAdvisorAnalysis") ||
+  //         P.equals("PartiallyInlineLibCallsPass") ||
+  //         P.equals("RelLookupTableConverterPass") ||
+  //         P.equals("InlineCostAnnotationPrinterPass") ||
+  //         P.equals("InlineSizeEstimatorAnalysisPrinterPass") ||
+  //         P.equals("InlineSizeEstimatorAnalysis"))
+  //       return false;
+
+  //     return true;
+  //   });
+  // } else {
+  //   // Register a callback for disabling RelLookupTableConverterPass.
+  //   PIC.registerShouldRunOptionalPassCallback([](StringRef P, Any) {
+  //     return !(P.equals("RelLookupTableConverterPass") || P.equals("AlwaysInlinerPass"));
+  //   });
+  // }
+
     PIC.registerShouldRunOptionalPassCallback([](StringRef P, Any) {
-      if (P.equals("ModuleInlinerWrapperPass") ||
-          P.equals("InlineAdvisorAnalysisPrinterPass") ||
-          P.equals("PartialInlinerPass") || P.equals("buildInlinerPipeline") ||
-          P.equals("ModuleInlinerPass") || P.equals("InlinerPass") ||
-          P.equals("InlineAdvisorAnalysis") ||
-          P.equals("PartiallyInlineLibCallsPass") ||
-          P.equals("RelLookupTableConverterPass") ||
-          P.equals("InlineCostAnnotationPrinterPass") ||
-          P.equals("InlineSizeEstimatorAnalysisPrinterPass") ||
-          P.equals("InlineSizeEstimatorAnalysis"))
-        return false;
-
-      return true;
+      return !(P.equals("AlwaysInlinerPass"));
     });
-  } else {
-    // Register a callback for disabling RelLookupTableConverterPass.
-    PIC.registerShouldRunOptionalPassCallback([](StringRef P, Any) {
-      return !P.equals("RelLookupTableConverterPass");
-    });
-  }
 
   SI.registerCallbacks(PIC, &MAM);
 

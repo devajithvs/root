@@ -208,7 +208,6 @@ namespace cling {
       return true;
 
     for (Decl* D : DGR) {
-      D->dump();
       if (auto* TSD = llvm::dyn_cast<TopLevelStmtDecl>(D);
           TSD && TSD->isSemiMissing()) {
         llvm::errs() << "Setting statement\n";

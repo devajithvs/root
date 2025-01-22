@@ -14,15 +14,10 @@
 #define LLVM_PATH nullptr
 #endif
 
-#include "clang/AST/Decl.h"
-#include "clang/AST/Expr.h"
-
 #include "cling/Interpreter/InvocationOptions.h"
 #include "cling/Interpreter/RuntimeOptions.h"
-#include "cling/Interpreter/Value.h"
 
 #include "llvm/ADT/StringRef.h"
-#include "llvm/ExecutionEngine/Orc/Shared/ExecutorAddress.h"
 #include "llvm/ExecutionEngine/Orc/ThreadSafeModule.h"
 
 #include <cstdlib>
@@ -202,7 +197,7 @@ namespace cling {
     std::unique_ptr<LookupHelper> m_LookupHelper;
 
     ///\brief Cache of compiled destructors wrappers.
-    std::unordered_map<const clang::CXXRecordDecl*, void*> m_DtorWrappers;
+    std::unordered_map<const clang::RecordDecl*, void*> m_DtorWrappers;
 
     ///\brief Counter used when we need unique names.
     ///
@@ -814,7 +809,7 @@ namespace cling {
 
     ///\brief Compile (and cache) destructor calls for a record decl. Used by ~Value.
     /// They are of type extern "C" void()(void* pObj).
-    void* CompileDtorCall(clang::CXXRecordDecl* CXXRD);
+    void* compileDtorCallFor(const clang::RecordDecl* RD);
 
     ///\brief Gets the address of an existing global and whether it was JITted.
     ///
@@ -867,14 +862,6 @@ namespace cling {
     ///
     void runAtExitFuncs();
 
-    bool FindRuntimeInterface();
-
-    enum InterfaceKind { NoAlloc, WithAlloc, CopyArray, NewTag };
-    const llvm::SmallVectorImpl<clang::Expr*>& getValuePrintingInfo() const {
-      return ValuePrintingInfo;
-    }
-    llvm::SmallVector<clang::Expr*, 3> ValuePrintingInfo;
-
     void GenerateAutoLoadingMap(llvm::StringRef inFile, llvm::StringRef outFile,
                                 bool enableMacros = false, bool enableLogs = true);
 
@@ -885,14 +872,6 @@ namespace cling {
                         llvm::raw_ostream* logs = nullptr,
                         IgnoreFilesFunc_t ignoreFiles =
                           [](const clang::PresumedLoc&) { return false;}) const;
-
-    clang::FunctionDecl* LookupPrintFunction(clang::Sema& S,
-                                             llvm::StringRef FuncName);
-    clang::Expr* SynthesizeExpr(clang::Expr* E);
-    // This member holds the last result of the value printing. It's a class
-    // member because we might want to access it after more inputs. If no value
-    // printing happens, it's in an invalid state.
-    Value LastValue;
 
     friend class runtime::internal::LifetimeHandler;
   };

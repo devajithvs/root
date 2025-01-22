@@ -156,7 +156,6 @@ IncrementalExecutor::ExecutionResult
 IncrementalExecutor::runStaticInitializersOnce(Transaction& T) {
   llvm::Module* m = T.getModule();
   assert(m && "Module must not be null");
-  m->print(llvm::errs(), nullptr);
 
   if (isPracticallyEmptyModule(m))
     return kExeSuccess;

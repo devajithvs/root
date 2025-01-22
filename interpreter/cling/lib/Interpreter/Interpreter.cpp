@@ -1635,10 +1635,18 @@ namespace cling {
     IncrementalParser::ParseResultTransaction PRT
       = m_IncrParser->Compile(input, CO);
     llvm::errs() << "Post compile\n";
-    llvm::errs() << "LastValue.isValid()??" << LastValue.isValid() << "\n";
-    
+    if (auto* T = PRT.getPointer()) {
+      if (!T->getParent()) {
+        if (executeTransaction(*T) >=
+            Interpreter::kExeFirstError) {
+          unload(*T);
+        }
+      }
+    }
 
     Transaction* lastT = PRT.getPointer();
+    if (lastT->getModule()) llvm::errs() << "Module exist\n";
+    else llvm::errs() << "Module doesn't exist\n";
     if (lastT && lastT->getState() != Transaction::kCommitted) {
       assert((lastT->getState() == Transaction::kCommitted
               || lastT->getState() == Transaction::kRolledBack
@@ -1670,17 +1678,7 @@ namespace cling {
     else llvm::errs() << "Module doesn't exist\n";
     bool WantValuePrinting = lastT->getCompilationOpts().ValuePrinting
       != CompilationOptions::VPDisabled;
-    
     auto res = executeTransaction(*lastT);
-    if (res>=Interpreter::kExeFirstError) unload(*lastT);
-    // if (auto* T = PRT.getPointer()) {
-    //   if (!T->getParent()) {
-    //     if (executeTransaction(*T) >=
-    //         Interpreter::kExeFirstError) {
-    //       unload(*T);
-    //     }
-    //   }
-    // }
 
     if (lastT->getModule()) llvm::errs() << "Module exist\n";
     else llvm::errs() << "Module doesn't exist\n";
@@ -1689,32 +1687,31 @@ namespace cling {
     std::cout.flush();
     fflush(stdout);
 
-    llvm::errs() << "LastValue.isValid()??" << LastValue.isValid() << "\n";
+    llvm::errs() << "LastValue.isValid()" << LastValue.isValid() << "\n";
     if (LastValue.isValid()) {
       LastValue.dump();
-      // *V = std::move(LastValue);
-      LastValue.clear();
+      *V = std::move(LastValue);
     }
 
     
-    // if (res < kExeFirstError) {
-    //   llvm::errs() << "WantValuePrinting" << WantValuePrinting << "\n";
-    //   llvm::errs() << "V->isValid()" << V->isValid() << "\n";
-    //   llvm::errs() << "V->needsManagedAllocation()" << V->needsManagedAllocation() << "\n";
-    //     if (WantValuePrinting && V->isValid()
-    //       // the !V->needsManagedAllocation() case is handled by
-    //       // dumpIfNoStorage.
-    //       && V->needsManagedAllocation()){
-    //     llvm::errs() << "Dumping\n";
-    //     V->dump();
-    //     llvm::errs() << "Post Dumping\n";}
-    //     return Interpreter::kSuccess;
-    // } else {
-    //   llvm::errs() << "Not Working\n";
-    //   llvm::errs() << res << "\n";
-    //   llvm::errs() << kExeNoModule << "\n";
-    //   return Interpreter::kFailure;
-    // }
+    if (res < kExeFirstError) {
+      llvm::errs() << "WantValuePrinting" << WantValuePrinting << "\n";
+      llvm::errs() << "V->isValid()" << V->isValid() << "\n";
+      llvm::errs() << "V->needsManagedAllocation()" << V->needsManagedAllocation() << "\n";
+        if (WantValuePrinting && V->isValid()
+          // the !V->needsManagedAllocation() case is handled by
+          // dumpIfNoStorage.
+          && V->needsManagedAllocation()){
+        llvm::errs() << "Dumping\n";
+        V->dump();
+        llvm::errs() << "Post Dumping\n";}
+        return Interpreter::kSuccess;
+    } else {
+      llvm::errs() << "Not Working\n";
+      llvm::errs() << res << "\n";
+      llvm::errs() << kExeNoModule << "\n";
+      return Interpreter::kFailure;
+    }
     return Interpreter::kSuccess;
   }
 
@@ -2147,13 +2144,11 @@ namespace cling {
       llvm_unreachable("We can't find the runtime iterface for pretty print!");
 
     // Create parameter `ThisInterp`.
-    llvm::errs() << "ThisInterp: \n";
     auto* ThisInterp =
         cling::utils::Synthesize::CStyleCastPtrExpr(&S, Ctx.VoidPtrTy,
                                                     (uintptr_t)this);
 
     // Create parameter `OutVal`.
-    llvm::errs() << "OutVal: \n";
     auto* OutValue =
         cling::utils::Synthesize::CStyleCastPtrExpr(&S, Ctx.VoidPtrTy,
                                                     (uintptr_t)&LastValue);
@@ -2161,17 +2156,13 @@ namespace cling {
     // Build `__cling_Interpreter_SetValue*` call.
     RuntimeInterfaceBuilder Builder(*this, Ctx, S, E, {ThisInterp, OutValue});
 
-    llvm::errs() << "Builder.getCall(): \n";
     ExprResult Result = Builder.getCall();
 
     llvm::errs() << "LastValue.isValid(): " << (bool)LastValue.isValid() << "\n";
     // It could fail, like printing an array type in C. (not supported)
     if (Result.isInvalid())
       return E;
-  auto result = Result.get();
-  result->dump();
-  llvm::errs() << "LastValue.isValid()2: " << (bool)LastValue.isValid() << "\n";  
-    return result;
+    return Result.get();
   }
 
   namespace runtime {

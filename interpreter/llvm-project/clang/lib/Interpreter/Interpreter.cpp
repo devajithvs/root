@@ -384,38 +384,25 @@ llvm::Error Interpreter::Execute(PartialTranslationUnit &T) {
     if (Err)
       return Err;
   }
-  T.TheModule->print(llvm::errs(), nullptr);
   // FIXME: Add a callback to retain the llvm::Module once the JIT is done.
   if (auto Err = IncrExecutor->addModule(T))
     return Err;
 
-  llvm::errs() << "LastValue.isValidrunCtors" << LastValue.isValid() << "\n";
   if (auto Err = IncrExecutor->runCtors())
     return Err;
-  llvm::errs() << "LastValue.isValidrunCtors" << LastValue.isValid() << "\n";
 
   return llvm::Error::success();
 }
 
 llvm::Error Interpreter::ParseAndExecute(llvm::StringRef Code, Value *V) {
 
-  llvm::errs() << "Pre compile\n";
   auto PTU = Parse(Code);
   if (!PTU)
     return PTU.takeError();
-  llvm::errs() << "Post compile\n";
-  llvm::errs() << "LastValue.isValid()??" << LastValue.isValid() << "\n";
-  
-  if (PTU->TheModule) llvm::errs() << "Module exist\n";
-  else llvm::errs() << "Module doesn't exist\n";
   if (PTU->TheModule)
     if (llvm::Error Err = Execute(*PTU))
       return Err;
 
-  if (PTU->TheModule) llvm::errs() << "Module exist\n";
-  else llvm::errs() << "Module doesn't exist\n";
-
-  llvm::errs() << "LastValue.isValid()??" << LastValue.isValid() << "\n";
   if (LastValue.isValid()) {
     if (!V) {
       LastValue.dump();
@@ -741,7 +728,6 @@ private:
 //   xQualType)) (x);
 
 Expr *Interpreter::SynthesizeExpr(Expr *E) {
-  llvm::errs() << "Type of expression: " << E->getType().getAsString() << "\n";
   Sema &S = getCompilerInstance()->getSema();
   ASTContext &Ctx = S.getASTContext();
 
@@ -759,13 +745,9 @@ Expr *Interpreter::SynthesizeExpr(Expr *E) {
 
   ExprResult Result = Builder.getCall();
   // It could fail, like printing an array type in C. (not supported)
-  llvm::errs() << "LastValue.isValid(): " << (bool)LastValue.isValid() << "\n";  
   if (Result.isInvalid())
     return E;
-  auto result = Result.get();
-  result->dump();
-  llvm::errs() << "LastValue.isValid()2: " << (bool)LastValue.isValid() << "\n";  
-  return result;
+  return Result.get();
 }
 
 // Temporary rvalue struct that need special care.

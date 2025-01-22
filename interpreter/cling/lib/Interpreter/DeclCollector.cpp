@@ -208,13 +208,12 @@ namespace cling {
       return true;
 
     for (Decl* D : DGR) {
+      D->dump();
       if (auto* TSD = llvm::dyn_cast<TopLevelStmtDecl>(D);
           TSD && TSD->isSemiMissing()) {
         llvm::errs() << "Setting statement\n";
-        auto stmt = TSD->getStmt();
-        auto castedStmt = cast<Expr>(stmt);
-        castedStmt->dump();
-        TSD->setStmt(m_IncrParser->getInterpreter()->SynthesizeExpr(castedStmt));
+        TSD->setStmt(m_IncrParser->getInterpreter()->SynthesizeExpr(
+            cast<Expr>(TSD->getStmt())));
         llvm::errs() << "Setting statement done\n";
       }
     }

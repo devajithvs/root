@@ -569,8 +569,7 @@ namespace cling {
   }
 
   void IncrementalParser::commitTransaction(ParseResultTransaction& PRT,
-                                            bool ClearDiagClient,
-                                            bool ExecuteandUnload) {
+                                            bool ClearDiagClient) {
     Transaction* T = PRT.getPointer();
     if (!T) {
       if (PRT.getInt() != kSuccess) {
@@ -680,7 +679,7 @@ namespace cling {
       m_Consumer->setTransaction(T);
       codeGenTransaction(T);
       T->setState(Transaction::kCommitted);
-      if (ExecuteandUnload && !T->getParent()) {
+      if (!T->getParent()) {
         if (m_Interpreter->executeTransaction(*T)
             >= Interpreter::kExeFirstError) {
           // Roll back on error in initializers.
@@ -850,7 +849,7 @@ namespace cling {
       CurT->setIssuedDiags(Transaction::kErrors);
 
     ParseResultTransaction PRT = endTransaction(CurT);
-    commitTransaction(PRT, true, false);
+    commitTransaction(PRT);
 
     return PRT;
   }

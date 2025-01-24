@@ -539,15 +539,15 @@ IncrementalJIT::IncrementalJIT(
     }
     JD.addGenerator(std::move(*HostProcessLookup));
 
-    // This must come after process resolution, to  consistently resolve global
-    // symbols (e.g. std::cout) to the same address.
-    auto LibLookup = std::make_unique<RTDynamicLibrarySearchGenerator>(
-        llvm::sys::DynamicLibrary(ExtraLibHandle), LinkerPrefix,
-        [this] { return m_CurrentProcessRT; },
-        [this](const SymbolStringPtr& Sym) {
-          return !m_ForbidDlSymbols.contains(*Sym);
-        });
-    JD.addGenerator(std::move(LibLookup));
+    // // This must come after process resolution, to  consistently resolve global
+    // // symbols (e.g. std::cout) to the same address.
+    // auto LibLookup = std::make_unique<RTDynamicLibrarySearchGenerator>(
+    //     llvm::sys::DynamicLibrary(ExtraLibHandle), LinkerPrefix,
+    //     [this] { return m_CurrentProcessRT; },
+    //     [this](const SymbolStringPtr& Sym) {
+    //       return !m_ForbidDlSymbols.contains(*Sym);
+    //     });
+    // JD.addGenerator(std::move(LibLookup));
     return &JD;
   });
 

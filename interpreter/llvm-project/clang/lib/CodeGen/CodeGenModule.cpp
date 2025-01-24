@@ -6676,6 +6676,9 @@ void CodeGenModule::EmitTopLevelStmt(const TopLevelStmtDecl *D) {
   // Device code should not be at top level.
   if (LangOpts.CUDA && LangOpts.CUDAIsDevice)
     return;
+  
+  llvm::errs() << "\nEmitTopLevelStmt\n";
+  D->dump();
 
   std::unique_ptr<CodeGenFunction> &CurCGF =
       GlobalTopLevelStmtBlockInFlight.first;
@@ -6683,14 +6686,17 @@ void CodeGenModule::EmitTopLevelStmt(const TopLevelStmtDecl *D) {
   // We emitted a top-level stmt but after it there is initialization.
   // Stop squashing the top-level stmts into a single function.
   if (CurCGF && CXXGlobalInits.back() != CurCGF->CurFn) {
+  llvm::errs() << "\nWe emitted a top-level stmt but after it there is initialization.\n";
     CurCGF->FinishFunction(D->getEndLoc());
     CurCGF = nullptr;
   }
 
   if (!CurCGF) {
+  llvm::errs() << "\nEmitTopLevelStmt: Working here\n";
     // void __stmts__N(void)
     // FIXME: Ask the ABI name mangler to pick a name.
-    std::string Name = "__stmts__" + llvm::utostr(CXXGlobalInits.size());
+    std::string Name = "__stmts__" + llvm::utostr(CXXGlobalInits.size()+1+CXXGlobalInitsNum++);
+  llvm::errs() << Name;
     FunctionArgList Args;
     QualType RetTy = getContext().VoidTy;
     const CGFunctionInfo &FnInfo =
@@ -6698,14 +6704,15 @@ void CodeGenModule::EmitTopLevelStmt(const TopLevelStmtDecl *D) {
     llvm::FunctionType *FnTy = getTypes().GetFunctionType(FnInfo);
     llvm::Function *Fn = llvm::Function::Create(
         FnTy, llvm::GlobalValue::InternalLinkage, Name, &getModule());
-
+    Fn->print(llvm::errs());
     CurCGF.reset(new CodeGenFunction(*this));
     GlobalTopLevelStmtBlockInFlight.second = D;
     CurCGF->StartFunction(GlobalDecl(), RetTy, Fn, FnInfo, Args,
                           D->getBeginLoc(), D->getBeginLoc());
     CXXGlobalInits.push_back(Fn);
   }
-
+  llvm::errs() << "\nEmitTopLevelStmt2\n";
+  D->getStmt()->dump();
   CurCGF->EmitStmt(D->getStmt());
 }
 

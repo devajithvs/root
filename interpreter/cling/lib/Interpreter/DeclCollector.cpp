@@ -206,53 +206,63 @@ namespace cling {
     if (getTransaction()->getIssuedDiags() == Transaction::kErrors)
       return true;
 
-    for (Decl* D : DGR)
-      if (auto* TSD = llvm::dyn_cast<TopLevelStmtDecl>(D);
-          TSD && TSD->isSemiMissing()){
+    for (Decl* D : DGR){
+      if (auto* TSD = llvm::dyn_cast<TopLevelStmtDecl>(D)){
+            llvm::errs() << "TSD still running on\n\n\n";
+            TSD->dump();
+          if(TSD && TSD->isSemiMissing()){
+            llvm::errs() << "synthesizer still running start\n\n\n";
+            TSD->dump();
             if (auto *synthesizer = m_IncrParser->GetSynthesizer())
         TSD->setStmt(synthesizer->SynthesizeSVRInit(
-            cast<Expr>(TSD->getStmt())));}
+            cast<Expr>(TSD->getStmt())));
+            llvm::errs() << "synthesizer still running done\n\n\n";
+            cast<Expr>(TSD->getStmt())->dump();
+            
+            }}}
 
-    if (comesFromASTReader(DGR)) {
-      for (DeclGroupRef::iterator DI = DGR.begin(), DE = DGR.end();
-           DI != DE; ++DI) {
-        DeclGroupRef SplitDGR(*DI);
-        // FIXME: The special namespace treatment (not sending itself to
-        // CodeGen, but only its content - if the contained decl should be
-        // emitted) works around issue with the static initialization when
-        // having a PCH and loading a library. We don't want to generate
-        // code for the static that will come through the library.
-        //
-        // This will be fixed with the clang::Modules. Make sure we remember.
-        // assert(!getCI()->getLangOpts().Modules && "Please revisit!");
-        if (NamespaceDecl* ND = dyn_cast<NamespaceDecl>(*DI)) {
-          for (NamespaceDecl::decl_iterator NDI = ND->decls_begin(),
-               EN = ND->decls_end(); NDI != EN; ++NDI) {
-            // Recurse over decls inside the namespace, like
-            // CodeGenModule::EmitNamespace() does.
-            if (!shouldIgnore(*NDI))
-              m_Consumer->HandleTopLevelDecl(DeclGroupRef(*NDI));
-          }
-        } else if (!shouldIgnore(*DI)) {
-          m_Consumer->HandleTopLevelDecl(DeclGroupRef(*DI));
-        }
-        continue;
-      }
-    } else {
+  //   llvm::errs() << "HandleTopLevelDecl still running on7\n";
+  //   if (comesFromASTReader(DGR)) {
+  //     for (DeclGroupRef::iterator DI = DGR.begin(), DE = DGR.end();
+  //          DI != DE; ++DI) {
+  //       DeclGroupRef SplitDGR(*DI);
+  //       // FIXME: The special namespace treatment (not sending itself to
+  //       // CodeGen, but only its content - if the contained decl should be
+  //       // emitted) works around issue with the static initialization when
+  //       // having a PCH and loading a library. We don't want to generate
+  //       // code for the static that will come through the library.
+  //       //
+  //       // This will be fixed with the clang::Modules. Make sure we remember.
+  //       // assert(!getCI()->getLangOpts().Modules && "Please revisit!");
+  //       if (NamespaceDecl* ND = dyn_cast<NamespaceDecl>(*DI)) {
+  //         for (NamespaceDecl::decl_iterator NDI = ND->decls_begin(),
+  //              EN = ND->decls_end(); NDI != EN; ++NDI) {
+  //           // Recurse over decls inside the namespace, like
+  //           // CodeGenModule::EmitNamespace() does.
+  //           if (!shouldIgnore(*NDI))
+  //             m_Consumer->HandleTopLevelDecl(DeclGroupRef(*NDI));
+  //         }
+  //       } else if (!shouldIgnore(*DI)) {
+  //         m_Consumer->HandleTopLevelDecl(DeclGroupRef(*DI));
+  //       }
+  //       continue;
+  //     }
+  //   } else {
 
-      // FIXME: This is a temporary fix for the ROOT module preloading mechanism.
-      // When we preload modules we would like to enable a module as if we called
-      // clang::Sema::ActOnModuleImport (which does not call HandleTopLevelDecl).
-      // However, we need a valid source locations as modules are very sensitive
-      // to them. In order to have a valid source location,
-      // Interpreter::loadModule calls '#pragma clang module import "A"', which
-      // calls HandleTopLevelDecl which causes CodeGen to run the module
-      // initializers eagerly.
-      if (DGR.isSingleDecl() && isa<ImportDecl>(DGR.getSingleDecl()))
-	return true;
+  //     // FIXME: This is a temporary fix for the ROOT module preloading mechanism.
+  //     // When we preload modules we would like to enable a module as if we called
+  //     // clang::Sema::ActOnModuleImport (which does not call HandleTopLevelDecl).
+  //     // However, we need a valid source locations as modules are very sensitive
+  //     // to them. In order to have a valid source location,
+  //     // Interpreter::loadModule calls '#pragma clang module import "A"', which
+  //     // calls HandleTopLevelDecl which causes CodeGen to run the module
+  //     // initializers eagerly.
+  //     if (DGR.isSingleDecl() && isa<ImportDecl>(DGR.getSingleDecl()))
+	// return true;
 
       m_Consumer->HandleTopLevelDecl(DGR);
-    }
+    // }
+    // llvm::errs() << "HandleTopLevelDecl still running on9\n";
     return true;
   }
 

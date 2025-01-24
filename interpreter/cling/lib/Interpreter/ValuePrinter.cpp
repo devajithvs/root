@@ -697,6 +697,7 @@ static const char* BuildAndEmitVPWrapperBody(cling::Interpreter &Interp,
 }
 
 static std::string callPrintValue(const Value& V, const void* Val) {
+  llvm::errs() << "CallPrintValue still running\n";
   Interpreter *Interp = V.getInterpreter();
   assert(Interp && "No cling::Interpreter!");
   Value printValueV;
@@ -1014,6 +1015,7 @@ namespace cling {
     }
 
     std::string printValueInternal(const Value &V) {
+      llvm::errs() << "printValueInternal is running still\n";
       Interpreter* Interp = V.getInterpreter();
       LockCompilationDuringUserCodeExecutionRAII LCDUCER(*Interp);
       declarePrintValue(*Interp);

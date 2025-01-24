@@ -511,20 +511,20 @@ namespace {
 // Provide implementation of the functions that ValueExtractionSynthesizer calls
 namespace {
 
-  // static void dumpIfNoStorage(void* vpV, char vpOn) {
-  //   const cling::Value& V = *(cling::Value*)vpV;
-  //   // If the value copies over the temporary we must delay the printing until
-  //   // the temporary gets copied over. For the rest of the temporaries we *must*
-  //   // dump here because their lifetime will be gone otherwise. Eg.
-  //   //
-  //   // std::string f(); f().c_str() // have to dump during the same stmt.
-  //   //
-  //   assert(!V.needsManagedAllocation() && "Must contain non managed temporary");
-  //   assert(vpOn != (char)cling::CompilationOptions::VPAuto
-  //          && "VPAuto must have been expanded earlier.");
-  //   if (vpOn == (char)cling::CompilationOptions::VPEnabled)
-  //     V.dump();
-  // }
+  static void dumpIfNoStorage(void* vpV) {
+    const cling::Value& V = *(cling::Value*)vpV;
+    // If the value copies over the temporary we must delay the printing until
+    // the temporary gets copied over. For the rest of the temporaries we *must*
+    // dump here because their lifetime will be gone otherwise. Eg.
+    //
+    // std::string f(); f().c_str() // have to dump during the same stmt.
+    //
+    assert(!V.needsManagedAllocation() && "Must contain non managed temporary");
+    // assert(vpOn != (char)cling::CompilationOptions::VPAuto
+    //        && "VPAuto must have been expanded earlier.");
+    // if (vpOn == (char)cling::CompilationOptions::VPEnabled)
+      V.dump();
+  }
 
   ///\brief Allocate the Value and return the Value
   /// for an expression evaluated at the prompt.
@@ -557,28 +557,28 @@ namespace runtime {
                          float value) {
       llvm::errs() << "setValueNoAlloc\n";
       allocateStoredRefValueAndGetGV(vpI, vpSVR, vpQT).setFloat(value);
-      // dumpIfNoStorage(vpSVR, vpOn);
+      dumpIfNoStorage(vpSVR);
     }
 
     CLING_LIB_EXPORT
     void setValueNoAlloc(void* vpI, void* vpSVR, void* vpQT,
                          double value) {
       allocateStoredRefValueAndGetGV(vpI, vpSVR, vpQT).setDouble(value);
-      // dumpIfNoStorage(vpSVR, vpOn);
+      dumpIfNoStorage(vpSVR);
     }
 
     CLING_LIB_EXPORT
     void setValueNoAlloc(void* vpI, void* vpSVR, void* vpQT,
                          long double value) {
       allocateStoredRefValueAndGetGV(vpI, vpSVR, vpQT).setLongDouble(value);
-      // dumpIfNoStorage(vpSVR, vpOn);
+      dumpIfNoStorage(vpSVR);
     }
 
     CLING_LIB_EXPORT
     void setValueNoAlloc(void* vpI, void* vpSVR, void* vpQT,
                          unsigned long long value) {
       allocateStoredRefValueAndGetGV(vpI, vpSVR, vpQT).setULongLong(value);
-      // dumpIfNoStorage(vpSVR, vpOn);
+      dumpIfNoStorage(vpSVR);
     }
 
     CLING_LIB_EXPORT
@@ -586,7 +586,7 @@ namespace runtime {
                          const void* value){
       allocateStoredRefValueAndGetGV(vpI, vpSVR, vpQT)
         .setPtr(const_cast<void*>(value));
-      // dumpIfNoStorage(vpSVR, vpOn);
+      dumpIfNoStorage(vpSVR);
     }
 
     CLING_LIB_EXPORT

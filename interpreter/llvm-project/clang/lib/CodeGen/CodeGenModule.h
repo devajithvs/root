@@ -473,6 +473,7 @@ private:
 
   /// Global variables with initializers that need to run before main.
   std::vector<llvm::Function *> CXXGlobalInits;
+  int CXXGlobalInitsNum = 0;
 
   /// When a C++ decl with an initializer is deferred, null is
   /// appended to CXXGlobalInits, and the index of that null is placed

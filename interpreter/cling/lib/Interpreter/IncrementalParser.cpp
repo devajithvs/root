@@ -1076,13 +1076,13 @@ namespace cling {
 
     typedef std::unique_ptr<WrapperTransformer> WTPtr_t;
     std::vector<WTPtr_t> WrapperTransformers;
-    if (!m_Interpreter->getOptions().NoRuntime && !isCUDADevice)
-      WrapperTransformers.emplace_back(new ValuePrinterSynthesizer(TheSema));
-    WrapperTransformers.emplace_back(new DeclExtractor(TheSema));
+    // if (!m_Interpreter->getOptions().NoRuntime && !isCUDADevice)
+    //   WrapperTransformers.emplace_back(new ValuePrinterSynthesizer(TheSema));
+    // WrapperTransformers.emplace_back(new DeclExtractor(TheSema));
     // if (!m_Interpreter->getOptions().NoRuntime && !isCUDADevice)
     //   WrapperTransformers.emplace_back(new ValueExtractionSynthesizer(TheSema,
     //                                                        isChildInterpreter));
-    WrapperTransformers.emplace_back(new CheckEmptyTransactionTransformer(TheSema));
+    // WrapperTransformers.emplace_back(new CheckEmptyTransactionTransformer(TheSema));
 
     m_Consumer->SetTransformers(std::move(ASTTransformers),
                                 std::move(WrapperTransformers));

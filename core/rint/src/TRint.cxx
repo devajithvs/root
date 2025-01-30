@@ -635,6 +635,19 @@ Bool_t TRint::HandleTermInput()
       SetBit(kProcessRemotely);
 
       try {
+#ifdef _WIN64
+         __try {
+            if (!sline.IsNull())
+               LineProcessed(sline);
+            ProcessLineNr("ROOT_prompt_", sline);
+         }
+         __except (EXCEPTION_EXECUTE_HANDLER) {
+            // enable again input handler
+            fInputHandler->Activate();
+            added = kTRUE;
+            Throw(GetExceptionCode());
+         }
+#else
          TRY {
             if (!sline.IsNull())
                LineProcessed(sline);
@@ -645,6 +658,7 @@ Bool_t TRint::HandleTermInput()
             added = kTRUE;
             Throw(excode);
          } ENDTRY;
+#endif
       }
       // handle every exception
       catch (std::exception& e) {

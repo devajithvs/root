@@ -5077,6 +5077,16 @@ ASTFileSignature ASTWriter::WriteASTCore(Sema &SemaRef, StringRef isysroot,
     Stream.EmitRecord(METADATA_OLD_FORMAT, Record);
   }
 
+  if (!SpecializationsUpdates.empty()) {
+    WriteSpecializationsUpdates(/*IsPartial=*/false);
+    SpecializationsUpdates.clear();
+  }
+
+  if (!PartialSpecializationsUpdates.empty()) {
+    WriteSpecializationsUpdates(/*IsPartial=*/true);
+    PartialSpecializationsUpdates.clear();
+  }
+
   // Create a lexical update block containing all of the declarations in the
   // translation unit that do not come from other AST files.
   const TranslationUnitDecl *TU = Context.getTranslationUnitDecl();
@@ -5253,7 +5263,7 @@ ASTFileSignature ASTWriter::WriteASTCore(Sema &SemaRef, StringRef isysroot,
 
   // Keep writing types, declarations, and declaration update records
   // until we've emitted all of them.
-  Stream.EnterSubblock(DECLTYPES_BLOCK_ID, /*bits for abbreviations*/5);
+  Stream.EnterSubblock(DECLTYPES_BLOCK_ID, /*bits for abbreviations*/ 6);
   DeclTypesBlockStartOffset = Stream.GetCurrentBitNo();
   WriteTypeAbbrevs();
   WriteDeclAbbrevs();
@@ -5428,6 +5438,31 @@ ASTFileSignature ASTWriter::WriteASTCore(Sema &SemaRef, StringRef isysroot,
   return backpatchSignature();
 }
 
+void ASTWriter::WriteSpecializationsUpdates(bool IsPartial) {
+  auto RecordType = IsPartial ? CXX_ADDED_TEMPLATE_PARTIAL_SPECIALIZATION
+                              : CXX_ADDED_TEMPLATE_SPECIALIZATION;
+
+  auto Abv = std::make_shared<llvm::BitCodeAbbrev>();
+  Abv->Add(llvm::BitCodeAbbrevOp(RecordType));
+  Abv->Add(llvm::BitCodeAbbrevOp(llvm::BitCodeAbbrevOp::VBR, 6));
+  Abv->Add(llvm::BitCodeAbbrevOp(llvm::BitCodeAbbrevOp::Blob));
+  auto UpdateSpecializationAbbrev = Stream.EmitAbbrev(std::move(Abv));
+
+  auto &SpecUpdates =
+      IsPartial ? PartialSpecializationsUpdates : SpecializationsUpdates;
+  for (auto &SpecializationUpdate : SpecUpdates) {
+    const NamedDecl *D = SpecializationUpdate.first;
+
+    llvm::SmallString<4096> LookupTable;
+    GenerateSpecializationInfoLookupTable(D, SpecializationUpdate.second,
+                                          LookupTable, IsPartial);
+
+    // Write the lookup table
+    RecordData::value_type Record[] = {RecordType, getDeclID(D)};
+    Stream.EmitRecordWithBlob(UpdateSpecializationAbbrev, Record, LookupTable);
+  }
+}
+
 void ASTWriter::WriteDeclUpdatesBlocks(RecordDataImpl &OffsetsRecord) {
   if (DeclUpdates.empty())
     return;
@@ -5460,25 +5495,6 @@ void ASTWriter::WriteDeclUpdatesBlocks(RecordDataImpl &OffsetsRecord) {
         assert(Update.getDecl() && "no decl to add?");
         Record.push_back(GetDeclRef(Update.getDecl()));
         break;
-      case UPD_CXX_ADDED_TEMPLATE_SPECIALIZATION: {
-        const Decl *Spec = Update.getDecl();
-        assert(Spec && "no decl to add?");
-        Record.push_back(GetDeclRef(Spec));
-        ArrayRef<TemplateArgument> Args;
-        if (auto *CTSD = dyn_cast<ClassTemplateSpecializationDecl>(Spec))
-          Args = CTSD->getTemplateArgs().asArray();
-        else if (auto *VTSD = dyn_cast<VarTemplateSpecializationDecl>(Spec))
-          Args = VTSD->getTemplateArgs().asArray();
-        else if (auto *FD = dyn_cast<FunctionDecl>(Spec))
-          Args = FD->getTemplateSpecializationArgs()->asArray();
-        assert(Args.size());
-        Record.push_back(TemplateArgumentList::ComputeODRHash(Args));
-        bool IsPartialSpecialization
-          = isa<ClassTemplatePartialSpecializationDecl>(Spec) ||
-          isa<VarTemplatePartialSpecializationDecl>(Spec);
-        Record.push_back(IsPartialSpecialization);
-        break;
-      }
       case UPD_CXX_ADDED_FUNCTION_DEFINITION:
       case UPD_CXX_ADDED_VAR_DEFINITION:
         break;

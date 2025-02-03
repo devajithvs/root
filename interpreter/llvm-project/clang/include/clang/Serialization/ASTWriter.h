@@ -385,6 +385,13 @@ private:
   /// record containing modifications to them.
   DeclUpdateMap DeclUpdates;
 
+  /// Mapping from decl templates and its new specialization in the
+  /// current TU.
+  using SpecializationUpdateMap =
+      llvm::MapVector<const NamedDecl *, SmallVector<const Decl *>>;
+  SpecializationUpdateMap SpecializationsUpdates;
+  SpecializationUpdateMap PartialSpecializationsUpdates;
+
   using FirstLatestDeclMap = llvm::DenseMap<Decl *, Decl *>;
 
   /// Map of first declarations from a chained PCH that point to the
@@ -546,6 +553,7 @@ private:
                             bool IsModule);
   void WriteDeclUpdatesBlocks(RecordDataImpl &OffsetsRecord);
   void WriteDeclContextVisibleUpdate(const DeclContext *DC);
+  void WriteSpecializationsUpdates(bool IsPartial);
   void WriteFPPragmaOptions(const FPOptionsOverride &Opts);
   void WriteOpenCLExtensions(Sema &SemaRef);
   void WriteCUDAPragmas(Sema &SemaRef);

@@ -635,6 +635,12 @@ private:
   llvm::DenseMap<serialization::DeclID, DeclContextVisibleUpdates>
       PendingVisibleUpdates;
 
+  using SpecializationsUpdate = SmallVector<UpdateData, 1>;
+  using SpecializationsUpdateMap =
+      llvm::DenseMap<serialization::GlobalDeclID, SpecializationsUpdate>;
+  SpecializationsUpdateMap PendingSpecializationsUpdates;
+  SpecializationsUpdateMap PendingPartialSpecializationsUpdates;
+
   /// The set of C++ or Objective-C classes that have forward
   /// declarations that have not yet been linked to their definitions.
   llvm::SmallPtrSet<Decl *, 4> PendingDefinitions;
@@ -660,6 +666,11 @@ private:
   bool ReadVisibleDeclContextStorage(ModuleFile &M,
                                      llvm::BitstreamCursor &Cursor,
                                      uint64_t Offset, serialization::DeclID ID);
+
+  bool ReadSpecializations(ModuleFile &M, llvm::BitstreamCursor &Cursor,
+                           uint64_t Offset, Decl *D, bool IsPartial);
+  void AddSpecializations(const Decl *D, const unsigned char *Data,
+                          ModuleFile &M, bool IsPartial);
 
   /// A vector containing identifiers that have already been
   /// loaded.

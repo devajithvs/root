@@ -262,6 +262,9 @@ public:
   /// stack object. It does not own its template arguments.
   enum OnStackType { OnStack };
 
+  /// Create stable hash for the given arguments across compiler invocations.
+  static unsigned ComputeStableHash(ArrayRef<TemplateArgument> Args);
+
   /// Create a new template argument list that copies the given set of
   /// template arguments.
   static TemplateArgumentList *CreateCopy(ASTContext &Context,
@@ -800,11 +803,10 @@ protected:
   findSpecializationImpl(llvm::FoldingSetVector<EntryType> &Specs,
                          void *&InsertPos, ProfileArguments &&...ProfileArgs);
 
-  template <class EntryType, typename... ProfileArguments>
-  typename SpecEntryTraits<EntryType>::DeclType *
+  template <class EntryType, typename ...ProfileArguments>
+  typename SpecEntryTraits<EntryType>::DeclType*
   findSpecializationLocally(llvm::FoldingSetVector<EntryType> &Specs,
-                            void *&InsertPos,
-                            ProfileArguments &&...ProfileArgs);
+                            void *&InsertPos, ProfileArguments &&...ProfileArgs);
 
   template <class Derived, class EntryType>
   void addSpecializationImpl(llvm::FoldingSetVector<EntryType> &Specs,

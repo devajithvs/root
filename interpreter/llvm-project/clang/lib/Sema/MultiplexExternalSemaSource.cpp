@@ -115,21 +115,18 @@ FindExternalVisibleDeclsByName(const DeclContext *DC, DeclarationName Name) {
   return AnyDeclsFound;
 }
 
-bool MultiplexExternalSemaSource::LoadExternalSpecializations(
+void MultiplexExternalSemaSource::LoadExternalSpecializations(
     const Decl *D, bool OnlyPartial) {
-  bool Loaded = false;
   for (size_t i = 0; i < Sources.size(); ++i)
-    Loaded |= Sources[i]->LoadExternalSpecializations(D, OnlyPartial);
-  return Loaded;
+    Sources[i]->LoadExternalSpecializations(D, OnlyPartial);
 }
 
 bool MultiplexExternalSemaSource::LoadExternalSpecializations(
     const Decl *D, ArrayRef<TemplateArgument> TemplateArgs) {
-  bool AnyNewSpecsLoaded = false;
+  bool AnySpecsLoaded = false;
   for (size_t i = 0; i < Sources.size(); ++i)
-    AnyNewSpecsLoaded |=
-        Sources[i]->LoadExternalSpecializations(D, TemplateArgs);
-  return AnyNewSpecsLoaded;
+    AnySpecsLoaded |= Sources[i]->LoadExternalSpecializations(D, TemplateArgs);
+  return AnySpecsLoaded;
 }
 
 void MultiplexExternalSemaSource::completeVisibleDeclsMap(const DeclContext *DC){

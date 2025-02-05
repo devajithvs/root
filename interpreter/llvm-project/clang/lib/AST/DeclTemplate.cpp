@@ -350,21 +350,13 @@ bool RedeclarableTemplateDecl::loadLazySpecializationsImpl(
   if (!ExternalSource)
     return false;
 
-  // If TPL is not null, it implies that we're loading specializations for
-  // partial templates. We need to load all specializations in such cases.
-  if (TPL)
-    return ExternalSource->LoadExternalSpecializations(this->getCanonicalDecl(),
-                                                       /*OnlyPartial=*/false);
-
-  return ExternalSource->LoadExternalSpecializations(this->getCanonicalDecl(),
-                                                     Args);
+  return ExternalSource->LoadExternalSpecializations(this->getCanonicalDecl(), Args);
 }
 
-template <class EntryType, typename... ProfileArguments>
+template<class EntryType, typename... ProfileArguments>
 typename RedeclarableTemplateDecl::SpecEntryTraits<EntryType>::DeclType *
-RedeclarableTemplateDecl::findSpecializationLocally(
-    llvm::FoldingSetVector<EntryType> &Specs, void *&InsertPos,
-    ProfileArguments &&...ProfileArgs) {
+RedeclarableTemplateDecl::findSpecializationLocally(llvm::FoldingSetVector<EntryType> &Specs, void *&InsertPos,
+    ProfileArguments&&... ProfileArgs) {
   using SETraits = RedeclarableTemplateDecl::SpecEntryTraits<EntryType>;
 
   llvm::FoldingSetNodeID ID;
@@ -374,22 +366,22 @@ RedeclarableTemplateDecl::findSpecializationLocally(
   return Entry ? SETraits::getDecl(Entry)->getMostRecentDecl() : nullptr;
 }
 
-template <class EntryType, typename... ProfileArguments>
+template<class EntryType, typename... ProfileArguments>
 typename RedeclarableTemplateDecl::SpecEntryTraits<EntryType>::DeclType *
 RedeclarableTemplateDecl::findSpecializationImpl(
     llvm::FoldingSetVector<EntryType> &Specs, void *&InsertPos,
-    ProfileArguments &&...ProfileArgs) {
-
-  if (auto *Found = findSpecializationLocally(
-          Specs, InsertPos, std::forward<ProfileArguments>(ProfileArgs)...))
+    ProfileArguments&&... ProfileArgs) {
+  if (auto *Found = findSpecializationLocally(Specs, InsertPos,
+      std::forward<ProfileArguments>(ProfileArgs)...))
     return Found;
 
-  if (!loadLazySpecializationsImpl(
-          std::forward<ProfileArguments>(ProfileArgs)...))
+  // Try to load external specializations if we can't find the specialization
+  // locally.
+  if (!loadLazySpecializationsImpl(std::forward<ProfileArguments>(ProfileArgs)...))
     return nullptr;
 
-  return findSpecializationLocally(
-      Specs, InsertPos, std::forward<ProfileArguments>(ProfileArgs)...);
+  return findSpecializationLocally(Specs, InsertPos,
+      std::forward<ProfileArguments>(ProfileArgs)...);
 }
 
 template<class Derived, class EntryType>
@@ -926,6 +918,27 @@ TemplateArgumentList::CreateCopy(ASTContext &Context,
                                  ArrayRef<TemplateArgument> Args) {
   void *Mem = Context.Allocate(totalSizeToAlloc<TemplateArgument>(Args.size()));
   return new (Mem) TemplateArgumentList(Args);
+}
+
+unsigned
+TemplateArgumentList::ComputeStableHash(ArrayRef<TemplateArgument> Args) {
+  // FIXME: ODR hashing may not be the best mechanism to hash the template
+  // arguments. ODR hashing is (or perhaps, should be) about determining whether
+  // two things are spelled the same way and have the same meaning (as required
+  // by the C++ ODR), whereas what we want here is whether they have the same
+  // meaning regardless of spelling. Maybe we can get away with reusing ODR
+  // hashing anyway, on the basis that any canonical, non-dependent template
+  // argument should have the same (invented) spelling in every translation
+  // unit, but it is not sure that's true in all cases. There may still be cases
+  // where the canonical type includes some aspect of "whatever we saw first",
+  // in which case the ODR hash can differ across translation units for
+  // non-dependent, canonical template arguments that are spelled differently
+  // but have the same meaning. But it is not easy to raise examples.
+  ODRHash Hasher;
+  for (TemplateArgument TA : Args)
+    Hasher.AddTemplateArgument(TA);
+
+  return Hasher.CalculateHash();
 }
 
 FunctionTemplateSpecializationInfo *FunctionTemplateSpecializationInfo::Create(

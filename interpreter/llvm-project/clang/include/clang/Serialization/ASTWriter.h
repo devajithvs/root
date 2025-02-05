@@ -385,12 +385,9 @@ private:
   /// record containing modifications to them.
   DeclUpdateMap DeclUpdates;
 
-  /// Mapping from decl templates and its new specialization in the
-  /// current TU.
   using SpecializationUpdateMap =
       llvm::MapVector<const NamedDecl *, SmallVector<const Decl *>>;
   SpecializationUpdateMap SpecializationsUpdates;
-  SpecializationUpdateMap PartialSpecializationsUpdates;
 
   using FirstLatestDeclMap = llvm::DenseMap<Decl *, Decl *>;
 
@@ -536,10 +533,11 @@ private:
 
   void GenerateSpecializationInfoLookupTable(
       const NamedDecl *D, llvm::SmallVectorImpl<const Decl *> &Specializations,
-      llvm::SmallVectorImpl<char> &LookupTable, bool IsPartial);
+      llvm::SmallVectorImpl<char> &LookupTable);
   uint64_t WriteSpecializationInfoLookupTable(
-      const NamedDecl *D, llvm::SmallVectorImpl<const Decl *> &Specializations,
-      bool IsPartial);
+      const NamedDecl *D,
+      llvm::SmallVectorImpl<const Decl *> &Specializations);
+
   void GenerateNameLookupTable(const DeclContext *DC,
                                llvm::SmallVectorImpl<char> &LookupTable);
   uint64_t WriteDeclContextLexicalBlock(ASTContext &Context, DeclContext *DC);
@@ -551,9 +549,9 @@ private:
   void WriteReferencedSelectorsPool(Sema &SemaRef);
   void WriteIdentifierTable(Preprocessor &PP, IdentifierResolver &IdResolver,
                             bool IsModule);
+  void WriteSpecializationsUpdates();
   void WriteDeclUpdatesBlocks(RecordDataImpl &OffsetsRecord);
   void WriteDeclContextVisibleUpdate(const DeclContext *DC);
-  void WriteSpecializationsUpdates(bool IsPartial);
   void WriteFPPragmaOptions(const FPOptionsOverride &Opts);
   void WriteOpenCLExtensions(Sema &SemaRef);
   void WriteCUDAPragmas(Sema &SemaRef);
@@ -578,9 +576,6 @@ private:
   unsigned DeclEnumAbbrev = 0;
   unsigned DeclObjCIvarAbbrev = 0;
   unsigned DeclCXXMethodAbbrev = 0;
-  unsigned DeclSpecializationsAbbrev = 0;
-  unsigned DeclPartialSpecializationsAbbrev = 0;
-
   unsigned DeclDependentNonTemplateCXXMethodAbbrev = 0;
   unsigned DeclTemplateCXXMethodAbbrev = 0;
   unsigned DeclMemberSpecializedCXXMethodAbbrev = 0;
@@ -588,6 +583,7 @@ private:
   unsigned DeclDependentSpecializationCXXMethodAbbrev = 0;
   unsigned DeclTemplateTypeParmAbbrev = 0;
   unsigned DeclUsingShadowAbbrev = 0;
+  unsigned DeclSpecializationsAbbrev = 0;
 
   unsigned DeclRefExprAbbrev = 0;
   unsigned CharacterLiteralAbbrev = 0;

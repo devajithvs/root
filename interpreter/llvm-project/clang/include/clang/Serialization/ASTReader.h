@@ -606,19 +606,10 @@ private:
   llvm::DenseMap<const DeclContext *,
                  serialization::reader::DeclContextLookupTable> Lookups;
 
-  using SpecLookupTableTy =
-      llvm::DenseMap<const Decl *,
-                     serialization::reader::LazySpecializationInfoLookupTable>;
   /// Map from decls to specialized decls.
-  SpecLookupTableTy SpecializationsLookups;
-  /// Split partial specialization from specialization to speed up lookups.
-  SpecLookupTableTy PartialSpecializationsLookups;
-
-  bool LoadExternalSpecializationsImpl(SpecLookupTableTy &SpecLookups,
-                                       const Decl *D);
-  bool LoadExternalSpecializationsImpl(SpecLookupTableTy &SpecLookups,
-                                       const Decl *D,
-                                       ArrayRef<TemplateArgument> TemplateArgs);
+  llvm::DenseMap<const Decl *,
+                 serialization::reader::LazySpecializationInfoLookupTable>
+      SpecializationsLookups;
 
   // Updates for visible decls can occur for other contexts than just the
   // TU, and when we read those update records, the actual context may not
@@ -636,10 +627,8 @@ private:
       PendingVisibleUpdates;
 
   using SpecializationsUpdate = SmallVector<UpdateData, 1>;
-  using SpecializationsUpdateMap =
-      llvm::DenseMap<serialization::GlobalDeclID, SpecializationsUpdate>;
-  SpecializationsUpdateMap PendingSpecializationsUpdates;
-  SpecializationsUpdateMap PendingPartialSpecializationsUpdates;
+  llvm::DenseMap<serialization::DeclID, SpecializationsUpdate>
+      PendingSpecializationsUpdates;
 
   /// The set of C++ or Objective-C classes that have forward
   /// declarations that have not yet been linked to their definitions.
@@ -668,9 +657,9 @@ private:
                                      uint64_t Offset, serialization::DeclID ID);
 
   bool ReadSpecializations(ModuleFile &M, llvm::BitstreamCursor &Cursor,
-                           uint64_t Offset, Decl *D, bool IsPartial);
+                           uint64_t Offset, Decl *D);
   void AddSpecializations(const Decl *D, const unsigned char *Data,
-                          ModuleFile &M, bool IsPartial);
+                          ModuleFile &M);
 
   /// A vector containing identifiers that have already been
   /// loaded.
@@ -1381,10 +1370,7 @@ public:
   /// Get the loaded specializations lookup tables for \p D,
   /// if any.
   serialization::reader::LazySpecializationInfoLookupTable *
-  getLoadedSpecializationsLookupTables(const Decl *D, bool IsPartial);
-
-  /// If we have any unloaded specialization for \p D
-  bool haveUnloadedSpecializations(const Decl *D) const;
+  getLoadedSpecializationsLookupTables(const Decl *D);
 
 private:
   struct ImportedModule {
@@ -2025,7 +2011,7 @@ public:
                                       unsigned BlockID,
                                       uint64_t *StartOfBlockOffset = nullptr);
 
-  bool LoadExternalSpecializations(const Decl *D, bool OnlyPartial) override;
+  void LoadExternalSpecializations(const Decl *D, bool OnlyPartial) override;
 
   bool
   LoadExternalSpecializations(const Decl *D,

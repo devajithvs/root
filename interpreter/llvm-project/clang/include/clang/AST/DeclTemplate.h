@@ -749,25 +749,6 @@ class RedeclarableTemplateDecl : public TemplateDecl,
   }
 
   void anchor() override;
-  struct LazySpecializationInfo {
-    uint32_t DeclID = ~0U;
-    unsigned ODRHash = ~0U;
-    bool IsPartial = false;
-    LazySpecializationInfo(uint32_t ID, unsigned Hash = ~0U,
-                           bool Partial = false)
-      : DeclID(ID), ODRHash(Hash), IsPartial(Partial) { }
-    LazySpecializationInfo() { }
-    bool operator<(const LazySpecializationInfo &Other) const {
-      return DeclID < Other.DeclID;
-    }
-    bool operator==(const LazySpecializationInfo &Other) const {
-      assert((DeclID != Other.DeclID || ODRHash == Other.ODRHash) &&
-             "Hashes differ!");
-      assert((DeclID != Other.DeclID || IsPartial == Other.IsPartial) &&
-             "Both must be the same kinds!");
-      return DeclID == Other.DeclID;
-    }
-  };
 
 protected:
   template <typename EntryType> struct SpecEntryTraits {
@@ -814,8 +795,6 @@ protected:
   bool loadLazySpecializationsImpl(llvm::ArrayRef<TemplateArgument> Args,
                                    TemplateParameterList *TPL = nullptr) const;
 
-  Decl *loadLazySpecializationImpl(LazySpecializationInfo &LazySpecInfo) const;
-
   template <class EntryType, typename ...ProfileArguments>
   typename SpecEntryTraits<EntryType>::DeclType*
   findSpecializationImpl(llvm::FoldingSetVector<EntryType> &Specs,
@@ -841,13 +820,6 @@ protected:
     /// was explicitly specialized.
     llvm::PointerIntPair<RedeclarableTemplateDecl*, 1, bool>
       InstantiatedFromMember;
-
-    /// If non-null, points to an array of specializations (including
-    /// partial specializations) known only by their external declaration IDs.
-    ///
-    /// The first value in the array is the number of specializations/partial
-    /// specializations that follow.
-    LazySpecializationInfo *LazySpecializations = nullptr;
 
     /// The set of "injected" template arguments used within this
     /// template.

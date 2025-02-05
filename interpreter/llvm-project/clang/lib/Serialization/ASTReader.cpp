@@ -12,7 +12,7 @@
 
 #include "ASTCommon.h"
 #include "ASTReaderInternals.h"
-#include "TemplateArgumentHasher.h"
+#include "clang/Serialization/TemplateArgumentHasher.h"
 #include "clang/AST/ASTConsumer.h"
 #include "clang/AST/ASTContext.h"
 #include "clang/AST/ASTMutationListener.h"

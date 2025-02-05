@@ -6,7 +6,7 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "clang/Serialization/TemplateArgumentHasher.h"
+#include "TemplateArgumentHasher.h"
 #include "clang/AST/APValue.h"
 #include "clang/AST/Decl.h"
 #include "clang/AST/DeclCXX.h"

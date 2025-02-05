@@ -11,6 +11,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "ASTCommon.h"
+#include "clang/Serialization/TemplateArgumentHasher.h"
 #include "clang/AST/Attr.h"
 #include "clang/AST/DeclCXX.h"
 #include "clang/AST/DeclTemplate.h"
@@ -215,11 +216,20 @@ namespace clang {
       CollectFirstDeclFromEachModule(D, /*IncludeLocal*/ true, Firsts);
 
       for (const auto &F : Firsts) {
-        if (isa<ClassTemplatePartialSpecializationDecl,
-                VarTemplatePartialSpecializationDecl>(F.second))
-          PartialSpecsInMap.push_back(F.second);
-        else
-          SpecsInMap.push_back(F.second);
+        Record.AddDeclRef(F.second);
+        ArrayRef<TemplateArgument> Args;
+        if (auto *CTSD = dyn_cast<ClassTemplateSpecializationDecl>(D))
+          Args = CTSD->getTemplateArgs().asArray();
+        else if (auto *VTSD = dyn_cast<VarTemplateSpecializationDecl>(D))
+          Args = VTSD->getTemplateArgs().asArray();
+        else if (auto *FD = dyn_cast<FunctionDecl>(D))
+          Args = FD->getTemplateSpecializationArgs()->asArray();
+        assert(Args.size());
+        Record.push_back(clang::serialization::StableHashForTemplateArguments(Args));
+        bool IsPartialSpecialization
+          = isa<ClassTemplatePartialSpecializationDecl>(D) ||
+          isa<VarTemplatePartialSpecializationDecl>(D);
+        Record.push_back(IsPartialSpecialization);
       }
     }
 
@@ -248,14 +258,24 @@ namespace clang {
       // our chained AST reader, we can just write out the DeclIDs. Otherwise,
       // we need to resolve them to actual declarations.
       if (Writer.Chain != Writer.Context->getExternalSource() &&
-          Writer.Chain && Writer.Chain->haveUnloadedSpecializations(D)) {
+          Common->LazySpecializations) {
         D->LoadLazySpecializations();
-        assert(!Writer.Chain->haveUnloadedSpecializations(D));
+        assert(!Common->LazySpecializations);
       }
 
-      // AddFirstSpecializationDeclFromEachModule might trigger deserialization,
-      // invalidating *Specializations iterators.
-      llvm::SmallVector<const Decl *, 16> AllSpecs;
+      using LazySpecializationInfo
+        = RedeclarableTemplateDecl::LazySpecializationInfo;
+      ArrayRef<LazySpecializationInfo> LazySpecializations;
+      if (auto *LS = Common->LazySpecializations)
+        LazySpecializations = llvm::ArrayRef(LS + 1, LS[0].DeclID);
+
+      // Add a slot to the record for the number of specializations.
+      unsigned I = Record.size();
+      Record.push_back(0);
+
+      // AddFirstDeclFromEachModule might trigger deserialization, invalidating
+      // *Specializations iterators.
+      llvm::SmallVector<const Decl*, 16> AllSpecs;
       for (auto &Entry : Common->Specializations)
         AllSpecs.push_back(getSpecializationDecl(Entry));
       for (auto &Entry : getPartialSpecializations(Common))
@@ -267,18 +287,18 @@ namespace clang {
         assert(D->isCanonicalDecl() && "non-canonical decl in set");
         AddFirstSpecializationDeclFromEachModule(D, Specs, PartialSpecs);
       }
-
-      Record.AddOffset(Writer.WriteSpecializationInfoLookupTable(
-          D, Specs, /*IsPartial=*/false));
-
-      // Function Template Decl doesn't have partial decls.
-      if (isa<FunctionTemplateDecl>(D)) {
-        assert(PartialSpecs.empty());
-        return;
+      for (auto &SpecInfo : LazySpecializations) {
+        Record.push_back(SpecInfo.DeclID);
+        Record.push_back(SpecInfo.ODRHash);
+        Record.push_back(SpecInfo.IsPartial);
       }
 
-      Record.AddOffset(Writer.WriteSpecializationInfoLookupTable(
-          D, PartialSpecs, /*IsPartial=*/true));
+      // Update the size entry we added earlier. We linerized the
+      // LazySpecializationInfo members and we need to adjust the size as we
+      // will read them always together.
+      assert ((Record.size() - I - 1) % 3 == 0
+              && "Must be divisible by LazySpecializationInfo count!");
+      Record[I] = (Record.size() - I - 1) / 3;
     }
 
     /// Ensure that this template specialization is associated with the specified
@@ -299,13 +319,8 @@ namespace clang {
       if (Writer.getFirstLocalDecl(Specialization) != Specialization)
         return;
 
-      if (isa<ClassTemplatePartialSpecializationDecl,
-              VarTemplatePartialSpecializationDecl>(Specialization))
-        Writer.PartialSpecializationsUpdates[cast<NamedDecl>(Template)]
-            .push_back(cast<NamedDecl>(Specialization));
-      else
-        Writer.SpecializationsUpdates[cast<NamedDecl>(Template)].push_back(
-            cast<NamedDecl>(Specialization));
+      Writer.DeclUpdates[Template].push_back(ASTWriter::DeclUpdate(
+          UPD_CXX_ADDED_TEMPLATE_SPECIALIZATION, Specialization));
     }
   };
 }

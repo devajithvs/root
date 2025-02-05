@@ -390,6 +390,7 @@ private:
   using SpecializationUpdateMap =
       llvm::MapVector<const NamedDecl *, SmallVector<const Decl *>>;
   SpecializationUpdateMap SpecializationsUpdates;
+  SpecializationUpdateMap PartialSpecializationsUpdates;
 
   using FirstLatestDeclMap = llvm::DenseMap<Decl *, Decl *>;
 
@@ -535,9 +536,10 @@ private:
 
   void GenerateSpecializationInfoLookupTable(
       const NamedDecl *D, llvm::SmallVectorImpl<const Decl *> &Specializations,
-      llvm::SmallVectorImpl<char> &LookupTable);
+      llvm::SmallVectorImpl<char> &LookupTable, bool IsPartial);
   uint64_t WriteSpecializationInfoLookupTable(
-      const NamedDecl *D, llvm::SmallVectorImpl<const Decl *> &Specializations);
+      const NamedDecl *D, llvm::SmallVectorImpl<const Decl *> &Specializations,
+      bool IsPartial);
   void GenerateNameLookupTable(const DeclContext *DC,
                                llvm::SmallVectorImpl<char> &LookupTable);
   uint64_t WriteDeclContextLexicalBlock(ASTContext &Context, DeclContext *DC);

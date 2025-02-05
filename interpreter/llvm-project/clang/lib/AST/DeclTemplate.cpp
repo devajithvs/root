@@ -10,7 +10,6 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "clang/Serialization/TemplateArgumentHasher.h"
 #include "clang/AST/DeclTemplate.h"
 #include "clang/AST/ASTContext.h"
 #include "clang/AST/ASTMutationListener.h"
@@ -335,43 +334,30 @@ RedeclarableTemplateDecl::CommonBase *RedeclarableTemplateDecl::getCommonPtr() c
 }
 
 void RedeclarableTemplateDecl::loadLazySpecializationsImpl(
-                                             bool OnlyPartial/*=false*/) const {
-  // Grab the most recent declaration to ensure we've loaded any lazy
-  // redeclarations of this template.
-  CommonBase *CommonBasePtr = getMostRecentDecl()->getCommonPtr();
-  if (auto *Specs = CommonBasePtr->LazySpecializations) {
-    if (!OnlyPartial)
-      CommonBasePtr->LazySpecializations = nullptr;
-    for (uint32_t I = 0, N = Specs[0].DeclID; I != N; ++I) {
-      // Skip over already loaded specializations.
-      if (!Specs[I+1].ODRHash)
-        continue;
-      if (!OnlyPartial || Specs[I+1].IsPartial)
-        (void)loadLazySpecializationImpl(Specs[I+1]);
-    }
-  }
+    bool OnlyPartial /*=false*/) const {
+  auto *ExternalSource = getASTContext().getExternalSource();
+  if (!ExternalSource)
+    return;
+
+  ExternalSource->LoadExternalSpecializations(this->getCanonicalDecl(),
+                                              OnlyPartial);
+  return;
 }
 
 bool RedeclarableTemplateDecl::loadLazySpecializationsImpl(
     ArrayRef<TemplateArgument> Args, TemplateParameterList *TPL) const {
-  bool NewDeclsFound;
-  CommonBase *CommonBasePtr = getMostRecentDecl()->getCommonPtr();
-  if (auto *Specs = CommonBasePtr->LazySpecializations) {
-    unsigned Hash = clang::serialization::StableHashForTemplateArguments(Args);
-    for (uint32_t I = 0, N = Specs[0].DeclID; I != N; ++I)
-      if (Specs[I+1].ODRHash && Specs[I+1].ODRHash == Hash)
-        NewDeclsFound |= (bool)loadLazySpecializationImpl(Specs[I+1]);
-  }
-  return NewDeclsFound;
-}
+  auto *ExternalSource = getASTContext().getExternalSource();
+  if (!ExternalSource)
+    return false;
 
-Decl *RedeclarableTemplateDecl::loadLazySpecializationImpl(
-                                   LazySpecializationInfo &LazySpecInfo) const {
-  uint32_t ID = LazySpecInfo.DeclID;
-  assert(ID && "Loading already loaded specialization!");
-  // Note that we loaded the specialization.
-  LazySpecInfo.DeclID = LazySpecInfo.ODRHash = LazySpecInfo.IsPartial = 0;
-  return getASTContext().getExternalSource()->GetExternalDecl(ID);
+  // If TPL is not null, it implies that we're loading specializations for
+  // partial templates. We need to load all specializations in such cases.
+  if (TPL)
+    return ExternalSource->LoadExternalSpecializations(this->getCanonicalDecl(),
+                                                       /*OnlyPartial=*/false);
+
+  return ExternalSource->LoadExternalSpecializations(this->getCanonicalDecl(),
+                                                     Args);
 }
 
 template <class EntryType, typename... ProfileArguments>

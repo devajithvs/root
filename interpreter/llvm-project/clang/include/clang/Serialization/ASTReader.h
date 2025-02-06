@@ -615,7 +615,7 @@ private:
   SpecLookupTableTy PartialSpecializationsLookups;
 
   bool LoadExternalSpecializationsImpl(SpecLookupTableTy &SpecLookups,
-                                       const Decl *D);
+                                       const Decl *D, bool OnlyPartial);
   bool LoadExternalSpecializationsImpl(SpecLookupTableTy &SpecLookups,
                                        const Decl *D,
                                        ArrayRef<TemplateArgument> TemplateArgs);

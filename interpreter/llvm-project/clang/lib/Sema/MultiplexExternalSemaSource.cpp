@@ -117,10 +117,8 @@ FindExternalVisibleDeclsByName(const DeclContext *DC, DeclarationName Name) {
 
 bool MultiplexExternalSemaSource::LoadExternalSpecializations(
     const Decl *D, bool OnlyPartial) {
-  bool Loaded = false;
   for (size_t i = 0; i < Sources.size(); ++i)
-    Loaded |= Sources[i]->LoadExternalSpecializations(D, OnlyPartial);
-  return Loaded;
+    Sources[i]->LoadExternalSpecializations(D, OnlyPartial);
 }
 
 bool MultiplexExternalSemaSource::LoadExternalSpecializations(

@@ -1251,10 +1251,11 @@ void LazySpecializationInfoLookupTrait::ReadDataInto(internal_key_type,
   using namespace llvm::support;
 
   for (unsigned NumDecls =
-           DataLen / sizeof(serialization::reader::LazySpecializationInfo);
+           DataLen / serialization::reader::LazySpecializationInfo::Length;
        NumDecls; --NumDecls) {
     LocalDeclID LocalID = endian::readNext<DeclID, llvm::endianness::little, unaligned>(d);
-    Val.insert(Reader.getGlobalDeclID(F, LocalID));
+    const bool IsPartial = endian::readNext<bool, llvm::endianness::little, unaligned>(d);
+    Val.insert({Reader.getGlobalDeclID(F, LocalID), IsPartial});
   }
 }
 
@@ -1348,16 +1349,15 @@ bool ASTReader::ReadVisibleDeclContextStorage(ModuleFile &M,
 }
 
 void ASTReader::AddSpecializations(const Decl *D, const unsigned char *Data,
-                                   ModuleFile &M, bool IsPartial) {
+                                   ModuleFile &M) {
   D = D->getCanonicalDecl();
-  auto &SpecLookups =
-      IsPartial ? PartialSpecializationsLookups : SpecializationsLookups;
+  auto &SpecLookups = SpecializationsLookups;
   SpecLookups[D].Table.add(&M, Data,
                            reader::LazySpecializationInfoLookupTrait(*this, M));
 }
 
 bool ASTReader::ReadSpecializations(ModuleFile &M, BitstreamCursor &Cursor,
-                                    uint64_t Offset, Decl *D, bool IsPartial) {
+                                    uint64_t Offset, Decl *D) {
   assert(Offset != 0);
 
   SavedStreamPosition SavedPosition(Cursor);
@@ -1381,14 +1381,13 @@ bool ASTReader::ReadSpecializations(ModuleFile &M, BitstreamCursor &Cursor,
     return true;
   }
   unsigned RecCode = MaybeRecCode.get();
-  if (RecCode != DECL_SPECIALIZATIONS &&
-      RecCode != DECL_PARTIAL_SPECIALIZATIONS) {
+  if (RecCode != DECL_SPECIALIZATIONS) {
     Error("Expected decl specs block");
     return true;
   }
 
   auto *Data = (const unsigned char *)Blob.data();
-  AddSpecializations(D, Data, M, IsPartial);
+  AddSpecializations(D, Data, M);
   return false;
 }
 
@@ -3537,19 +3536,6 @@ llvm::Error ASTReader::ReadASTBlock(ModuleFile &F,
       GlobalDeclID ID = ReadDeclID(F, Record, Idx);
       auto *Data = (const unsigned char *)Blob.data();
       PendingSpecializationsUpdates[ID].push_back(UpdateData{&F, Data});
-      // If we've already loaded the decl, perform the updates when we finish
-      // loading this block.
-      if (Decl *D = GetExistingDecl(ID))
-        PendingUpdateRecords.push_back(
-            PendingUpdateRecord(ID, D, /*JustLoaded=*/false));
-      break;
-    }
-
-    case CXX_ADDED_TEMPLATE_PARTIAL_SPECIALIZATION: {
-      unsigned Idx = 0;
-      GlobalDeclID ID = ReadDeclID(F, Record, Idx);
-      auto *Data = (const unsigned char *)Blob.data();
-      PendingPartialSpecializationsUpdates[ID].push_back(UpdateData{&F, Data});
       // If we've already loaded the decl, perform the updates when we finish
       // loading this block.
       if (Decl *D = GetExistingDecl(ID))
@@ -7723,14 +7709,8 @@ void ASTReader::CompleteRedeclChain(const Decl *D) {
     }
   }
 
-  if (Template) {
-    // For partitial specialization, load all the specializations for safety.
-    if (isa<ClassTemplatePartialSpecializationDecl,
-            VarTemplatePartialSpecializationDecl>(D))
-      Template->loadLazySpecializationsImpl();
-    else
-      Template->loadLazySpecializationsImpl(Args);
-  }
+  if (Template)
+    Template->loadLazySpecializationsImpl(Args);
 }
 
 CXXCtorInitializer **
@@ -8014,9 +7994,10 @@ Stmt *ASTReader::GetExternalDeclStmt(uint64_t Offset) {
   return ReadStmtFromStream(*Loc.F);
 }
 
-bool ASTReader::LoadExternalSpecializationsImpl(SpecLookupTableTy &SpecLookups,
-                                                const Decl *D) {
+bool ASTReader::LoadExternalSpecializations(const Decl *D, bool OnlyPartial) {
   assert(D);
+
+  auto &SpecLookups = SpecializationsLookups;
 
   auto It = SpecLookups.find(D);
   if (It == SpecLookups.end())
@@ -8029,56 +8010,17 @@ bool ASTReader::LoadExternalSpecializationsImpl(SpecLookupTableTy &SpecLookups,
 
   // Since we've loaded all the specializations, we can erase it from
   // the lookup table.
-  SpecLookups.erase(It);
+  if (!OnlyPartial)
+    SpecializationsLookups.erase(It);
 
   bool NewSpecsFound = false;
   Deserializing LookupResults(this);
-  for (auto &Info : Infos) {
-    if (GetExistingDecl(Info))
-      continue;
-    NewSpecsFound = true;
-    GetDecl(Info);
-  }
-
-  return NewSpecsFound;
-}
-
-bool ASTReader::LoadExternalSpecializations(const Decl *D, bool OnlyPartial) {
-  assert(D);
-
-  bool NewSpecsFound =
-      LoadExternalSpecializationsImpl(PartialSpecializationsLookups, D);
-  if (OnlyPartial)
-    return NewSpecsFound;
-
-  NewSpecsFound |= LoadExternalSpecializationsImpl(SpecializationsLookups, D);
-  return NewSpecsFound;
-}
-
-bool ASTReader::LoadExternalSpecializationsImpl(
-    SpecLookupTableTy &SpecLookups, const Decl *D,
-    ArrayRef<TemplateArgument> TemplateArgs) {
-  assert(D);
-
-  auto It = SpecLookups.find(D);
-  if (It == SpecLookups.end())
-    return false;
-
-  Deserializing LookupResults(this);
-  auto HashValue = StableHashForTemplateArguments(TemplateArgs);
-
-  // Get Decl may violate the iterator from SpecLookups
-  llvm::SmallVector<serialization::reader::LazySpecializationInfo, 8> Infos =
-      It->second.Table.find(HashValue);
-
-  bool NewSpecsFound = false;
-  for (auto &Info : Infos) {
-    if (GetExistingDecl(Info))
-      continue;
-    NewSpecsFound = true;
-    GetDecl(Info);
-  }
-
+  for (auto &Info : Infos)
+    if (!OnlyPartial || Info.IsPartial) {
+      GetDecl(Info.ID);
+      NewSpecsFound = true;
+    }
+  
   return NewSpecsFound;
 }
 
@@ -8086,12 +8028,28 @@ bool ASTReader::LoadExternalSpecializations(
     const Decl *D, ArrayRef<TemplateArgument> TemplateArgs) {
   assert(D);
 
-  bool NewDeclsFound = LoadExternalSpecializationsImpl(
-      PartialSpecializationsLookups, D, TemplateArgs);
-  NewDeclsFound |=
-      LoadExternalSpecializationsImpl(SpecializationsLookups, D, TemplateArgs);
+  auto &SpecLookups = SpecializationsLookups;
 
-  return NewDeclsFound;
+  auto It = SpecLookups.find(D);
+  if (It == SpecLookups.end())
+    return false;
+
+  Deserializing LookupResults(this);
+  auto HashValue = TemplateArgumentList::ComputeStableHash(TemplateArgs);
+
+  // Get Decl may violate the iterator from SpecLookups
+  llvm::SmallVector<serialization::reader::LazySpecializationInfo, 8> Infos =
+      It->second.Table.find(HashValue);
+
+  bool NewSpecsFound = false;
+  for (auto &Info : Infos) {
+    if (GetExistingDecl(Info.ID))
+      continue;
+    NewSpecsFound = true;
+    GetDecl(Info.ID);
+  }
+
+  return NewSpecsFound;
 }
 
 void ASTReader::FindExternalLexicalDecls(
@@ -8269,18 +8227,15 @@ ASTReader::getLoadedLookupTables(DeclContext *Primary) const {
 }
 
 serialization::reader::LazySpecializationInfoLookupTable *
-ASTReader::getLoadedSpecializationsLookupTables(const Decl *D, bool IsPartial) {
+ASTReader::getLoadedSpecializationsLookupTables(const Decl *D) {
   assert(D->isCanonicalDecl());
-  auto &LookupTable =
-      IsPartial ? PartialSpecializationsLookups : SpecializationsLookups;
-  auto I = LookupTable.find(D);
-  return I == LookupTable.end() ? nullptr : &I->second;
+  auto I = SpecializationsLookups.find(D);
+  return I == SpecializationsLookups.end() ? nullptr : &I->second;
 }
 
 bool ASTReader::haveUnloadedSpecializations(const Decl *D) const {
   assert(D->isCanonicalDecl());
-  return (PartialSpecializationsLookups.find(D) !=
-          PartialSpecializationsLookups.end()) ||
+  return
          (SpecializationsLookups.find(D) != SpecializationsLookups.end());
 }
 

@@ -104,8 +104,8 @@ ExternalASTSource::FindExternalVisibleDeclsByName(const DeclContext *DC,
   return false;
 }
 
-void ExternalASTSource::LoadExternalSpecializations(const Decl *D, bool) {
-  return;
+bool ExternalASTSource::LoadExternalSpecializations(const Decl *D, bool) {
+  return false;
 }
 
 bool ExternalASTSource::LoadExternalSpecializations(

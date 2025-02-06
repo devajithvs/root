@@ -112,8 +112,8 @@ namespace cling {
       return m_Source->FindExternalVisibleDeclsByName(DC, Name);
     }
 
-    bool LoadExternalSpecializations(const Decl *D, bool OnlyPartial) override {
-      return m_Source->LoadExternalSpecializations(D, OnlyPartial);
+    void LoadExternalSpecializations(const Decl *D, bool OnlyPartial) override {
+      m_Source->LoadExternalSpecializations(D, OnlyPartial);
     }
 
     bool

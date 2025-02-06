@@ -611,9 +611,11 @@ private:
                      serialization::reader::LazySpecializationInfoLookupTable>;
   /// Map from decls to specialized decls.
   SpecLookupTableTy SpecializationsLookups;
+  /// Split partial specialization from specialization to speed up lookups.
+  SpecLookupTableTy PartialSpecializationsLookups;
 
   bool LoadExternalSpecializationsImpl(SpecLookupTableTy &SpecLookups,
-                                       const Decl *D, bool OnlyPartial);
+                                       const Decl *D);
   bool LoadExternalSpecializationsImpl(SpecLookupTableTy &SpecLookups,
                                        const Decl *D,
                                        ArrayRef<TemplateArgument> TemplateArgs);
@@ -637,6 +639,7 @@ private:
   using SpecializationsUpdateMap =
       llvm::DenseMap<serialization::GlobalDeclID, SpecializationsUpdate>;
   SpecializationsUpdateMap PendingSpecializationsUpdates;
+  SpecializationsUpdateMap PendingPartialSpecializationsUpdates;
 
   /// The set of C++ or Objective-C classes that have forward
   /// declarations that have not yet been linked to their definitions.
@@ -665,9 +668,9 @@ private:
                                      uint64_t Offset, serialization::DeclID ID);
 
   bool ReadSpecializations(ModuleFile &M, llvm::BitstreamCursor &Cursor,
-                           uint64_t Offset, Decl *D);
+                           uint64_t Offset, Decl *D, bool IsPartial);
   void AddSpecializations(const Decl *D, const unsigned char *Data,
-                          ModuleFile &M);
+                          ModuleFile &M, bool IsPartial);
 
   /// A vector containing identifiers that have already been
   /// loaded.
@@ -1378,7 +1381,7 @@ public:
   /// Get the loaded specializations lookup tables for \p D,
   /// if any.
   serialization::reader::LazySpecializationInfoLookupTable *
-  getLoadedSpecializationsLookupTables(const Decl *D);
+  getLoadedSpecializationsLookupTables(const Decl *D, bool IsPartial);
 
   /// If we have any unloaded specialization for \p D
   bool haveUnloadedSpecializations(const Decl *D) const;

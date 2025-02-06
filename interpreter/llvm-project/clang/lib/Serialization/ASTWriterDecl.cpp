@@ -206,15 +206,21 @@ namespace clang {
     /// ODRHash of the template arguments of D which should provide enough
     /// information to load D only if the template instantiator needs it.
     void AddFirstSpecializationDeclFromEachModule(
-        const Decl *D, llvm::SmallVectorImpl<const Decl *> &SpecsInMap) {
+        const Decl *D, llvm::SmallVectorImpl<const Decl *> &SpecsInMap,
+        llvm::SmallVectorImpl<const Decl *> &PartialSpecsInMap) {
       assert((isa<ClassTemplateSpecializationDecl>(D) ||
               isa<VarTemplateSpecializationDecl>(D) || isa<FunctionDecl>(D)) &&
              "Must not be called with other decls");
       llvm::MapVector<ModuleFile *, const Decl *> Firsts;
       CollectFirstDeclFromEachModule(D, /*IncludeLocal*/ true, Firsts);
 
-      for (const auto &F : Firsts)
-        SpecsInMap.push_back(F.second);
+      for (const auto &F : Firsts) {
+        if (isa<ClassTemplatePartialSpecializationDecl,
+                VarTemplatePartialSpecializationDecl>(F.second))
+          PartialSpecsInMap.push_back(F.second);
+        else
+          SpecsInMap.push_back(F.second);
+      }
     }
 
     /// Get the specialization decl from an entry in the specialization list.
@@ -255,15 +261,24 @@ namespace clang {
       for (auto &Entry : getPartialSpecializations(Common))
         AllSpecs.push_back(getSpecializationDecl(Entry));
 
-      llvm::SmallVector<const Decl*, 16> SpecsInOnDiskMap = AllSpecs;
-
+      llvm::SmallVector<const Decl *, 16> Specs;
+      llvm::SmallVector<const Decl *, 16> PartialSpecs;
       for (auto *D : AllSpecs) {
         assert(D->isCanonicalDecl() && "non-canonical decl in set");
-        AddFirstSpecializationDeclFromEachModule(D, SpecsInOnDiskMap);
+        AddFirstSpecializationDeclFromEachModule(D, Specs, PartialSpecs);
       }
 
       Record.AddOffset(Writer.WriteSpecializationInfoLookupTable(
-        D, SpecsInOnDiskMap));
+          D, Specs, /*IsPartial=*/false));
+
+      // Function Template Decl doesn't have partial decls.
+      if (isa<FunctionTemplateDecl>(D)) {
+        assert(PartialSpecs.empty());
+        return;
+      }
+
+      Record.AddOffset(Writer.WriteSpecializationInfoLookupTable(
+          D, PartialSpecs, /*IsPartial=*/true));
     }
 
     /// Ensure that this template specialization is associated with the specified
@@ -284,7 +299,12 @@ namespace clang {
       if (Writer.getFirstLocalDecl(Specialization) != Specialization)
         return;
 
-      Writer.SpecializationsUpdates[cast<NamedDecl>(Template)].push_back(
+      if (isa<ClassTemplatePartialSpecializationDecl,
+              VarTemplatePartialSpecializationDecl>(Specialization))
+        Writer.PartialSpecializationsUpdates[cast<NamedDecl>(Template)]
+            .push_back(cast<NamedDecl>(Specialization));
+      else
+        Writer.SpecializationsUpdates[cast<NamedDecl>(Template)].push_back(
             cast<NamedDecl>(Specialization));
     }
   };
@@ -2692,6 +2712,11 @@ void ASTWriter::WriteDeclAbbrevs() {
   Abv->Add(BitCodeAbbrevOp(serialization::DECL_SPECIALIZATIONS));
   Abv->Add(BitCodeAbbrevOp(BitCodeAbbrevOp::Blob));
   DeclSpecializationsAbbrev = Stream.EmitAbbrev(std::move(Abv));
+
+  Abv = std::make_shared<BitCodeAbbrev>();
+  Abv->Add(BitCodeAbbrevOp(serialization::DECL_PARTIAL_SPECIALIZATIONS));
+  Abv->Add(BitCodeAbbrevOp(BitCodeAbbrevOp::Blob));
+  DeclPartialSpecializationsAbbrev = Stream.EmitAbbrev(std::move(Abv));
 }
 
 /// isRequiredDecl - Check if this is a "required" Decl, which must be seen by

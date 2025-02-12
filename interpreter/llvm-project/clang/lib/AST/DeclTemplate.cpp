@@ -928,27 +928,6 @@ TemplateArgumentList::CreateCopy(ASTContext &Context,
   return new (Mem) TemplateArgumentList(Args);
 }
 
-unsigned
-TemplateArgumentList::ComputeStableHash(ArrayRef<TemplateArgument> Args) {
-  // FIXME: ODR hashing may not be the best mechanism to hash the template
-  // arguments. ODR hashing is (or perhaps, should be) about determining whether
-  // two things are spelled the same way and have the same meaning (as required
-  // by the C++ ODR), whereas what we want here is whether they have the same
-  // meaning regardless of spelling. Maybe we can get away with reusing ODR
-  // hashing anyway, on the basis that any canonical, non-dependent template
-  // argument should have the same (invented) spelling in every translation
-  // unit, but it is not sure that's true in all cases. There may still be cases
-  // where the canonical type includes some aspect of "whatever we saw first",
-  // in which case the ODR hash can differ across translation units for
-  // non-dependent, canonical template arguments that are spelled differently
-  // but have the same meaning. But it is not easy to raise examples.
-  ODRHash Hasher;
-  for (TemplateArgument TA : Args)
-    Hasher.AddTemplateArgument(TA);
-
-  return Hasher.CalculateHash();
-}
-
 FunctionTemplateSpecializationInfo *FunctionTemplateSpecializationInfo::Create(
     ASTContext &C, FunctionDecl *FD, FunctionTemplateDecl *Template,
     TemplateSpecializationKind TSK, const TemplateArgumentList *TemplateArgs,

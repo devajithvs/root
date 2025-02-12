@@ -215,10 +215,6 @@ namespace clang {
       CollectFirstDeclFromEachModule(D, /*IncludeLocal*/ true, Firsts);
 
       for (const auto &F : Firsts) {
-        if (isa<ClassTemplatePartialSpecializationDecl,
-                VarTemplatePartialSpecializationDecl>(F.second))
-          PartialSpecsInMap.push_back(F.second);
-        else
           SpecsInMap.push_back(F.second);
       }
     }
@@ -276,9 +272,6 @@ namespace clang {
         assert(PartialSpecs.empty());
         return;
       }
-
-      Record.AddOffset(Writer.WriteSpecializationInfoLookupTable(
-          D, PartialSpecs, /*IsPartial=*/true));
     }
 
     /// Ensure that this template specialization is associated with the specified

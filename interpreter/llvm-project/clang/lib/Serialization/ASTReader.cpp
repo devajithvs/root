@@ -1251,10 +1251,11 @@ void LazySpecializationInfoLookupTrait::ReadDataInto(internal_key_type,
   using namespace llvm::support;
 
   for (unsigned NumDecls =
-           DataLen / sizeof(serialization::reader::LazySpecializationInfo);
+           DataLen / serialization::reader::LazySpecializationInfo::Length;
        NumDecls; --NumDecls) {
     LocalDeclID LocalID = endian::readNext<DeclID, llvm::endianness::little, unaligned>(d);
-    Val.insert(Reader.getGlobalDeclID(F, LocalID));
+    const bool IsPartial = endian::readNext<bool, llvm::endianness::little, unaligned>(d);
+    Val.insert({Reader.getGlobalDeclID(F, LocalID), IsPartial});
   }
 }
 
@@ -8029,15 +8030,17 @@ bool ASTReader::LoadExternalSpecializationsImpl(SpecLookupTableTy &SpecLookups,
 
   // Since we've loaded all the specializations, we can erase it from
   // the lookup table.
-  SpecLookups.erase(It);
+  // FIXME: Without skipping this for partial specializations, ROOT fails to compile 
+  if (!isa<ClassTemplatePartialSpecializationDecl, VarTemplatePartialSpecializationDecl>(D))
+    SpecLookups.erase(It);
 
   bool NewSpecsFound = false;
   Deserializing LookupResults(this);
   for (auto &Info : Infos) {
-    if (GetExistingDecl(Info))
+    if (GetExistingDecl(Info.ID))
       continue;
     NewSpecsFound = true;
-    GetDecl(Info);
+    GetDecl(Info.ID);
   }
 
   return NewSpecsFound;
@@ -8046,12 +8049,7 @@ bool ASTReader::LoadExternalSpecializationsImpl(SpecLookupTableTy &SpecLookups,
 bool ASTReader::LoadExternalSpecializations(const Decl *D, bool OnlyPartial) {
   assert(D);
 
-  bool NewSpecsFound =
-      LoadExternalSpecializationsImpl(PartialSpecializationsLookups, D);
-  if (OnlyPartial)
-    return NewSpecsFound;
-
-  NewSpecsFound |= LoadExternalSpecializationsImpl(SpecializationsLookups, D);
+  bool NewSpecsFound = LoadExternalSpecializationsImpl(SpecializationsLookups, D);
   return NewSpecsFound;
 }
 
@@ -8073,10 +8071,10 @@ bool ASTReader::LoadExternalSpecializationsImpl(
 
   bool NewSpecsFound = false;
   for (auto &Info : Infos) {
-    if (GetExistingDecl(Info))
+    if (GetExistingDecl(Info.ID))
       continue;
     NewSpecsFound = true;
-    GetDecl(Info);
+    GetDecl(Info.ID);
   }
 
   return NewSpecsFound;
@@ -8086,9 +8084,7 @@ bool ASTReader::LoadExternalSpecializations(
     const Decl *D, ArrayRef<TemplateArgument> TemplateArgs) {
   assert(D);
 
-  bool NewDeclsFound = LoadExternalSpecializationsImpl(
-      PartialSpecializationsLookups, D, TemplateArgs);
-  NewDeclsFound |=
+  bool NewDeclsFound =
       LoadExternalSpecializationsImpl(SpecializationsLookups, D, TemplateArgs);
 
   return NewDeclsFound;

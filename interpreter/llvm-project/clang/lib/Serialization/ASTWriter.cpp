@@ -3956,7 +3956,8 @@ public:
     for (auto *D : C) {
       NamedDecl *ND = getDeclForLocalLookup(Writer.getLangOpts(),
                                             const_cast<NamedDecl *>(D));
-      Specs.push_back(GlobalDeclID(Writer.GetDeclRef(ND)));
+      bool IsPartial = isa<ClassTemplatePartialSpecializationDecl, VarTemplatePartialSpecializationDecl>(D);
+      Specs.push_back({GlobalDeclID(Writer.GetDeclRef(ND)), IsPartial});
     }
     for (const serialization::reader::LazySpecializationInfo &Info :
          ExistingInfo)
@@ -3990,7 +3991,7 @@ public:
                                                   data_type_ref Lookup) {
     // 4 bytes for each slot.
     unsigned KeyLen = 4;
-    unsigned DataLen = sizeof(serialization::reader::LazySpecializationInfo) *
+    unsigned DataLen = serialization::reader::LazySpecializationInfo::Length *
                        (Lookup.second - Lookup.first);
 
     return emitULEBKeyDataLength(KeyLen, DataLen, Out);
@@ -4011,7 +4012,8 @@ public:
     uint64_t Start = Out.tell();
     (void)Start;
     for (unsigned I = Lookup.first, N = Lookup.second; I != N; ++I) {
-      LE.write<DeclID>(Specs[I]);
+      LE.write<uint32_t>(Specs[I].ID);
+      LE.write<bool>(Specs[I].IsPartial);
     }
     assert(Out.tell() - Start == DataLen && "Data length is wrong");
   }
@@ -5077,16 +5079,6 @@ ASTFileSignature ASTWriter::WriteASTCore(Sema &SemaRef, StringRef isysroot,
     Stream.EmitRecord(METADATA_OLD_FORMAT, Record);
   }
 
-  if (!SpecializationsUpdates.empty()) {
-    WriteSpecializationsUpdates(/*IsPartial=*/false);
-    SpecializationsUpdates.clear();
-  }
-
-  if (!PartialSpecializationsUpdates.empty()) {
-    WriteSpecializationsUpdates(/*IsPartial=*/true);
-    PartialSpecializationsUpdates.clear();
-  }
-
   // Create a lexical update block containing all of the declarations in the
   // translation unit that do not come from other AST files.
   const TranslationUnitDecl *TU = Context.getTranslationUnitDecl();
@@ -5286,6 +5278,10 @@ ASTFileSignature ASTWriter::WriteASTCore(Sema &SemaRef, StringRef isysroot,
   WriteTypeDeclOffsets();
   if (!DeclUpdatesOffsetsRecord.empty())
     Stream.EmitRecord(DECL_UPDATE_OFFSETS, DeclUpdatesOffsetsRecord);
+
+  if (!SpecializationsUpdates.empty())
+    WriteSpecializationsUpdates(/*IsPartial=*/false);
+
   WriteFileDeclIDsMap();
   WriteSourceManagerBlock(Context.getSourceManager(), PP);
   WriteComments();

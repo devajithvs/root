@@ -3950,17 +3950,14 @@ public:
   explicit LazySpecializationInfoLookupTrait(ASTWriter &Writer)
       : Writer(Writer) {}
 
-  template <typename Col, typename Col2>
-  data_type getData(Col &&C, Col2 &ExistingInfo) {
+  template <typename Col>
+  data_type getData(Col &&C) {
     unsigned Start = Specs.size();
     for (auto *D : C) {
-      NamedDecl *ND = getDeclForLocalLookup(Writer.getLangOpts(),
-                                            const_cast<NamedDecl *>(D));
-      Specs.push_back(GlobalDeclID(Writer.GetDeclRef(ND)));
+      bool IsPartial = isa<ClassTemplatePartialSpecializationDecl, VarTemplatePartialSpecializationDecl>(D);
+      Specs.push_back({Writer.GetDeclRef(getDeclForLocalLookup(
+          Writer.getLangOpts(), const_cast<NamedDecl *>(D))), IsPartial});
     }
-    for (const serialization::reader::LazySpecializationInfo &Info :
-         ExistingInfo)
-      Specs.push_back(Info);
     return std::make_pair(Start, Specs.size());
   }
 
@@ -3990,7 +3987,7 @@ public:
                                                   data_type_ref Lookup) {
     // 4 bytes for each slot.
     unsigned KeyLen = 4;
-    unsigned DataLen = sizeof(serialization::reader::LazySpecializationInfo) *
+    unsigned DataLen = serialization::reader::LazySpecializationInfo::Length *
                        (Lookup.second - Lookup.first);
 
     return emitULEBKeyDataLength(KeyLen, DataLen, Out);
@@ -4011,7 +4008,8 @@ public:
     uint64_t Start = Out.tell();
     (void)Start;
     for (unsigned I = Lookup.first, N = Lookup.second; I != N; ++I) {
-      LE.write<DeclID>(Specs[I]);
+      LE.write<uint32_t>(Specs[I].ID);
+      LE.write<bool>(Specs[I].IsPartial);
     }
     assert(Out.tell() - Start == DataLen && "Data length is wrong");
   }
@@ -4028,7 +4026,7 @@ unsigned CalculateODRHashForSpecs(const Decl *Spec) {
   else
     llvm_unreachable("New Specialization Kind?");
 
-  return StableHashForTemplateArguments(Args);
+  return TemplateArgumentList::ComputeStableHash(Args);
 }
 } // namespace
 
@@ -4064,19 +4062,7 @@ void ASTWriter::GenerateSpecializationInfoLookupTable(
             : nullptr;
 
   for (auto &[HashValue, Specs] : SpecializationMaps) {
-    SmallVector<serialization::reader::LazySpecializationInfo, 16>
-        ExisitingSpecs;
-    // We have to merge the lookup table manually here. We can't depend on the
-    // merge mechanism offered by
-    // clang::serialization::MultiOnDiskHashTableGenerator since that generator
-    // assumes the we'll get the same value with the same key.
-    // And also underlying llvm::OnDiskChainedHashTableGenerator assumes that we
-    // won't insert the values with the same key twice. So we have to merge the
-    // lookup table here manually.
-    if (Lookups)
-      ExisitingSpecs = Lookups->Table.find(HashValue);
-
-    Generator.insert(HashValue, Trait.getData(Specs, ExisitingSpecs), Trait);
+    Generator.insert(HashValue, Trait.getData(Specs), Trait);
   }
 
   Generator.emit(LookupTable, Trait, Lookups ? &Lookups->Table : nullptr);
@@ -5077,16 +5063,6 @@ ASTFileSignature ASTWriter::WriteASTCore(Sema &SemaRef, StringRef isysroot,
     Stream.EmitRecord(METADATA_OLD_FORMAT, Record);
   }
 
-  if (!SpecializationsUpdates.empty()) {
-    WriteSpecializationsUpdates(/*IsPartial=*/false);
-    SpecializationsUpdates.clear();
-  }
-
-  if (!PartialSpecializationsUpdates.empty()) {
-    WriteSpecializationsUpdates(/*IsPartial=*/true);
-    PartialSpecializationsUpdates.clear();
-  }
-
   // Create a lexical update block containing all of the declarations in the
   // translation unit that do not come from other AST files.
   const TranslationUnitDecl *TU = Context.getTranslationUnitDecl();
@@ -5286,6 +5262,10 @@ ASTFileSignature ASTWriter::WriteASTCore(Sema &SemaRef, StringRef isysroot,
   WriteTypeDeclOffsets();
   if (!DeclUpdatesOffsetsRecord.empty())
     Stream.EmitRecord(DECL_UPDATE_OFFSETS, DeclUpdatesOffsetsRecord);
+
+  if (!SpecializationsUpdates.empty())
+    WriteSpecializationsUpdates(/*IsPartial=*/false);
+
   WriteFileDeclIDsMap();
   WriteSourceManagerBlock(Context.getSourceManager(), PP);
   WriteComments();

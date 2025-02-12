@@ -2438,6 +2438,7 @@ void ASTDeclReader::VisitClassTemplateDecl(ClassTemplateDecl *D) {
   if (ThisDeclID == Redecl.getFirstID()) {
     // This ClassTemplateDecl owns a CommonPtr; read it to keep track of all of
     // the specializations.
+    ReadSpecializations(*Loc.F, D, Loc.F->DeclsCursor, /*IsPartial=*/false);
     ReadSpecializations(*Loc.F, D, Loc.F->DeclsCursor, /*IsPartial=*/true);
   }
 
@@ -2464,6 +2465,7 @@ void ASTDeclReader::VisitVarTemplateDecl(VarTemplateDecl *D) {
   if (ThisDeclID == Redecl.getFirstID()) {
     // This VarTemplateDecl owns a CommonPtr; read it to keep track of all of
     // the specializations.
+    ReadSpecializations(*Loc.F, D, Loc.F->DeclsCursor, /*IsPartial=*/false);
     ReadSpecializations(*Loc.F, D, Loc.F->DeclsCursor, /*IsPartial=*/true);
   }
 }

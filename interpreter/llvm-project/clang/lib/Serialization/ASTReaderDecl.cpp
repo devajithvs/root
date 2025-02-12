@@ -2439,7 +2439,6 @@ void ASTDeclReader::VisitClassTemplateDecl(ClassTemplateDecl *D) {
     // This ClassTemplateDecl owns a CommonPtr; read it to keep track of all of
     // the specializations.
     ReadSpecializations(*Loc.F, D, Loc.F->DeclsCursor, /*IsPartial=*/false);
-    ReadSpecializations(*Loc.F, D, Loc.F->DeclsCursor, /*IsPartial=*/true);
   }
 
   if (D->getTemplatedDecl()->TemplateOrInstantiation) {
@@ -2466,7 +2465,6 @@ void ASTDeclReader::VisitVarTemplateDecl(VarTemplateDecl *D) {
     // This VarTemplateDecl owns a CommonPtr; read it to keep track of all of
     // the specializations.
     ReadSpecializations(*Loc.F, D, Loc.F->DeclsCursor, /*IsPartial=*/false);
-    ReadSpecializations(*Loc.F, D, Loc.F->DeclsCursor, /*IsPartial=*/true);
   }
 }
 

@@ -206,21 +206,15 @@ namespace clang {
     /// ODRHash of the template arguments of D which should provide enough
     /// information to load D only if the template instantiator needs it.
     void AddFirstSpecializationDeclFromEachModule(
-        const Decl *D, llvm::SmallVectorImpl<const Decl *> &SpecsInMap,
-        llvm::SmallVectorImpl<const Decl *> &PartialSpecsInMap) {
+        const Decl *D, llvm::SmallVectorImpl<const Decl *> &SpecsInMap) {
       assert((isa<ClassTemplateSpecializationDecl>(D) ||
               isa<VarTemplateSpecializationDecl>(D) || isa<FunctionDecl>(D)) &&
              "Must not be called with other decls");
       llvm::MapVector<ModuleFile *, const Decl *> Firsts;
       CollectFirstDeclFromEachModule(D, /*IncludeLocal*/ true, Firsts);
 
-      for (const auto &F : Firsts) {
-        if (isa<ClassTemplatePartialSpecializationDecl,
-                VarTemplatePartialSpecializationDecl>(F.second))
-          PartialSpecsInMap.push_back(F.second);
-        else
-          SpecsInMap.push_back(F.second);
-      }
+      for (const auto &F : Firsts)
+        SpecsInMap.push_back(F.second);
     }
 
     /// Get the specialization decl from an entry in the specialization list.
@@ -261,24 +255,15 @@ namespace clang {
       for (auto &Entry : getPartialSpecializations(Common))
         AllSpecs.push_back(getSpecializationDecl(Entry));
 
-      llvm::SmallVector<const Decl *, 16> Specs;
+      llvm::SmallVector<const Decl*, 16> Specs = AllSpecs;
       llvm::SmallVector<const Decl *, 16> PartialSpecs;
       for (auto *D : AllSpecs) {
         assert(D->isCanonicalDecl() && "non-canonical decl in set");
-        AddFirstSpecializationDeclFromEachModule(D, Specs, PartialSpecs);
+        AddFirstSpecializationDeclFromEachModule(D, Specs);
       }
 
       Record.AddOffset(Writer.WriteSpecializationInfoLookupTable(
           D, Specs, /*IsPartial=*/false));
-
-      // Function Template Decl doesn't have partial decls.
-      if (isa<FunctionTemplateDecl>(D)) {
-        assert(PartialSpecs.empty());
-        return;
-      }
-
-      Record.AddOffset(Writer.WriteSpecializationInfoLookupTable(
-          D, PartialSpecs, /*IsPartial=*/true));
     }
 
     /// Ensure that this template specialization is associated with the specified

@@ -1251,11 +1251,10 @@ void LazySpecializationInfoLookupTrait::ReadDataInto(internal_key_type,
   using namespace llvm::support;
 
   for (unsigned NumDecls =
-           DataLen / serialization::reader::LazySpecializationInfo::Length;
+           DataLen / sizeof(serialization::reader::LazySpecializationInfo);
        NumDecls; --NumDecls) {
     LocalDeclID LocalID = endian::readNext<DeclID, llvm::endianness::little, unaligned>(d);
-    const bool IsPartial = endian::readNext<bool, llvm::endianness::little, unaligned>(d);
-    Val.insert({Reader.getGlobalDeclID(F, LocalID), IsPartial});
+    Val.insert(Reader.getGlobalDeclID(F, LocalID));
   }
 }
 
@@ -1351,7 +1350,8 @@ bool ASTReader::ReadVisibleDeclContextStorage(ModuleFile &M,
 void ASTReader::AddSpecializations(const Decl *D, const unsigned char *Data,
                                    ModuleFile &M, bool IsPartial) {
   D = D->getCanonicalDecl();
-  auto &SpecLookups = SpecializationsLookups;
+  auto &SpecLookups =
+      IsPartial ? PartialSpecializationsLookups : SpecializationsLookups;
   SpecLookups[D].Table.add(&M, Data,
                            reader::LazySpecializationInfoLookupTrait(*this, M));
 }
@@ -8015,7 +8015,7 @@ Stmt *ASTReader::GetExternalDeclStmt(uint64_t Offset) {
 }
 
 bool ASTReader::LoadExternalSpecializationsImpl(SpecLookupTableTy &SpecLookups,
-                                                const Decl *D, bool OnlyPartial) {
+                                                const Decl *D) {
   assert(D);
 
   auto It = SpecLookups.find(D);
@@ -8029,24 +8029,29 @@ bool ASTReader::LoadExternalSpecializationsImpl(SpecLookupTableTy &SpecLookups,
 
   // Since we've loaded all the specializations, we can erase it from
   // the lookup table.
-  if (!OnlyPartial)
-    SpecializationsLookups.erase(It);
+  SpecLookups.erase(It);
 
   bool NewSpecsFound = false;
   Deserializing LookupResults(this);
-  for (auto &Info : Infos)
-    if (!OnlyPartial || Info.IsPartial) {
-      GetDecl(Info.ID);
-      NewSpecsFound = true;
-    }
-  
+  for (auto &Info : Infos) {
+    if (GetExistingDecl(Info))
+      continue;
+    NewSpecsFound = true;
+    GetDecl(Info);
+  }
+
   return NewSpecsFound;
 }
 
 bool ASTReader::LoadExternalSpecializations(const Decl *D, bool OnlyPartial) {
   assert(D);
 
-  bool NewSpecsFound = LoadExternalSpecializationsImpl(SpecializationsLookups, D, OnlyPartial);
+  bool NewSpecsFound =
+      LoadExternalSpecializationsImpl(PartialSpecializationsLookups, D);
+  if (OnlyPartial)
+    return NewSpecsFound;
+
+  NewSpecsFound |= LoadExternalSpecializationsImpl(SpecializationsLookups, D);
   return NewSpecsFound;
 }
 
@@ -8060,7 +8065,7 @@ bool ASTReader::LoadExternalSpecializationsImpl(
     return false;
 
   Deserializing LookupResults(this);
-  auto HashValue = TemplateArgumentList::ComputeStableHash(TemplateArgs);
+  auto HashValue = StableHashForTemplateArguments(TemplateArgs);
 
   // Get Decl may violate the iterator from SpecLookups
   llvm::SmallVector<serialization::reader::LazySpecializationInfo, 8> Infos =
@@ -8068,10 +8073,10 @@ bool ASTReader::LoadExternalSpecializationsImpl(
 
   bool NewSpecsFound = false;
   for (auto &Info : Infos) {
-    if (GetExistingDecl(Info.ID))
+    if (GetExistingDecl(Info))
       continue;
     NewSpecsFound = true;
-    GetDecl(Info.ID);
+    GetDecl(Info);
   }
 
   return NewSpecsFound;
@@ -8081,7 +8086,9 @@ bool ASTReader::LoadExternalSpecializations(
     const Decl *D, ArrayRef<TemplateArgument> TemplateArgs) {
   assert(D);
 
-  bool NewDeclsFound =
+  bool NewDeclsFound = LoadExternalSpecializationsImpl(
+      PartialSpecializationsLookups, D, TemplateArgs);
+  NewDeclsFound |=
       LoadExternalSpecializationsImpl(SpecializationsLookups, D, TemplateArgs);
 
   return NewDeclsFound;
@@ -8272,7 +8279,8 @@ ASTReader::getLoadedSpecializationsLookupTables(const Decl *D, bool IsPartial) {
 
 bool ASTReader::haveUnloadedSpecializations(const Decl *D) const {
   assert(D->isCanonicalDecl());
-  return
+  return (PartialSpecializationsLookups.find(D) !=
+          PartialSpecializationsLookups.end()) ||
          (SpecializationsLookups.find(D) != SpecializationsLookups.end());
 }
 

@@ -3950,14 +3950,17 @@ public:
   explicit LazySpecializationInfoLookupTrait(ASTWriter &Writer)
       : Writer(Writer) {}
 
-  template <typename Col>
-  data_type getData(Col &&C) {
+  template <typename Col, typename Col2>
+  data_type getData(Col &&C, Col2 &ExistingInfo) {
     unsigned Start = Specs.size();
     for (auto *D : C) {
-      bool IsPartial = isa<ClassTemplatePartialSpecializationDecl, VarTemplatePartialSpecializationDecl>(D);
-      Specs.push_back({Writer.GetDeclRef(getDeclForLocalLookup(
-          Writer.getLangOpts(), const_cast<NamedDecl *>(D))), IsPartial});
+      NamedDecl *ND = getDeclForLocalLookup(Writer.getLangOpts(),
+                                            const_cast<NamedDecl *>(D));
+      Specs.push_back(GlobalDeclID(Writer.GetDeclRef(ND)));
     }
+    for (const serialization::reader::LazySpecializationInfo &Info :
+         ExistingInfo)
+      Specs.push_back(Info);
     return std::make_pair(Start, Specs.size());
   }
 
@@ -3987,7 +3990,7 @@ public:
                                                   data_type_ref Lookup) {
     // 4 bytes for each slot.
     unsigned KeyLen = 4;
-    unsigned DataLen = serialization::reader::LazySpecializationInfo::Length *
+    unsigned DataLen = sizeof(serialization::reader::LazySpecializationInfo) *
                        (Lookup.second - Lookup.first);
 
     return emitULEBKeyDataLength(KeyLen, DataLen, Out);
@@ -4008,8 +4011,7 @@ public:
     uint64_t Start = Out.tell();
     (void)Start;
     for (unsigned I = Lookup.first, N = Lookup.second; I != N; ++I) {
-      LE.write<uint32_t>(Specs[I].ID);
-      LE.write<bool>(Specs[I].IsPartial);
+      LE.write<DeclID>(Specs[I]);
     }
     assert(Out.tell() - Start == DataLen && "Data length is wrong");
   }
@@ -4026,7 +4028,7 @@ unsigned CalculateODRHashForSpecs(const Decl *Spec) {
   else
     llvm_unreachable("New Specialization Kind?");
 
-  return TemplateArgumentList::ComputeStableHash(Args);
+  return StableHashForTemplateArguments(Args);
 }
 } // namespace
 
@@ -4062,7 +4064,19 @@ void ASTWriter::GenerateSpecializationInfoLookupTable(
             : nullptr;
 
   for (auto &[HashValue, Specs] : SpecializationMaps) {
-    Generator.insert(HashValue, Trait.getData(Specs), Trait);
+    SmallVector<serialization::reader::LazySpecializationInfo, 16>
+        ExisitingSpecs;
+    // We have to merge the lookup table manually here. We can't depend on the
+    // merge mechanism offered by
+    // clang::serialization::MultiOnDiskHashTableGenerator since that generator
+    // assumes the we'll get the same value with the same key.
+    // And also underlying llvm::OnDiskChainedHashTableGenerator assumes that we
+    // won't insert the values with the same key twice. So we have to merge the
+    // lookup table here manually.
+    if (Lookups)
+      ExisitingSpecs = Lookups->Table.find(HashValue);
+
+    Generator.insert(HashValue, Trait.getData(Specs, ExisitingSpecs), Trait);
   }
 
   Generator.emit(LookupTable, Trait, Lookups ? &Lookups->Table : nullptr);
@@ -4077,8 +4091,11 @@ uint64_t ASTWriter::WriteSpecializationInfoLookupTable(
                                         IsPartial);
 
   uint64_t Offset = Stream.GetCurrentBitNo();
-  RecordData::value_type Record[] = {DECL_SPECIALIZATIONS};
-  Stream.EmitRecordWithBlob(DeclSpecializationsAbbrev, Record, LookupTable);
+  RecordData::value_type Record[] = {IsPartial ? DECL_PARTIAL_SPECIALIZATIONS
+                                               : DECL_SPECIALIZATIONS};
+  Stream.EmitRecordWithBlob(IsPartial ? DeclPartialSpecializationsAbbrev
+                                      : DeclSpecializationsAbbrev,
+                            Record, LookupTable);
 
   return Offset;
 }
@@ -5060,6 +5077,16 @@ ASTFileSignature ASTWriter::WriteASTCore(Sema &SemaRef, StringRef isysroot,
     Stream.EmitRecord(METADATA_OLD_FORMAT, Record);
   }
 
+  if (!SpecializationsUpdates.empty()) {
+    WriteSpecializationsUpdates(/*IsPartial=*/false);
+    SpecializationsUpdates.clear();
+  }
+
+  if (!PartialSpecializationsUpdates.empty()) {
+    WriteSpecializationsUpdates(/*IsPartial=*/true);
+    PartialSpecializationsUpdates.clear();
+  }
+
   // Create a lexical update block containing all of the declarations in the
   // translation unit that do not come from other AST files.
   const TranslationUnitDecl *TU = Context.getTranslationUnitDecl();
@@ -5259,10 +5286,6 @@ ASTFileSignature ASTWriter::WriteASTCore(Sema &SemaRef, StringRef isysroot,
   WriteTypeDeclOffsets();
   if (!DeclUpdatesOffsetsRecord.empty())
     Stream.EmitRecord(DECL_UPDATE_OFFSETS, DeclUpdatesOffsetsRecord);
-
-  if (!SpecializationsUpdates.empty())
-    WriteSpecializationsUpdates(/*IsPartial=*/false);
-
   WriteFileDeclIDsMap();
   WriteSourceManagerBlock(Context.getSourceManager(), PP);
   WriteComments();
@@ -5425,7 +5448,9 @@ void ASTWriter::WriteSpecializationsUpdates(bool IsPartial) {
   Abv->Add(llvm::BitCodeAbbrevOp(llvm::BitCodeAbbrevOp::Blob));
   auto UpdateSpecializationAbbrev = Stream.EmitAbbrev(std::move(Abv));
 
-  for (auto &SpecializationUpdate : SpecializationsUpdates) {
+  auto &SpecUpdates =
+      IsPartial ? PartialSpecializationsUpdates : SpecializationsUpdates;
+  for (auto &SpecializationUpdate : SpecUpdates) {
     const NamedDecl *D = SpecializationUpdate.first;
 
     llvm::SmallString<4096> LookupTable;

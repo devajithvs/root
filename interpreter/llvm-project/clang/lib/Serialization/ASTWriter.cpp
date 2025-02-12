@@ -5060,11 +5060,6 @@ ASTFileSignature ASTWriter::WriteASTCore(Sema &SemaRef, StringRef isysroot,
     Stream.EmitRecord(METADATA_OLD_FORMAT, Record);
   }
 
-  if (!SpecializationsUpdates.empty()) {
-    WriteSpecializationsUpdates(/*IsPartial=*/false);
-    SpecializationsUpdates.clear();
-  }
-
   // Create a lexical update block containing all of the declarations in the
   // translation unit that do not come from other AST files.
   const TranslationUnitDecl *TU = Context.getTranslationUnitDecl();
@@ -5264,6 +5259,10 @@ ASTFileSignature ASTWriter::WriteASTCore(Sema &SemaRef, StringRef isysroot,
   WriteTypeDeclOffsets();
   if (!DeclUpdatesOffsetsRecord.empty())
     Stream.EmitRecord(DECL_UPDATE_OFFSETS, DeclUpdatesOffsetsRecord);
+
+  if (!SpecializationsUpdates.empty())
+    WriteSpecializationsUpdates(/*IsPartial=*/false);
+
   WriteFileDeclIDsMap();
   WriteSourceManagerBlock(Context.getSourceManager(), PP);
   WriteComments();

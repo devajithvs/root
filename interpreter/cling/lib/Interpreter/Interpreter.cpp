@@ -1039,7 +1039,7 @@ namespace cling {
                 getCI()->getFrontendOpts().CodeCompleteOpts, completions);
     // Child interpreter CI will own consumer!
     childCI->setCodeCompletionConsumer(consumer);
-    childSemaRef.CodeCompleter = consumer;
+    // childSemaRef.CodeCompletionPtr = consumer; FIXME
 
     // Ignore diagnostics when we tab complete.
     // This is because we get redefinition errors due to the import of the decls.

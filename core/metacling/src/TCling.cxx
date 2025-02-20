@@ -5101,7 +5101,7 @@ void TCling::GetFunctionOverloads(ClassInfo_t *cl, const char *funcname,
 
    // NotForRedeclaration: we want to find names in inline namespaces etc.
    clang::LookupResult R(S, DName, clang::SourceLocation(),
-                         Sema::LookupOrdinaryName, clang::Sema::NotForRedeclaration);
+                         Sema::LookupOrdinaryName, clang::RedeclarationKind::NotForRedeclaration);
    R.suppressDiagnostics(); // else lookup with NotForRedeclaration will check access etc
    S.LookupQualifiedName(R, const_cast<DeclContext*>(DeclCtx));
    if (R.empty()) return;
@@ -6958,7 +6958,7 @@ void TCling::InvalidateCachedDecl(const std::tuple<TListOfDataMembers*,
 
          // For NamespaceDecl (redeclarable), only invalidate this redecl.
          if (D->getKind() != Decl::Namespace
-             || cast<NamespaceDecl>(D)->isOriginalNamespace())
+             || cast<NamespaceDecl>(D)->isFirstDecl())
             C->ResetClassInfo();
       }
    }

@@ -188,7 +188,7 @@ namespace cling {
   /// Decl(s) (Contexts).
   ///
   bool ExternalInterpreterSource::FindExternalVisibleDeclsByName(
-    const DeclContext *childCurrentDeclContext, DeclarationName childDeclName) {
+    const DeclContext *childCurrentDeclContext, DeclarationName childDeclName, const DeclContext *OriginalDC) {
 
     assert(childDeclName && "Child Decl name is empty");
 

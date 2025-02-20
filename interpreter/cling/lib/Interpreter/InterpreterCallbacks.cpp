@@ -12,6 +12,7 @@
 #include "cling/Interpreter/Interpreter.h"
 
 #include "clang/AST/ASTContext.h"
+#include "clang/Basic/ASTSourceDescriptor.h"
 #include "clang/Frontend/CompilerInstance.h"
 #include "clang/Lex/Preprocessor.h"
 #include "clang/Sema/CodeCompleteConsumer.h"
@@ -44,10 +45,11 @@ namespace cling {
                             llvm::StringRef SearchPath,
                             llvm::StringRef RelativePath,
                             const clang::Module *Imported,
+                            bool ModuleImported,
                             SrcMgr::CharacteristicKind FileType) override {
       m_Callbacks->InclusionDirective(HashLoc, IncludeTok, FileName,
                                       IsAngled, FilenameRange, File,
-                                      SearchPath, RelativePath, Imported,
+                                      SearchPath, RelativePath, Imported, ModuleImported,
                                       FileType);
     }
 
@@ -77,7 +79,7 @@ namespace cling {
       assert(m_Source && "Can't wrap nullptr ExternalASTSource");
     }
 
-    virtual Decl* GetExternalDecl(uint32_t ID) override {
+    virtual Decl* GetExternalDecl(GlobalDeclID ID) override {
       return m_Source->GetExternalDecl(ID);
     }
 
@@ -103,13 +105,14 @@ namespace cling {
       return m_Source->GetExternalCXXBaseSpecifiers(Offset);
     }
 
-    virtual void updateOutOfDateIdentifier(IdentifierInfo& II) override {
+    virtual void updateOutOfDateIdentifier(const IdentifierInfo& II) override {
       m_Source->updateOutOfDateIdentifier(II);
     }
 
     virtual bool FindExternalVisibleDeclsByName(const DeclContext* DC,
-                                                DeclarationName Name) override {
-      return m_Source->FindExternalVisibleDeclsByName(DC, Name);
+                                                DeclarationName Name,
+                                                const DeclContext *OriginalDC) override {
+      return m_Source->FindExternalVisibleDeclsByName(DC, Name, OriginalDC);
     }
 
     virtual void completeVisibleDeclsMap(const DeclContext* DC) override {
@@ -239,7 +242,8 @@ namespace cling {
     }
 
     bool FindExternalVisibleDeclsByName(const clang::DeclContext* DC,
-                                        clang::DeclarationName Name) override {
+                                        clang::DeclarationName Name,
+                                        const DeclContext *OriginalDC) override {
       if (m_Callbacks)
         return m_Callbacks->LookupObject(DC, Name);
 

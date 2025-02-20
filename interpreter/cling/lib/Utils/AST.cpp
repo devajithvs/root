@@ -1462,7 +1462,7 @@ namespace utils {
   NamedDecl* Lookup::Named(Sema* S, const clang::DeclarationName& Name,
                            const DeclContext* Within) {
     LookupResult R(*S, Name, SourceLocation(), Sema::LookupOrdinaryName,
-                   Sema::ForVisibleRedeclaration);
+                   RedeclarationKind::ForVisibleRedeclaration);
     Lookup::Named(S, R, Within);
     return LookupResult2Decl<clang::NamedDecl>(R);
   }
@@ -1481,7 +1481,7 @@ namespace utils {
   TagDecl* Lookup::Tag(Sema* S, const clang::DeclarationName& Name,
                        const DeclContext* Within) {
     LookupResult R(*S, Name, SourceLocation(), Sema::LookupTagName,
-                   Sema::ForVisibleRedeclaration);
+                   RedeclarationKind::ForVisibleRedeclaration);
     Lookup::Named(S, R, Within);
     return LookupResult2Decl<clang::TagDecl>(R);
   }
@@ -1507,7 +1507,7 @@ namespace utils {
       // If the lookup fails and the context is a namespace, try to lookup in
       // the namespaces by setting NotForRedeclaration.
       if (!res && primaryWithin->isNamespace()) {
-        R.setRedeclarationKind(Sema::NotForRedeclaration);
+        R.setRedeclarationKind(RedeclarationKind::NotForRedeclaration);
         S->LookupQualifiedName(R, const_cast<DeclContext*>(primaryWithin));
       }
     }

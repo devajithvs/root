@@ -838,6 +838,7 @@ namespace cling {
   IncrementalParser::ParseResultTransaction
   IncrementalParser::Compile(llvm::StringRef input,
                              const CompilationOptions& Opts) {
+    llvm::errs() << input;
     Transaction* CurT = beginTransaction(Opts);
     EParseResult ParseRes = ParseInternal(input);
 

@@ -960,7 +960,8 @@ namespace cling {
           Args->get(i).print(m_Policy, Stream, /*IncludeType=*/true);
         }
         else if (NTTP->hasDefaultArgument()) {
-          Expr* DefArg = NTTP->getDefaultArgument()->IgnoreImpCasts();
+          // FIXME: DEV - Post LLVM20 Check
+          Expr* DefArg = NTTP->getDefaultArgument().getArgument().getAsExpr()->IgnoreImpCasts();
           if (DeclRefExpr* DRE = dyn_cast<DeclRefExpr>(DefArg)) {
             Visit(DRE->getFoundDecl());
             if (m_SkipFlag) {

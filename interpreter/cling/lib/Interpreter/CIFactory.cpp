@@ -1475,7 +1475,10 @@ namespace {
     if (DiagOpts.VerifyDiagnostics)
       Diags->setClient(new clang::VerifyDiagnosticConsumer(*Diags));
     
-    llvm::vfs::FileSystem &VFS = CI->getVirtualFileSystem();
+    IntrusiveRefCntPtr<llvm::vfs::OverlayFileSystem> Overlay =
+        new llvm::vfs::OverlayFileSystem(llvm::vfs::getRealFileSystem());
+    auto FileMgr = CI->createFileManager(Overlay);
+    llvm::vfs::FileSystem &VFS = FileMgr->getVirtualFileSystem();
     // Configure our handling of diagnostics.
     ProcessWarningOptions(*Diags, DiagOpts, VFS);
 
@@ -1494,9 +1497,6 @@ namespace {
       return CI.release();
     }
 
-    IntrusiveRefCntPtr<llvm::vfs::OverlayFileSystem> Overlay =
-        new llvm::vfs::OverlayFileSystem(llvm::vfs::getRealFileSystem());
-    CI->createFileManager(Overlay);
     clang::CompilerInvocation& Invocation = CI->getInvocation();
     std::string& PCHFile = Invocation.getPreprocessorOpts().ImplicitPCHInclude;
     bool InitLang = true, InitTarget = true;

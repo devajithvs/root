@@ -55,9 +55,17 @@ if(DEFINED ADAPTIVE_CPP_SOURCE_DIR)
 else()
   list(APPEND ADAPTIVE_CPP_EXTRA_SETTINGS
     GIT_REPOSITORY https://github.com/AdaptiveCpp/AdaptiveCpp.git
-    GIT_TAG v24.10.0
+    GIT_TAG 206760b95ab2a81f70de468cb87db0999a959c4d
   )
 endif()
+
+list(APPEND ADAPTIVE_CPP_PATCHES_LIST "0001-Temporary-commit.patch")
+set(ADAPTIVE_CPP_PATCH_COMMAND
+  ${CMAKE_COMMAND} -E copy_directory
+  ${CMAKE_CURRENT_SOURCE_DIR}/patches <SOURCE_DIR>
+  && git checkout <SOURCE_DIR>
+  && git apply --ignore-space-change --ignore-whitespace ${ADAPTIVE_CPP_PATCHES_LIST}
+)
 
 ExternalProject_Add(
   adaptiveCpp

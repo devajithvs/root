@@ -1,0 +1,70 @@
+From 58c2e0679ba2c475bf35f68507765a72965f18ee Mon Sep 17 00:00:00 2001
+From: Devajith Valaparambil Sreeramaswamy
+ <devajith.valaparambil.sreeramaswamy@cern.ch>
+Date: Fri, 7 Mar 2025 16:23:34 +0100
+Subject: [PATCH] Temporary commit
+
+---
+ .../hipSYCL/glue/kernel_launcher_factory.hpp  |  1 +
+ .../glue/llvm-sscp/hcf_registration.hpp       | 29 ++++++++++++-------
+ 2 files changed, 20 insertions(+), 10 deletions(-)
+
+diff --git a/include/hipSYCL/glue/kernel_launcher_factory.hpp b/include/hipSYCL/glue/kernel_launcher_factory.hpp
+index 9e18e6c5..3fa0230c 100644
+--- a/include/hipSYCL/glue/kernel_launcher_factory.hpp
++++ b/include/hipSYCL/glue/kernel_launcher_factory.hpp
+@@ -52,6 +52,7 @@ make_kernel_launcher(sycl::id<Dim> offset, sycl::range<Dim> local_range,
+ 
+   using name_traits = kernel_name_traits<KernelNameTag, Kernel>;
+ 
++  hipsycl::glue::sscp::ensure_local_sscp_hcf_registered();
+   kernel_launcher_data static_launcher_data;
+   common::auto_small_vector<std::unique_ptr<rt::backend_kernel_launcher>>
+       launchers;
+diff --git a/include/hipSYCL/glue/llvm-sscp/hcf_registration.hpp b/include/hipSYCL/glue/llvm-sscp/hcf_registration.hpp
+index bbd28a4f..75f13d5e 100644
+--- a/include/hipSYCL/glue/llvm-sscp/hcf_registration.hpp
++++ b/include/hipSYCL/glue/llvm-sscp/hcf_registration.hpp
+@@ -32,20 +32,29 @@ static std::size_t get_local_hcf_id() {
+   return __acpp_local_sscp_hcf_object_id;
+ }
+ 
+-struct static_hcf_registration {
+-public:
+-  __attribute__((internal_linkage))
+-  static_hcf_registration() {
++/// Instead of a static object, define a function to do registration once.
++/// Also schedule unregistration via atexit().
++inline void ensure_local_sscp_hcf_registered()
++{
++  // A local static ensures this registration logic only runs once.
++  static bool hcf_registered = false;
++  if(!hcf_registered) {
++    // Actually register the HCF
+     __acpp_register_hcf(get_local_hcf_object(), get_local_hcf_size());
+-  }
+ 
+-  __attribute__((internal_linkage))
+-  ~static_hcf_registration() {
+-    __acpp_unregister_hcf(get_local_hcf_id());
++    // // Make sure we unregister at process exit:
++    // // Store the local id so we can unregister the correct HCF object
++    // const std::size_t local_id = get_local_hcf_id();
++    // std::atexit([local_id](){
++    //   HIPSYCL_DEBUG_ERROR
++    //     << "ensure_local_sscp_hcf_registered: unregistering local HCF\n";
++    //   __acpp_unregister_hcf(local_id);
++    // });
++
++    hcf_registered = true;
+   }
+-};
++}
+ 
+-static static_hcf_registration __acpp_register_sscp_hcf_object;
+ }
+ 
+ 
+-- 
+2.43.5
+

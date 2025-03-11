@@ -27,6 +27,8 @@ set(LLVM_LINK_COMPONENTS
 )
 
 set(LIBS
+  acpp-clang
+  acpp-rt
   clangCodeGen
   clangDriver
   clangFrontend

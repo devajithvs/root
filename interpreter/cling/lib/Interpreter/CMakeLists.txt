@@ -7,6 +7,8 @@
 #------------------------------------------------------------------------------
 
 set(LIBS
+  acpp-clang
+  acpp-rt
   clingUtils
   clangCodeGen
   clangDriver

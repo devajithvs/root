@@ -12,6 +12,8 @@ set(LLVM_NO_DEAD_STRIP 1)
 set(LLVM_LINK_COMPONENTS Support)
 if(BUILD_SHARED_LIBS)
   set(LIBS
+  acpp-clang
+  acpp-rt
 
     clangFrontendTool
 
@@ -25,6 +27,9 @@ if(BUILD_SHARED_LIBS)
   )
 else()
   set(LIBS
+  acpp-clang
+  acpp-rt
+
     clangASTMatchers
     clangFrontendTool
 

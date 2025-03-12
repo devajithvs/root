@@ -292,7 +292,6 @@ endif()
 
 # TODO-DEV - include_dir for each target
 include_directories(${PROJECT_BINARY_DIR}/include)
-include_directories(/home/dvalapar/work/xeus/cling-build/AdaptiveCppInstall/include/AdaptiveCpp/AdaptiveCpp/)
 
 add_subdirectory(${HIPSYCL_SOURCE_DIR}/src/common)
 add_subdirectory(${HIPSYCL_SOURCE_DIR}/src/compiler)

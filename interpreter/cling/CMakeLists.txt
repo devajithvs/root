@@ -218,29 +218,27 @@ configure_file(
   ${HIPSYCL_SOURCE_DIR}/include/hipSYCL/common/config.hpp.in
   ${PROJECT_BINARY_DIR}/include/hipSYCL/common/config.hpp)
 
-install(DIRECTORY include/CL DESTINATION include/AdaptiveCpp/ FILES_MATCHING PATTERN "*.hpp")
-install(DIRECTORY include/SYCL DESTINATION include/AdaptiveCpp/ FILES_MATCHING PATTERN "*.hpp")
+install(DIRECTORY ${HIPSYCL_SOURCE_DIR}/include/CL DESTINATION include/AdaptiveCpp/ FILES_MATCHING PATTERN "*.hpp")
+install(DIRECTORY ${HIPSYCL_SOURCE_DIR}/include/SYCL DESTINATION include/AdaptiveCpp/ FILES_MATCHING PATTERN "*.hpp")
 
-install(DIRECTORY include/hipSYCL DESTINATION include/AdaptiveCpp/ FILES_MATCHING PATTERN "*.hpp")
-install(DIRECTORY include/hipSYCL DESTINATION include/AdaptiveCpp/ FILES_MATCHING PATTERN "*.h")
-install(DIRECTORY include/hipSYCL/std DESTINATION include/AdaptiveCpp/hipSYCL/ )
-install(FILES ${PROJECT_BINARY_DIR}/include/hipSYCL/common/config.hpp DESTINATION include/AdaptiveCpp/hipSYCL/common/)
+install(DIRECTORY ${HIPSYCL_SOURCE_DIR}/include/hipSYCL DESTINATION include/AdaptiveCpp/ FILES_MATCHING PATTERN "*.hpp")
+install(DIRECTORY ${HIPSYCL_SOURCE_DIR}/include/hipSYCL DESTINATION include/AdaptiveCpp/ FILES_MATCHING PATTERN "*.h")
+install(DIRECTORY ${HIPSYCL_SOURCE_DIR}/include/hipSYCL/std DESTINATION include/AdaptiveCpp/hipSYCL/ )
+install(FILES ${HIPSYCL_SOURCE_DIR}/include/hipSYCL/common/config.hpp DESTINATION include/AdaptiveCpp/hipSYCL/common/)
 
 # This part of the installation process can be simplified once the source directory has been
 # renamed from hipSYCL to AdaptiveCpp.
-install(DIRECTORY include/hipSYCL/ DESTINATION include/AdaptiveCpp/AdaptiveCpp FILES_MATCHING PATTERN "*.hpp")
-install(DIRECTORY include/hipSYCL/ DESTINATION include/AdaptiveCpp/AdaptiveCpp FILES_MATCHING PATTERN "*.h")
-install(DIRECTORY include/hipSYCL/std/ DESTINATION include/AdaptiveCpp/AdaptiveCpp/std )
+install(DIRECTORY ${HIPSYCL_SOURCE_DIR}/include/hipSYCL/ DESTINATION include/AdaptiveCpp/AdaptiveCpp FILES_MATCHING PATTERN "*.hpp")
+install(DIRECTORY ${HIPSYCL_SOURCE_DIR}/include/hipSYCL/ DESTINATION include/AdaptiveCpp/AdaptiveCpp FILES_MATCHING PATTERN "*.h")
+install(DIRECTORY ${HIPSYCL_SOURCE_DIR}/include/hipSYCL/std/ DESTINATION include/AdaptiveCpp/AdaptiveCpp/std )
 install(FILES ${PROJECT_BINARY_DIR}/include/hipSYCL/common/config.hpp DESTINATION include/AdaptiveCpp/AdaptiveCpp/common/)
+message(WARNING "install(FILES ${PROJECT_BINARY_DIR}/include/hipSYCL/common/config.hpp DESTINATION include/AdaptiveCpp/AdaptiveCpp/common/)")
 
 if(NOT WIN32)
 # Windows is case-insensitive, so don't copy to sycl/sycl.hpp as
 # we already have SYCL/sycl.hpp
-install(FILES include/SYCL/sycl.hpp DESTINATION include/AdaptiveCpp/sycl/)
+install(FILES ${HIPSYCL_SOURCE_DIR}/include/SYCL/sycl.hpp DESTINATION include/AdaptiveCpp/sycl/)
 endif()
-install(PROGRAMS bin/acpp DESTINATION bin)
-install(PROGRAMS bin/acpp DESTINATION bin RENAME syclcc)
-install(PROGRAMS bin/acpp DESTINATION bin RENAME syclcc-clang)
 
 # TODO-DEV
 set(CLANG_EXECUTABLE_PATH /home/dvalapar/work/xeus/cling-build-static/bin/clang++)
@@ -294,7 +292,6 @@ endif()
 
 # TODO-DEV - include_dir for each target
 include_directories(${PROJECT_BINARY_DIR}/include)
-include_directories(${PROJECT_BINARY_DIR}/include/AdaptiveCpp)
 include_directories(/home/dvalapar/work/xeus/cling-build/AdaptiveCppInstall/include/AdaptiveCpp/AdaptiveCpp/)
 
 add_subdirectory(${HIPSYCL_SOURCE_DIR}/src/common)

@@ -194,7 +194,7 @@ install(DIRECTORY ${HIPSYCL_SOURCE_DIR}/include/SYCL DESTINATION include/Adaptiv
 install(DIRECTORY ${HIPSYCL_SOURCE_DIR}/include/hipSYCL DESTINATION include/AdaptiveCpp/ FILES_MATCHING PATTERN "*.hpp")
 install(DIRECTORY ${HIPSYCL_SOURCE_DIR}/include/hipSYCL DESTINATION include/AdaptiveCpp/ FILES_MATCHING PATTERN "*.h")
 install(DIRECTORY ${HIPSYCL_SOURCE_DIR}/include/hipSYCL/std DESTINATION include/AdaptiveCpp/hipSYCL/ )
-install(FILES ${HIPSYCL_SOURCE_DIR}/include/hipSYCL/common/config.hpp DESTINATION include/AdaptiveCpp/hipSYCL/common/)
+install(FILES ${PROJECT_BINARY_DIR}/include/hipSYCL/common/config.hpp DESTINATION include/AdaptiveCpp/hipSYCL/common/)
 
 # This part of the installation process can be simplified once the source directory has been
 # renamed from hipSYCL to AdaptiveCpp.

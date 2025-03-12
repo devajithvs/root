@@ -37,37 +37,7 @@ list(INSERT CMAKE_MODULE_PATH 0 "${CMAKE_CURRENT_SOURCE_DIR}/cmake/")
 find_package(CUDA QUIET)
 find_package(HIP QUIET HINTS ${ROCM_PATH} ${ROCM_PATH}/lib/cmake)
 
-#set(WITH_CUDA_NVCXX_ONLY FALSE CACHE BOOL "(Deprecated) Whether to target CUDA exclusively with nvc++")
-
-if(APPLE OR WIN32)
-  set(DEFAULT_COMPILER_FEATURES_ENABLED false)
-  set(ACPP_COMPILER_FEATURE_PROFILE "none" CACHE STRING "The level of AdaptiveCpp compiler features to enable. If not set to 'full', AdaptiveCpp will run in a degraded mode that may have implications for certain functionalities or performance in certain cases.")
-else()
-  set(DEFAULT_COMPILER_FEATURES_ENABLED true)
-  set(ACPP_COMPILER_FEATURE_PROFILE "full" CACHE STRING "The level of AdaptiveCpp compiler features to enable. If not set to 'full', AdaptiveCpp will run in a degraded mode that may have implications for certain functionalities or performance in certain cases.")
-endif()
-set_property(CACHE ACPP_COMPILER_FEATURE_PROFILE PROPERTY STRINGS full  minimal none)
-
-if(ACPP_COMPILER_FEATURE_PROFILE STREQUAL "full")
-  set(WITH_SSCP_COMPILER true)
-  set(WITH_STDPAR_COMPILER true)
-  set(WITH_ACCELERATED_CPU true)
-elseif(ACPP_COMPILER_FEATURE_PROFILE STREQUAL "minimal")
-  set(WITH_SSCP_COMPILER false)
-  set(WITH_STDPAR_COMPILER false)
-  set(WITH_ACCELERATED_CPU false)
-elseif(ACPP_COMPILER_FEATURE_PROFILE STREQUAL "none")
-  # CUDA_NVCXX is handled further down.
-  set(WITH_SSCP_COMPILER false)
-  set(WITH_STDPAR_COMPILER false)
-  set(WITH_ACCELERATED_CPU false)
-else()
-  message(SEND_ERROR "Invalid value for ACPP_COMPILER_FEATURE_PROFILE: '${ACPP_COMPILER_FEATURE_PROFILE}'. Allowed values are: full, minimal, none")
-endif()
-
-
-message(STATUS "Building with compiler feature profile: ${ACPP_COMPILER_FEATURE_PROFILE}")
-
+set(WITH_SSCP_COMPILER true)
 # Check for OpenCL unless user has explicitly set WITH_SSCP_COMPILER to False
 if (DEFINED WITH_SSCP_COMPILER)
   if (WITH_SSCP_COMPILER)
@@ -292,11 +262,42 @@ endif()
 
 # TODO-DEV - include_dir for each target
 include_directories(${PROJECT_BINARY_DIR}/include)
-
 add_subdirectory(${HIPSYCL_SOURCE_DIR}/src/common)
+
+set(WITH_LLVM_TO_AMDGPU_AMDHSA false)
+set(WITH_LLVM_TO_PTX false)
+set(WITH_LLVM_TO_SPIRV false)
+set(WITH_LLVM_TO_HOST false)
+
+if(WITH_SSCP_COMPILER)
+  if(WITH_LEVEL_ZERO_BACKEND OR WITH_OPENCL_BACKEND)
+    set(WITH_LLVM_TO_SPIRV true)
+  endif()
+
+  if(WITH_CUDA_BACKEND)
+    set(WITH_LLVM_TO_PTX true)
+  endif()
+
+  if(WITH_ROCM_BACKEND)
+    set(WITH_LLVM_TO_AMDGPU_AMDHSA true)
+  endif()
+
+  set(WITH_LLVM_TO_HOST true)
+endif()
+
 add_subdirectory(${HIPSYCL_SOURCE_DIR}/src/compiler)
 add_subdirectory(${HIPSYCL_SOURCE_DIR}/src/libkernel)
+
+set(ACPP_RT_SANITIZE "" CACHE STRING
+    "Enable building AdaptiveCpp runtime with specified sanitizers")
+
+if(NOT ${ACPP_RT_SANITIZE} STREQUAL "")
+  set(ACPP_RT_SANITIZE_FLAGS "-fsanitize=${ACPP_RT_SANITIZE}")
+else()
+  set(ACPP_RT_SANITIZE_FLAGS "")
+endif()
 add_subdirectory(${HIPSYCL_SOURCE_DIR}/src/runtime)
+
 if(WIN32)
   # We need cmake to support exporting of symbols not only from libraries but
   # from executables too. This way cling can find symbols from its own

@@ -29,9 +29,9 @@
 #include "llvm/Transforms/Scalar.h"
 #include "llvm/Transforms/Utils.h"
 
-#include "compiler/SMCPCompatPass.hpp"
-#include "compiler/GlobalsPruningPass.hpp"
-#include "compiler/sscp/TargetSeparationPass.hpp"
+#include "hipSYCL/compiler/SMCPCompatPass.hpp"
+#include "hipSYCL/compiler/GlobalsPruningPass.hpp"
+#include "hipSYCL/compiler/sscp/TargetSeparationPass.hpp"
 
 //#include "clang/Basic/LangOptions.h"
 //#include "clang/Basic/TargetOptions.h"

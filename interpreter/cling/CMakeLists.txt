@@ -1,7 +1,248 @@
-add_definitions(-DHIPSYCL_WITH_SSCP_COMPILER)
-SET(WITH_SSCP_COMPILER ON)
-SET(WITH_LLVM_TO_PTX ON)
-set(HIPSYCL_SOURCE_DIR /home/dvalapar/work/xeus/cling-static/adaptiveCpp)
+set(ACPP_VERSION_MAJOR 24)
+set(ACPP_VERSION_MINOR 10)
+set(ACPP_VERSION_PATCH 0)
+set(ACPP_VERSION_SUFFIX "+acpp-root")
+set(HIPSYCL_SOURCE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/adaptiveCpp)
+set(CXX_FILESYSTEM_HEADER filesystem)
+set(CXX_FILESYSTEM_NAMESPACE "std::filesystem")
+
+if(NOT CMAKE_BUILD_TYPE)
+  set(CMAKE_BUILD_TYPE Release)
+endif()
+
+if(NOT HIPSYCL_DEBUG_LEVEL)
+  if(CMAKE_BUILD_TYPE MATCHES "Debug")
+    set(HIPSYCL_DEBUG_LEVEL 3 CACHE STRING
+      "Choose the debug level, options are: 0 (no debug), 1 (print errors), 2 (also print warnings), 3 (also print general information)"
+FORCE)
+  else()
+    set(HIPSYCL_DEBUG_LEVEL 2 CACHE STRING
+      "Choose the debug level, options are: 0 (no debug), 1 (print errors), 2 (also print warnings), 3 (also print general information)"
+FORCE)
+  endif()
+endif()
+
+if (NOT ${BOOST_ROOT} STREQUAL "")
+  set(ENV{BOOST_ROOT} ${BOOST_ROOT})
+endif()
+
+find_package(Boost COMPONENTS context fiber )
+
+if(NOT Boost_FOUND)
+  message(FATAL_ERROR "Please provide the path to the root directory of the boost installation using the -DBOOST_ROOT option")
+endif()
+
+# Check for CUDA/ROCm and clang
+list(INSERT CMAKE_MODULE_PATH 0 "${CMAKE_CURRENT_SOURCE_DIR}/cmake/")
+find_package(CUDA QUIET)
+find_package(HIP QUIET HINTS ${ROCM_PATH} ${ROCM_PATH}/lib/cmake)
+
+#set(WITH_CUDA_NVCXX_ONLY FALSE CACHE BOOL "(Deprecated) Whether to target CUDA exclusively with nvc++")
+
+if(APPLE OR WIN32)
+  set(DEFAULT_COMPILER_FEATURES_ENABLED false)
+  set(ACPP_COMPILER_FEATURE_PROFILE "none" CACHE STRING "The level of AdaptiveCpp compiler features to enable. If not set to 'full', AdaptiveCpp will run in a degraded mode that may have implications for certain functionalities or performance in certain cases.")
+else()
+  set(DEFAULT_COMPILER_FEATURES_ENABLED true)
+  set(ACPP_COMPILER_FEATURE_PROFILE "full" CACHE STRING "The level of AdaptiveCpp compiler features to enable. If not set to 'full', AdaptiveCpp will run in a degraded mode that may have implications for certain functionalities or performance in certain cases.")
+endif()
+set_property(CACHE ACPP_COMPILER_FEATURE_PROFILE PROPERTY STRINGS full  minimal none)
+
+if(ACPP_COMPILER_FEATURE_PROFILE STREQUAL "full")
+  set(WITH_SSCP_COMPILER true)
+  set(WITH_STDPAR_COMPILER true)
+  set(WITH_ACCELERATED_CPU true)
+elseif(ACPP_COMPILER_FEATURE_PROFILE STREQUAL "minimal")
+  set(WITH_SSCP_COMPILER false)
+  set(WITH_STDPAR_COMPILER false)
+  set(WITH_ACCELERATED_CPU false)
+elseif(ACPP_COMPILER_FEATURE_PROFILE STREQUAL "none")
+  # CUDA_NVCXX is handled further down.
+  set(WITH_SSCP_COMPILER false)
+  set(WITH_STDPAR_COMPILER false)
+  set(WITH_ACCELERATED_CPU false)
+else()
+  message(SEND_ERROR "Invalid value for ACPP_COMPILER_FEATURE_PROFILE: '${ACPP_COMPILER_FEATURE_PROFILE}'. Allowed values are: full, minimal, none")
+endif()
+
+
+message(STATUS "Building with compiler feature profile: ${ACPP_COMPILER_FEATURE_PROFILE}")
+
+# Check for OpenCL unless user has explicitly set WITH_SSCP_COMPILER to False
+if (DEFINED WITH_SSCP_COMPILER)
+  if (WITH_SSCP_COMPILER)
+    find_package(OpenCL QUIET)
+  endif()
+else()
+  find_package(OpenCL QUIET)
+endif()
+
+# In case HIP is not found via the cmake pkgs we fall back to the legacy rocm discovery:
+if (NOT HIP_FOUND)
+  message(STATUS "Could not find HIP cmake integration, falling back to finding hipcc")
+  find_program(HIPCC_COMPILER NAMES hipcc HINTS ${ROCM_PATH} ${ROCM_PATH}/bin)
+  set(ROCM_PATH /opt/rocm CACHE PATH "Path to ROCm installation")
+  if(HIPCC_COMPILER MATCHES "-NOTFOUND")
+    message(STATUS "Could not find ROCm installation by looking for hipcc. ROCm support unavailable.")
+    set(ROCM_FOUND false)
+  else()
+    set(ROCM_FOUND true)
+  endif()
+else()
+  set(ROCM_FOUND true)
+endif()
+
+if(WITH_CUDA_BACKEND)
+  if(NOT CUDA_FOUND)
+    message(SEND_ERROR "CUDA was not found")
+  endif()
+endif()
+if(WITH_ROCM_BACKEND)
+  if(NOT ROCM_FOUND)
+    #  message(SEND_ERROR "hipcc was not found")
+
+    # User has requested ROCm, but we could not find hipcc.
+    # this is not necessarily a reason to abort,
+    # since we only need libhip_hcc, the HIP includes,
+    # and the ROCm device headers. It could be that we
+    # are faced with a minimal/incomplete ROCm installation
+    # that could still be enough for us.
+    # Let's assume the user knows what he/she is doing.
+  endif()
+endif()
+
+if(WITH_OPENCL_BACKEND)
+  if(NOT OpenCL_FOUND)
+    message(SEND_ERROR "OpenCL was not found")
+  endif()
+endif()
+
+set(WITH_CUDA_BACKEND ${CUDA_FOUND} CACHE BOOL "Build AdaptiveCpp support for NVIDIA GPUs with CUDA")
+set(WITH_ROCM_BACKEND ${ROCM_FOUND} CACHE BOOL "Build AdaptiveCpp support for AMD GPUs with ROCm")
+set(WITH_OPENCL_BACKEND ${OpenCL_FOUND} CACHE BOOL "Build AdaptiveCpp support for OpenCL SPIR-V devices supporting USM")
+
+set(WITH_CPU_BACKEND true)
+
+if(WITH_CUDA_BACKEND)
+  find_program(NVCXX_COMPILER NAMES nvc++)
+endif()
+
+if(WITH_CUDA_NVCXX_ONLY)
+  if(NVCXX_COMPILER MATCHES "-NOTFOUND")
+      message(SEND_ERROR "Could not find nvc++ executable, specifiy with -DNVCXX_COMPILER=")
+  endif()
+endif()
+
+
+if(WITH_ACCELERATED_CPU) # sanitize input
+  set(WITH_ACCELERATED_CPU true)
+  set(BUILD_CLANG_PLUGIN true)
+else()
+  set(WITH_ACCELERATED_CPU false)
+endif()
+
+if(WITH_SSCP_COMPILER) # sanitize input
+  set(WITH_SSCP_COMPILER true)
+  set(BUILD_CLANG_PLUGIN true)
+else()
+  set(WITH_SSCP_COMPILER false)
+endif()
+
+if(WITH_STDPAR_COMPILER) # sanitize input
+  set(WITH_STDPAR_COMPILER true)
+  set(BUILD_CLANG_PLUGIN true)
+else()
+  set(WITH_STDPAR_COMPILER false)
+endif()
+
+if(WITH_CUDA_BACKEND)
+  if(NOT WITH_CUDA_NVCXX_ONLY AND NOT ACPP_COMPILER_FEATURE_PROFILE STREQUAL "none")
+    set(BUILD_CLANG_PLUGIN true)
+  endif()
+endif()
+if(WITH_ROCM_BACKEND)
+  set(BUILD_CLANG_PLUGIN true)
+endif()
+if(WITH_OPENCL_BACKEND OR WITH_LEVEL_ZERO_BACKEND)
+  if(NOT ACPP_COMPILER_FEATURE_PROFILE STREQUAL "none" AND NOT ACPP_COMPILER_FEATURE_PROFILE STREQUAL "minimal")
+    set(BUILD_CLANG_PLUGIN true)
+    set(WITH_SSCP_COMPILER true)
+  endif()
+endif()
+
+add_definitions(-DHIPSYCL_DEBUG_LEVEL=${HIPSYCL_DEBUG_LEVEL})
+
+
+set(ACPP_CONFIG_FILE_PATH "${PROJECT_BINARY_DIR}")
+set(ACPP_CONFIG_FILE_GLOBAL_INSTALLATION false CACHE BOOL
+  "Whether to install the AdaptiveCpp configuration files into a global directory (typically, /etc/AdaptiveCpp). This is generally not recommended.")
+
+if(ACPP_CONFIG_FILE_GLOBAL_INSTALLATION)
+  set(ACPP_CONFIG_FILE_INSTALL_DIR /etc/AdaptiveCpp/)
+else()
+  set(ACPP_CONFIG_FILE_INSTALL_DIR etc/AdaptiveCpp)
+endif()
+
+if(Boost_FIBER_LIBRARY_DEBUG)
+  get_filename_component(Boost_LIBRARY_DIR "${Boost_FIBER_LIBRARY_DEBUG}" DIRECTORY)
+elseif(Boost_FIBER_LIBRARY_RELEASE)
+  get_filename_component(Boost_LIBRARY_DIR "${Boost_FIBER_LIBRARY_RELEASE}" DIRECTORY)
+else()
+  get_target_property(FIBER_IMPORT_LIBRARY Boost::fiber IMPORTED_LOCATION_DEBUG)
+  if(NOT FIBER_IMPORT_LIBRARY)
+    get_target_property(FIBER_IMPORT_LIBRARY Boost::fiber IMPORTED_LOCATION_RELEASE)
+  endif()
+  get_filename_component(Boost_LIBRARY_DIR "${FIBER_IMPORT_LIBRARY}" DIRECTORY)
+  get_target_property(Boost_INCLUDE_DIR Boost::fiber INTERFACE_INCLUDE_DIRECTORIES)
+endif()
+
+if(APPLE)
+  set(DEFAULT_OMP_FLAG "-Xclang -fopenmp")
+
+  if(Boost_FIBER_LIBRARY_DEBUG)
+    set(DEFAULT_BOOST_LIBRARIES "${Boost_CONTEXT_LIBRARY_DEBUG} ${Boost_FIBER_LIBRARY_DEBUG} -Wl,-rpath ${Boost_LIBRARY_DIR}")
+  else()
+    set(DEFAULT_BOOST_LIBRARIES "${Boost_CONTEXT_LIBRARY_RELEASE} ${Boost_FIBER_LIBRARY_RELEASE} -Wl,-rpath ${Boost_LIBRARY_DIR}")
+  endif()
+else()
+  set(DEFAULT_OMP_FLAG "-fopenmp")
+endif()
+
+
+set(ROCM_LIBS "-L${ROCM_PATH}/lib -L${ROCM_PATH}/hip/lib -lamdhip64" CACHE STRING "Necessary libraries for ROCm")
+set(ACPP_FILESYSTEM_SEARCH_OPTIONS "Final;Experimental;Boost" CACHE STRING "Which filesystem libraries should be searched for")
+
+
+# must stay after add_subdirectory(src) as HIPSYCL_COMMON_LIBRARY_OUTPUT_NAME is declared there
+configure_file(
+  ${HIPSYCL_SOURCE_DIR}/include/hipSYCL/common/config.hpp.in
+  ${PROJECT_BINARY_DIR}/include/hipSYCL/common/config.hpp)
+
+install(DIRECTORY include/CL DESTINATION include/AdaptiveCpp/ FILES_MATCHING PATTERN "*.hpp")
+install(DIRECTORY include/SYCL DESTINATION include/AdaptiveCpp/ FILES_MATCHING PATTERN "*.hpp")
+
+install(DIRECTORY include/hipSYCL DESTINATION include/AdaptiveCpp/ FILES_MATCHING PATTERN "*.hpp")
+install(DIRECTORY include/hipSYCL DESTINATION include/AdaptiveCpp/ FILES_MATCHING PATTERN "*.h")
+install(DIRECTORY include/hipSYCL/std DESTINATION include/AdaptiveCpp/hipSYCL/ )
+install(FILES ${PROJECT_BINARY_DIR}/include/hipSYCL/common/config.hpp DESTINATION include/AdaptiveCpp/hipSYCL/common/)
+
+# This part of the installation process can be simplified once the source directory has been
+# renamed from hipSYCL to AdaptiveCpp.
+install(DIRECTORY include/hipSYCL/ DESTINATION include/AdaptiveCpp/AdaptiveCpp FILES_MATCHING PATTERN "*.hpp")
+install(DIRECTORY include/hipSYCL/ DESTINATION include/AdaptiveCpp/AdaptiveCpp FILES_MATCHING PATTERN "*.h")
+install(DIRECTORY include/hipSYCL/std/ DESTINATION include/AdaptiveCpp/AdaptiveCpp/std )
+install(FILES ${PROJECT_BINARY_DIR}/include/hipSYCL/common/config.hpp DESTINATION include/AdaptiveCpp/AdaptiveCpp/common/)
+
+if(NOT WIN32)
+# Windows is case-insensitive, so don't copy to sycl/sycl.hpp as
+# we already have SYCL/sycl.hpp
+install(FILES include/SYCL/sycl.hpp DESTINATION include/AdaptiveCpp/sycl/)
+endif()
+install(PROGRAMS bin/acpp DESTINATION bin)
+install(PROGRAMS bin/acpp DESTINATION bin RENAME syclcc)
+install(PROGRAMS bin/acpp DESTINATION bin RENAME syclcc-clang)
+
+# TODO-DEV
 set(CLANG_EXECUTABLE_PATH /home/dvalapar/work/xeus/cling-build-static/bin/clang++)
 
 if (CMAKE_VERSION VERSION_LESS 3.17)
@@ -51,14 +292,15 @@ else()
    endif()
 endif()
 
-include_directories(/home/dvalapar/work/xeus/cling-build/AdaptiveCppInstall/include)
-include_directories(/home/dvalapar/work/xeus/cling-build/AdaptiveCppInstall/include/AdaptiveCpp)
+# TODO-DEV - include_dir for each target
+include_directories(${PROJECT_BINARY_DIR}/include)
+include_directories(${PROJECT_BINARY_DIR}/include/AdaptiveCpp)
 include_directories(/home/dvalapar/work/xeus/cling-build/AdaptiveCppInstall/include/AdaptiveCpp/AdaptiveCpp/)
 
-add_subdirectory(/home/dvalapar/work/xeus/cling-static/adaptiveCpp/src/common)
-add_subdirectory(/home/dvalapar/work/xeus/cling-static/adaptiveCpp/src/compiler)
-add_subdirectory(/home/dvalapar/work/xeus/cling-static/adaptiveCpp/src/libkernel)
-add_subdirectory(/home/dvalapar/work/xeus/cling-static/adaptiveCpp/src/runtime)
+add_subdirectory(${HIPSYCL_SOURCE_DIR}/src/common)
+add_subdirectory(${HIPSYCL_SOURCE_DIR}/src/compiler)
+add_subdirectory(${HIPSYCL_SOURCE_DIR}/src/libkernel)
+add_subdirectory(${HIPSYCL_SOURCE_DIR}/src/runtime)
 if(WIN32)
   # We need cmake to support exporting of symbols not only from libraries but
   # from executables too. This way cling can find symbols from its own

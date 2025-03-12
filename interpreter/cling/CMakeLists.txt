@@ -1,4 +1,8 @@
 add_definitions(-DHIPSYCL_WITH_SSCP_COMPILER)
+SET(WITH_SSCP_COMPILER ON)
+SET(WITH_LLVM_TO_PTX ON)
+set(HIPSYCL_SOURCE_DIR /home/dvalapar/work/xeus/cling-static/adaptiveCpp)
+set(CLANG_EXECUTABLE_PATH /home/dvalapar/work/xeus/cling-build-static/bin/clang++)
 
 if (CMAKE_VERSION VERSION_LESS 3.17)
    find_package(CUDA QUIET)

@@ -82,7 +82,7 @@ if(NOT Boost_FOUND)
 endif()
 
 # Check for CUDA/ROCm and clang
-list(INSERT CMAKE_MODULE_PATH 0 "${CMAKE_CURRENT_SOURCE_DIR}/cmake/")
+list(INSERT CMAKE_MODULE_PATH 0 "${HIPSYCL_SOURCE_DIR}/cmake/")
 find_package(CUDA QUIET)
 find_package(HIP QUIET HINTS ${ROCM_PATH} ${ROCM_PATH}/lib/cmake)
 

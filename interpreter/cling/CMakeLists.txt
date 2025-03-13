@@ -6,6 +6,8 @@ set(HIPSYCL_SOURCE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/adaptiveCpp)
 set(CXX_FILESYSTEM_HEADER filesystem)
 set(CXX_FILESYSTEM_NAMESPACE "std::filesystem")
 
+set(LLVM_VERSION_MAJOR 18)
+
 if(NOT CMAKE_BUILD_TYPE)
   set(CMAKE_BUILD_TYPE Release)
 endif()

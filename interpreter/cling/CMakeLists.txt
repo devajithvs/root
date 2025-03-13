@@ -779,7 +779,10 @@ include_directories(${PROJECT_BINARY_DIR}/include)
 add_subdirectory(${HIPSYCL_SOURCE_DIR}/src/common)
 add_subdirectory(${HIPSYCL_SOURCE_DIR}/src/compiler)
 add_subdirectory(${HIPSYCL_SOURCE_DIR}/src/libkernel)
+
+set(CMAKE_DISABLE_FIND_PACKAGE_CUDA OFF)
 add_subdirectory(${HIPSYCL_SOURCE_DIR}/src/runtime)
+set(CMAKE_DISABLE_FIND_PACKAGE_CUDA ON)
 
 add_subdirectory(include/cling/Interpreter)
 add_subdirectory(lib)

@@ -8,6 +8,53 @@ set(CXX_FILESYSTEM_NAMESPACE "std::filesystem")
 
 set(LLVM_VERSION_MAJOR 18)
 
+if (CMAKE_VERSION VERSION_LESS 3.17)
+   find_package(CUDA QUIET)
+
+   if (CUDA_FOUND)
+      find_library(CUDA_DRIVER_LIBRARY
+                   cuda
+                   HINTS
+                   ${CUDA_TOOLKIT_ROOT_DIR}/lib64/stubs
+                   ${CUDA_TOOLKIT_ROOT_DIR}/lib/x64 REQUIRED)
+
+      message(STATUS "Found CUDA version ${CUDA_VERSION} in ${CUDA_TOOLKIT_ROOT_DIR}")
+
+      set(CUDA_LIBS "")
+      list(APPEND CUDA_LIBS ${CUDA_LIBRARIES})
+      list(APPEND CUDA_LIBS ${CUDA_DRIVER_LIBRARY})
+   endif()
+else()
+   if (DEFINED CUDA_TOOLKIT_ROOT_DIR AND NOT DEFINED CUDAToolkit_ROOT)
+      set(CUDAToolkit_ROOT ${CUDA_TOOLKIT_ROOT_DIR})
+   endif()
+
+   find_package(CUDAToolkit QUIET)
+
+   if (CUDAToolkit_FOUND)
+      # CMake version < 3.18 does not define CUDAToolkit_LIBRARY_ROOT, and in some
+      # cases CMake does not define this variable even for CMake version >= 3.18.
+      # In these cases we define it ourselves by taking the parent directory of
+      # the CUDAToolkit_LIBRARY_DIR directory and check if this is the right directory.
+      if (CMAKE_VERSION VERSION_LESS 3.18 OR NOT CUDAToolkit_LIBRARY_ROOT)
+         get_filename_component(CUDAToolkit_LIBRARY_ROOT ${CUDAToolkit_LIBRARY_DIR} DIRECTORY)
+
+         if (NOT EXISTS "${CUDAToolkit_LIBRARY_ROOT}/nvvm")
+            message(WARNING "CUDAToolkit_LIBRARY_ROOT does not point to the correct directory, try setting it manually. Detected CUDA installation cannot be used.")
+            set(CUDAToolkit_FOUND FALSE)
+         endif()
+      endif()
+   endif()
+
+   if (CUDAToolkit_FOUND)
+      message(STATUS "Found CUDA version ${CUDAToolkit_VERSION} in ${CUDAToolkit_LIBRARY_ROOT}")
+
+      set(CUDA_FOUND TRUE)
+      set(CUDA_TOOLKIT_ROOT_DIR ${CUDAToolkit_LIBRARY_ROOT})
+      set(CUDA_LIBS CUDA::cudart CUDA::cuda_driver)
+   endif()
+endif()
+
 if(NOT CMAKE_BUILD_TYPE)
   set(CMAKE_BUILD_TYPE Release)
 endif()
@@ -215,57 +262,6 @@ endif()
 # TODO-DEV
 set(CLANG_EXECUTABLE_PATH /home/dvalapar/work/xeus/cling-build-static/bin/clang++)
 
-if (CMAKE_VERSION VERSION_LESS 3.17)
-   find_package(CUDA QUIET)
-
-   if (CUDA_FOUND)
-      find_library(CUDA_DRIVER_LIBRARY
-                   cuda
-                   HINTS
-                   ${CUDA_TOOLKIT_ROOT_DIR}/lib64/stubs
-                   ${CUDA_TOOLKIT_ROOT_DIR}/lib/x64 REQUIRED)
-
-      message(STATUS "Found CUDA version ${CUDA_VERSION} in ${CUDA_TOOLKIT_ROOT_DIR}")
-
-      set(CUDA_LIBS "")
-      list(APPEND CUDA_LIBS ${CUDA_LIBRARIES})
-      list(APPEND CUDA_LIBS ${CUDA_DRIVER_LIBRARY})
-   endif()
-else()
-   if (DEFINED CUDA_TOOLKIT_ROOT_DIR AND NOT DEFINED CUDAToolkit_ROOT)
-      set(CUDAToolkit_ROOT ${CUDA_TOOLKIT_ROOT_DIR})
-   endif()
-
-   find_package(CUDAToolkit QUIET)
-
-   if (CUDAToolkit_FOUND)
-      # CMake version < 3.18 does not define CUDAToolkit_LIBRARY_ROOT, and in some
-      # cases CMake does not define this variable even for CMake version >= 3.18.
-      # In these cases we define it ourselves by taking the parent directory of
-      # the CUDAToolkit_LIBRARY_DIR directory and check if this is the right directory.
-      if (CMAKE_VERSION VERSION_LESS 3.18 OR NOT CUDAToolkit_LIBRARY_ROOT)
-         get_filename_component(CUDAToolkit_LIBRARY_ROOT ${CUDAToolkit_LIBRARY_DIR} DIRECTORY)
-
-         if (NOT EXISTS "${CUDAToolkit_LIBRARY_ROOT}/nvvm")
-            message(WARNING "CUDAToolkit_LIBRARY_ROOT does not point to the correct directory, try setting it manually. Detected CUDA installation cannot be used.")
-            set(CUDAToolkit_FOUND FALSE)
-         endif()
-      endif()
-   endif()
-
-   if (CUDAToolkit_FOUND)
-      message(STATUS "Found CUDA version ${CUDAToolkit_VERSION} in ${CUDAToolkit_LIBRARY_ROOT}")
-
-      set(CUDA_FOUND TRUE)
-      set(CUDA_TOOLKIT_ROOT_DIR ${CUDAToolkit_LIBRARY_ROOT})
-      set(CUDA_LIBS CUDA::cudart CUDA::cuda_driver)
-   endif()
-endif()
-
-# TODO-DEV - include_dir for each target
-include_directories(${PROJECT_BINARY_DIR}/include)
-add_subdirectory(${HIPSYCL_SOURCE_DIR}/src/common)
-
 set(WITH_LLVM_TO_AMDGPU_AMDHSA false)
 set(WITH_LLVM_TO_PTX false)
 set(WITH_LLVM_TO_SPIRV false)
@@ -287,9 +283,6 @@ if(WITH_SSCP_COMPILER)
   set(WITH_LLVM_TO_HOST true)
 endif()
 
-add_subdirectory(${HIPSYCL_SOURCE_DIR}/src/compiler)
-add_subdirectory(${HIPSYCL_SOURCE_DIR}/src/libkernel)
-
 set(ACPP_RT_SANITIZE "" CACHE STRING
     "Enable building AdaptiveCpp runtime with specified sanitizers")
 
@@ -298,7 +291,6 @@ if(NOT ${ACPP_RT_SANITIZE} STREQUAL "")
 else()
   set(ACPP_RT_SANITIZE_FLAGS "")
 endif()
-add_subdirectory(${HIPSYCL_SOURCE_DIR}/src/runtime)
 
 if(WIN32)
   # We need cmake to support exporting of symbols not only from libraries but
@@ -547,7 +539,7 @@ if(MSVC)
     endif()
   endif()
 else()
-  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fno-rtti")
+  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS}")
 endif()
 
 if(MSVC)
@@ -779,6 +771,15 @@ endif()
 if (TARGET clang-headers)
   list(APPEND LLVM_COMMON_DEPENDS clang-headers)
 endif()
+
+cmake_policy(SET CMP0069 NEW) 
+set(CMAKE_POLICY_DEFAULT_CMP0069 NEW)
+# TODO-DEV - include_dir for each target
+include_directories(${PROJECT_BINARY_DIR}/include)
+add_subdirectory(${HIPSYCL_SOURCE_DIR}/src/common)
+add_subdirectory(${HIPSYCL_SOURCE_DIR}/src/compiler)
+add_subdirectory(${HIPSYCL_SOURCE_DIR}/src/libkernel)
+add_subdirectory(${HIPSYCL_SOURCE_DIR}/src/runtime)
 
 add_subdirectory(include/cling/Interpreter)
 add_subdirectory(lib)

@@ -1,20 +1,3 @@
-set(HIPSYCL_SOURCE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/adaptiveCpp)
-list(INSERT CMAKE_MODULE_PATH 0 "${HIPSYCL_SOURCE_DIR}/cmake/")
-
-set(ACPP_EXPORTS
-    acpp-clang-cbs
-    acpp-clang
-    acpp-common
-    llvm-to-backend
-    llvm-to-ptx
-    llvm-to-host
-    rt-backend-cuda
-    rt-backend-omp
-    acpp-rt
-)
-
-set_property(GLOBAL APPEND PROPERTY CLING_EXPORTS ${ACPP_EXPORTS})
-
 if(WIN32)
   # We need cmake to support exporting of symbols not only from libraries but
   # from executables too. This way cling can find symbols from its own
@@ -508,6 +491,22 @@ if (TARGET clang-headers)
   list(APPEND LLVM_COMMON_DEPENDS clang-headers)
 endif()
 
+set(HIPSYCL_SOURCE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/adaptiveCpp)
+list(INSERT CMAKE_MODULE_PATH 0 "${HIPSYCL_SOURCE_DIR}/cmake/")
+
+set(ACPP_EXPORTS
+    acpp-clang-cbs
+    acpp-clang
+    acpp-common
+    llvm-to-backend
+    llvm-to-ptx
+    llvm-to-host
+    rt-backend-cuda
+    rt-backend-omp
+    acpp-rt
+)
+
+set_property(GLOBAL APPEND PROPERTY CLING_EXPORTS ${ACPP_EXPORTS})
 add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/adaptiveCpp)
 
 add_subdirectory(include/cling/Interpreter)

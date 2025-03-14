@@ -742,11 +742,7 @@ cmake_policy(SET CMP0069 NEW)
 set(CMAKE_POLICY_DEFAULT_CMP0069 NEW)
 # TODO-DEV - include_dir for each target
 include_directories(${PROJECT_BINARY_DIR}/include)
-add_subdirectory(${HIPSYCL_SOURCE_DIR}/src/common)
-add_subdirectory(${HIPSYCL_SOURCE_DIR}/src/compiler)
-add_subdirectory(${HIPSYCL_SOURCE_DIR}/src/libkernel)
-
-add_subdirectory(${HIPSYCL_SOURCE_DIR}/src/runtime)
+add_subdirectory(${HIPSYCL_SOURCE_DIR}/src)
 
 add_subdirectory(include/cling/Interpreter)
 add_subdirectory(lib)

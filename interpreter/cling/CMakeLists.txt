@@ -1,15 +1,3 @@
-set(ACPP_VERSION_MAJOR 24)
-set(ACPP_VERSION_MINOR 10)
-set(ACPP_VERSION_PATCH 0)
-set(ACPP_VERSION_SUFFIX "+acpp-root")
-set(HIPSYCL_SOURCE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/adaptiveCpp)
-set(CXX_FILESYSTEM_HEADER filesystem)
-set(CXX_FILESYSTEM_NAMESPACE "std::filesystem")
-
-set(LLVM_VERSION_MAJOR 18)
-# TODO-DEV
-set(CLANG_EXECUTABLE_PATH /home/dvalapar/work/xeus/cling-build-static/bin/clang++)
-
 if(WIN32)
   # We need cmake to support exporting of symbols not only from libraries but
   # from executables too. This way cling can find symbols from its own
@@ -505,9 +493,10 @@ endif()
 
 cmake_policy(SET CMP0069 NEW) 
 set(CMAKE_POLICY_DEFAULT_CMP0069 NEW)
+
 # TODO-DEV - include_dir for each target
 include_directories(${PROJECT_BINARY_DIR}/include)
-add_subdirectory(${HIPSYCL_SOURCE_DIR})
+add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/adaptiveCpp)
 
 add_subdirectory(include/cling/Interpreter)
 add_subdirectory(lib)

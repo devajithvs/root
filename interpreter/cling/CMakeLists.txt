@@ -141,6 +141,7 @@ set(WITH_ROCM_BACKEND ${ROCM_FOUND} CACHE BOOL "Build AdaptiveCpp support for AM
 set(WITH_OPENCL_BACKEND ${OpenCL_FOUND} CACHE BOOL "Build AdaptiveCpp support for OpenCL SPIR-V devices supporting USM")
 
 set(WITH_CPU_BACKEND true)
+SET(WITH_CUDA_BACKEND true)
 
 if(WITH_CUDA_BACKEND)
   find_program(NVCXX_COMPILER NAMES nvc++)

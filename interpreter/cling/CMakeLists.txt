@@ -508,11 +508,6 @@ if (TARGET clang-headers)
   list(APPEND LLVM_COMMON_DEPENDS clang-headers)
 endif()
 
-cmake_policy(SET CMP0069 NEW) 
-set(CMAKE_POLICY_DEFAULT_CMP0069 NEW)
-
-# TODO-DEV - include_dir for each target
-include_directories(${PROJECT_BINARY_DIR}/include)
 add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/adaptiveCpp)
 
 add_subdirectory(include/cling/Interpreter)

@@ -48,13 +48,6 @@ set(LLVM_TOOL_LLVM_AR_BUILD OFF CACHE BOOL "")
 set(CLANG_TOOL_CLANG_OFFLOAD_BUNDLER_BUILD OFF CACHE BOOL "")
 set(LLVM_FORCE_USE_OLD_TOOLCHAIN ON CACHE BOOL "")
 
-# Prevent Clang from finding CUDA just to determine the architecture for OpenMP
-# offloading, which we are not interested in. If the CUDA package was already
-# found before (because the user turned on cuda or tmva-gpu), this will not have
-# an effect, which is fine.
-# (Note that the option is very counter-intuitive: We turn *on* disabling it...)
-# set(CMAKE_DISABLE_FIND_PACKAGE_CUDA ON)
-
 # will be set again in case NOT builtin_llvm
 set(LLVM_DIR "${CMAKE_CURRENT_BINARY_DIR}/llvm-project/llvm")
 if (clad)

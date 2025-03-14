@@ -265,10 +265,11 @@ def git_pull(directory: str, repository: str, branch: str):
                 git checkout {branch}
                 git fetch
                 git reset --hard @{{u}}
+                git submodule update --init --recursive
             """)
         else:
             returncode = subprocess_with_log(f"""
-                git clone --branch {branch} --single-branch {repository} "{targetdir}"
+                git clone --branch {branch} --single-branch --recurse-submodules {repository} "{targetdir}"
             """)
         
         if returncode == 0:

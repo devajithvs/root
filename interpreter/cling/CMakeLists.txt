@@ -431,6 +431,19 @@ set(CLING_BINARY_DIR ${CMAKE_CURRENT_BINARY_DIR})
 set(LLVM_TOOLS_BINARY_DIR "${LLVM_BINARY_DIR}/bin")
 if(DEFINED CLING_ROOT_BUILD)
   set(CMAKE_RUNTIME_OUTPUT_DIRECTORY "${LLVM_TOOLS_BINARY_DIR}")
+
+  # Hack for now to make it work with adaptiveCpp without making more changes
+  # Ensure runtime ACPP directory exists to prevent SYCL from running
+  set(ACPP_RUNTIME_DIRECTORY "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/../lib/hipSYCL/")
+  file(MAKE_DIRECTORY "${ACPP_RUNTIME_DIRECTORY}")
+
+  # Create a symbolic link to the bitcode directory
+  execute_process(
+    COMMAND ${CMAKE_COMMAND} -E create_symlink
+    "${CMAKE_BINARY_DIR}/lib/hipSYCL/bitcode"
+    "${ACPP_RUNTIME_DIRECTORY}/bitcode"
+    COMMAND_ERROR_IS_FATAL ANY
+  )
 endif()
 
 if( CMAKE_SOURCE_DIR STREQUAL CMAKE_BINARY_DIR AND NOT MSVC_IDE )

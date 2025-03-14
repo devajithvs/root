@@ -491,8 +491,8 @@ if (TARGET clang-headers)
   list(APPEND LLVM_COMMON_DEPENDS clang-headers)
 endif()
 
-set(HIPSYCL_SOURCE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/adaptiveCpp)
-list(INSERT CMAKE_MODULE_PATH 0 "${HIPSYCL_SOURCE_DIR}/cmake/")
+set(ADAPTIVE_CPP_SOURCE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/AdaptiveCpp)
+list(INSERT CMAKE_MODULE_PATH 0 "${ADAPTIVE_CPP_SOURCE_DIR}/cmake/")
 
 set(ACPP_EXPORTS
     acpp-clang-cbs
@@ -507,7 +507,7 @@ set(ACPP_EXPORTS
 )
 
 set_property(GLOBAL APPEND PROPERTY CLING_EXPORTS ${ACPP_EXPORTS})
-add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/adaptiveCpp)
+add_subdirectory(${ADAPTIVE_CPP_SOURCE_DIR})
 
 add_subdirectory(include/cling/Interpreter)
 add_subdirectory(lib)

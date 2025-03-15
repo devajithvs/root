@@ -212,6 +212,31 @@ namespace cling {
     m_RuntimeOptions{},
     m_OptLevel(parentInterp ? parentInterp->m_OptLevel : -1) {
 
+#ifdef ADAPTIVECPP_ENABLED
+    // Compiler arguments for ADAPTIVECPP
+    static constexpr std::array<const char*, 8> extraArgs = {
+      "-D__OPENSYCL__",
+      "-D__HIPSYCL__",
+      "-D__ADAPTIVECPP__",
+      "-D__ACPP__",
+      "-D__ACPP_ENABLE_LLVM_SSCP_TARGET",
+      "-ffp-contract=fast",
+      "-Xclang",
+      "-disable-O0-optnone"
+    };
+
+    std::vector<const char*> argvChar;
+    argvChar.reserve(argc + 8);
+
+    // Copy existing arguments
+    argvChar.assign(argv, argv + argc);
+
+    argvChar.insert(argvChar.end(), extraArgs.begin(), extraArgs.end());
+    argvChar.push_back(nullptr); // signal end of array
+
+    m_Opts = InvocationOptions(argvChar.size() - 1, argvChar.data());
+#endif
+
     if (handleSimpleOptions(m_Opts))
       return;
 

@@ -219,7 +219,7 @@ namespace cling {
       "-D__HIPSYCL__",
       "-D__ADAPTIVECPP__",
       "-D__ACPP__",
-      "-D__ACPP_ENABLE_LLVM_SSCP_TARGET",
+      "-D__ACPP_ENABLE_LLVM_SSCP_TARGET__",
       "-ffp-contract=fast",
       "-Xclang",
       "-disable-O0-optnone"

@@ -1343,17 +1343,6 @@ namespace {
       argvCompile.push_back( "c++");
     }
 
-#ifdef ADAPTIVECPP_ENABLED
-    argvCompile.push_back("-D__OPENSYCL__");
-    argvCompile.push_back("-D__HIPSYCL__");
-    argvCompile.push_back("-D__ADAPTIVECPP__");
-    argvCompile.push_back("-D__ACPP__");
-    argvCompile.push_back("-D__ACPP_ENABLE_LLVM_SSCP_TARGET");
-    argvCompile.push_back("-ffp-contract=fast");
-    argvCompile.push_back("-Xclang");
-    argvCompile.push_back("-disable-O0-optnone");
-#endif
-
     if (COpts.DefaultLanguage()) {
       // By default, set the standard to what cling was compiled with.
       // clang::driver::Compilation will do various things while initializing

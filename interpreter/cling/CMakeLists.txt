@@ -137,7 +137,7 @@ set(LLVM_TOOLS_BINARY_DIR "${LLVM_BINARY_DIR}/bin")
 if(DEFINED CLING_ROOT_BUILD)
   set(CMAKE_RUNTIME_OUTPUT_DIRECTORY "${LLVM_TOOLS_BINARY_DIR}")
 
-  if(adaptiveCpp)
+  if(adaptivecpp)
     # Hack for now to make it work with adaptiveCpp without making more changes
     # Ensure runtime ACPP directory exists to prevent SYCL from running
     set(ACPP_RUNTIME_DIRECTORY "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/../lib/hipSYCL/")
@@ -258,7 +258,7 @@ if(MSVC)
       set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std:c++14")
     endif()
   endif()
-elseif(NOT adaptiveCpp)
+elseif(NOT adaptivecpp)
   set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fno-rtti")
 endif()
 
@@ -492,7 +492,7 @@ if (TARGET clang-headers)
   list(APPEND LLVM_COMMON_DEPENDS clang-headers)
 endif()
 
-if(adaptiveCpp)
+if(adaptivecpp)
   set(ADAPTIVE_CPP_SOURCE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/AdaptiveCpp)
   list(INSERT CMAKE_MODULE_PATH 0 "${ADAPTIVE_CPP_SOURCE_DIR}/cmake/")
   add_compile_definitions(ADAPTIVECPP_ENABLED)

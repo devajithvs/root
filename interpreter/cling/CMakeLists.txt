@@ -494,6 +494,7 @@ endif()
 
 if(adaptivecpp)
   set(ADAPTIVE_CPP_SOURCE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/AdaptiveCpp)
+  set(WITH_CUDA_BACKEND false)
   set(Boost_FIBER_LIBRARY_DEBUG false)
   set(LLVM_VERSION_MAJOR 18)
   list(INSERT CMAKE_MODULE_PATH 0 "${ADAPTIVE_CPP_SOURCE_DIR}/cmake/")

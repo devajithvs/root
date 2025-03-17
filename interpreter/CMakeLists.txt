@@ -27,7 +27,7 @@ set(LLVM_INCLUDE_TESTS OFF CACHE BOOL "")
 set(LLVM_INCLUDE_BENCHMARKS OFF CACHE BOOL "")
 set(CLANG_INCLUDE_TESTS OFF CACHE BOOL "")
 set(LLVM_INCLUDE_EXAMPLES OFF CACHE BOOL "")
-set(CLANG_BUILD_TOOLS OFF CACHE BOOL "")
+set(CLANG_BUILD_TOOLS ON CACHE BOOL "")
 # It looks like that turning off CLANG_BUILD_TOOLS is not enough.
 set(CLANG_TOOL_ARCMT_TEST_BUILD OFF CACHE BOOL "")
 set(CLANG_TOOL_CLANG_CHECK_BUILD OFF CACHE BOOL "")
@@ -393,6 +393,9 @@ if (builtin_clang)
     ${CLANG_BINARY_DIR}/include
     CACHE STRING "Clang include directories.")
   set(CLANG_CMAKE_DIR "${CMAKE_BINARY_DIR}/lib/cmake/clang/")
+  set(CLANG_EXECUTABLE_PATH
+    "${LLVM_BINARY_DIR}/bin/clang${CMAKE_EXECUTABLE_SUFFIX}"
+    CACHE STRING "Path to just‐built clang (if builtin_clang).")
 else()
   find_package(Clang REQUIRED CONFIG)
   message(STATUS "Found Clang ${CLANG_PACKAGE_VERSION} in ${CLANG_CMAKE_DIR}")

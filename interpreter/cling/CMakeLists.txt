@@ -495,6 +495,7 @@ endif()
 if(adaptivecpp)
   set(ADAPTIVE_CPP_SOURCE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/AdaptiveCpp)
   set(Boost_FIBER_LIBRARY_DEBUG OFF)
+  set(LLVM_VERSION_MAJOR 18)
   list(INSERT CMAKE_MODULE_PATH 0 "${ADAPTIVE_CPP_SOURCE_DIR}/cmake/")
   add_compile_definitions(ADAPTIVECPP_ENABLED)
 
@@ -503,9 +504,9 @@ if(adaptivecpp)
       acpp-clang
       acpp-common
       llvm-to-backend
-      llvm-to-ptx
+      # llvm-to-ptx
       llvm-to-host
-      rt-backend-cuda
+      # rt-backend-cuda
       rt-backend-omp
       acpp-rt
   )

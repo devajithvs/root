@@ -512,6 +512,17 @@ if(adaptivecpp)
       acpp-rt
   )
 
+  if (builtin_clang)
+    if (TARGET clang)
+      message(WARNING "AdaptiveCpp: adding clang build dependencies for ACPP_EXPORTS.")
+      foreach(tgt IN LISTS ACPP_EXPORTS)
+        if (TARGET "${tgt}")
+          add_dependencies("${tgt}" clang clang-headers clang-resource-headers)
+        endif()
+      endforeach()
+    endif()
+  endif()
+
   set_property(GLOBAL APPEND PROPERTY CLING_EXPORTS ${ACPP_EXPORTS})
   add_subdirectory(${ADAPTIVE_CPP_SOURCE_DIR})
 endif()

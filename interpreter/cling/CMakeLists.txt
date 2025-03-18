@@ -499,6 +499,7 @@ if(adaptivecpp)
   set(LLVM_VERSION_MAJOR 18)
   list(INSERT CMAKE_MODULE_PATH 0 "${ADAPTIVE_CPP_SOURCE_DIR}/cmake/")
   add_compile_definitions(ADAPTIVECPP_ENABLED)
+  file(MAKE_DIRECTORY ${CMAKE_BINARY_DIR}/lib/hipSYCL/bitcode)
 
   set(ACPP_EXPORTS
       acpp-clang-cbs

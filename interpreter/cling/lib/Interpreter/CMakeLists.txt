@@ -26,6 +26,7 @@ set(LIBS
 )
 
 set(LLVM_LINK_COMPONENTS
+  ir
   analysis
   core
   coroutines

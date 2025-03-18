@@ -8,10 +8,6 @@ else(WIN32)
   cmake_minimum_required(VERSION 3.5)
 endif(WIN32)
 
-if(adaptivecpp)
-  add_compile_definitions(ADAPTIVECPP_ENABLED)
-endif()
-
 # If we are not building as a part of LLVM, build Cling as an
 # standalone project, using LLVM as an external library:
 if( CMAKE_SOURCE_DIR STREQUAL CMAKE_CURRENT_SOURCE_DIR )
@@ -140,6 +136,20 @@ set(CLING_BINARY_DIR ${CMAKE_CURRENT_BINARY_DIR})
 set(LLVM_TOOLS_BINARY_DIR "${LLVM_BINARY_DIR}/bin")
 if(DEFINED CLING_ROOT_BUILD)
   set(CMAKE_RUNTIME_OUTPUT_DIRECTORY "${LLVM_TOOLS_BINARY_DIR}")
+
+  if(adaptivecpp)
+    # Hack for now to make it work with adaptiveCpp without making more changes
+    # Ensure runtime ACPP directory exists to prevent SYCL from running
+    set(ACPP_RUNTIME_DIRECTORY "${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/../lib/hipSYCL/")
+    file(MAKE_DIRECTORY "${ACPP_RUNTIME_DIRECTORY}")
+
+    # Create a symbolic link to the bitcode directory
+    execute_process(
+      COMMAND ${CMAKE_COMMAND} -E create_symlink
+      "${CMAKE_BINARY_DIR}/lib/hipSYCL/bitcode"
+      "${ACPP_RUNTIME_DIRECTORY}/bitcode"
+    )
+  endif()
 endif()
 
 if( CMAKE_SOURCE_DIR STREQUAL CMAKE_BINARY_DIR AND NOT MSVC_IDE )
@@ -248,7 +258,7 @@ if(MSVC)
       set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std:c++14")
     endif()
   endif()
-else()
+elseif(NOT adaptivecpp)
   set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fno-rtti")
 endif()
 
@@ -480,6 +490,35 @@ if (TARGET intrinsics_gen)
 endif()
 if (TARGET clang-headers)
   list(APPEND LLVM_COMMON_DEPENDS clang-headers)
+endif()
+
+if(adaptivecpp)
+  set(ADAPTIVE_CPP_SOURCE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/AdaptiveCpp)
+  set(WITH_CUDA_BACKEND false)
+  set(Boost_FIBER_LIBRARY_DEBUG false)
+  set(LLVM_VERSION_MAJOR 18)
+  list(INSERT CMAKE_MODULE_PATH 0 "${ADAPTIVE_CPP_SOURCE_DIR}/cmake/")
+  add_compile_definitions(ADAPTIVECPP_ENABLED)
+
+  set(ACPP_EXPORTS
+      acpp-clang-cbs
+      acpp-clang
+      acpp-common
+      llvm-to-backend
+      # llvm-to-ptx
+      llvm-to-host
+      # rt-backend-cuda
+      rt-backend-omp
+      acpp-rt
+  )
+
+  set_property(GLOBAL APPEND PROPERTY CLING_EXPORTS ${ACPP_EXPORTS})
+  add_subdirectory(${ADAPTIVE_CPP_SOURCE_DIR})
+
+  if (TARGET intrinsics_gen)
+    add_dependencies(acpp-clang-cbs intrinsics_gen)
+    add_dependencies(llvm-to-backend intrinsics_gen)
+  endif()
 endif()
 
 add_subdirectory(include/cling/Interpreter)

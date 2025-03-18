@@ -11,6 +11,8 @@ set(SOURCES
   )
 
 set(LIBS
+  acpp-clang
+  acpp-rt
   clangAnalysis
   clangDriver
   clangFrontend

@@ -347,6 +347,12 @@ namespace {
         } else
           sArguments.addArgument("-nostdinc++");
       }
+  #ifdef ADAPTIVECPP_ENABLED
+    llvm::SmallString<256> adaptiveCppIncludePath(ADAPTIVE_CPP_HEADER_INSTALL_PATH);
+    if (!llvm::sys::fs::exists(adaptiveCppIncludePath))
+      adaptiveCppIncludePath = ADAPTIVE_CPP_HEADER_BUILD_PATH;
+    sArguments.addArgument("-isystem", adaptiveCppIncludePath.c_str());
+  #endif
 
   #ifdef CLING_OSX_SYSROOT
     sArguments.addArgument("-isysroot", CLING_OSX_SYSROOT);

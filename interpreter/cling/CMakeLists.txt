@@ -501,6 +501,9 @@ if(adaptivecpp)
   add_compile_definitions(ADAPTIVECPP_ENABLED)
   file(MAKE_DIRECTORY ${CMAKE_BINARY_DIR}/lib/hipSYCL/bitcode)
 
+  set(ADAPTIVE_CPP_HEADER_BUILD_PATH "${CMAKE_CURRENT_BINARY_DIR}/AdaptiveCpp/AdaptiveCppHeaders/include/AdaptiveCpp")
+  set(ADAPTIVE_CPP_HEADER_INSTALL_PATH "${CMAKE_INSTALL_PREFIX}/include/AdaptiveCpp")
+
   set(ACPP_EXPORTS
       acpp-clang-cbs
       acpp-clang

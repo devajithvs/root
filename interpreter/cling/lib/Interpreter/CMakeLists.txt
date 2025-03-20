@@ -7,8 +7,6 @@
 #------------------------------------------------------------------------------
 
 set(LIBS
-  acpp-clang
-  acpp-rt
   clingUtils
   clangCodeGen
   clangDriver
@@ -24,6 +22,10 @@ set(LIBS
   clangBasic
   clangLex
 )
+
+if(adaptivecpp)
+  list(APPEND LIBS acpp-clang acpp-rt)
+endif()
 
 set(LLVM_LINK_COMPONENTS
   analysis

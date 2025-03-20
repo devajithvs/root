@@ -258,7 +258,7 @@ if(MSVC)
       set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -std:c++14")
     endif()
   endif()
-elseif(NOT adaptivecpp)
+elseif(NOT adaptivecpp) # adaptivecpp does not build with -fno-rtti
   set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fno-rtti")
 endif()
 
@@ -493,8 +493,11 @@ if (TARGET clang-headers)
 endif()
 
 if(adaptivecpp)
-  set(ADAPTIVE_CPP_SOURCE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/AdaptiveCpp)
-  set(WITH_CUDA_BACKEND false)
+  # Use ADAPTIVE_CPP_SOURCE_DIR variable if it is defined in the CMake configuration
+  if (NOT DEFINED ADAPTIVE_CPP_SOURCE_DIR)
+    set(ADAPTIVE_CPP_SOURCE_DIR ${CMAKE_CURRENT_SOURCE_DIR}/AdaptiveCpp)
+  endif()
+
   set(Boost_FIBER_LIBRARY_DEBUG false)
   set(LLVM_VERSION_MAJOR 18)
   list(INSERT CMAKE_MODULE_PATH 0 "${ADAPTIVE_CPP_SOURCE_DIR}/cmake/")
@@ -504,20 +507,20 @@ if(adaptivecpp)
   set(ADAPTIVE_CPP_HEADER_BUILD_PATH "${CMAKE_CURRENT_BINARY_DIR}/AdaptiveCpp/AdaptiveCppHeaders/include/AdaptiveCpp")
   set(ADAPTIVE_CPP_HEADER_INSTALL_PATH "${CMAKE_INSTALL_PREFIX}/include/AdaptiveCpp")
 
+  add_subdirectory(${ADAPTIVE_CPP_SOURCE_DIR})
   set(ACPP_EXPORTS
       acpp-clang-cbs
       acpp-clang
       acpp-common
       llvm-to-backend
-      # llvm-to-ptx
       llvm-to-host
-      # rt-backend-cuda
       rt-backend-omp
       acpp-rt
   )
-
+  if(WITH_CUDA_BACKEND)
+    list(APPEND ACPP_EXPORTS llvm-to-ptx rt-backend-cuda)
+  endif()
   set_property(GLOBAL APPEND PROPERTY CLING_EXPORTS ${ACPP_EXPORTS})
-  add_subdirectory(${ADAPTIVE_CPP_SOURCE_DIR})
 
   if (TARGET intrinsics_gen)
     add_dependencies(acpp-clang-cbs intrinsics_gen)

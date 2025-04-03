@@ -37,6 +37,10 @@
 #include <sys/stat.h>
 #endif
 
+#ifdef __APPLE__
+#include <complex>
+#endif
+
 using namespace llvm;
 using namespace llvm::jitlink;
 using namespace llvm::orc;
@@ -408,6 +412,34 @@ CreateTargetMachine(const clang::CompilerInstance& CI, bool JITLink) {
   return cantFail(JTMB.createTargetMachine());
 }
 
+#ifdef __APPLE__
+std::complex<double> __divdc3(double a_real, double a_imag, double b_real,
+                              double b_imag) {
+  std::complex<double> a(a_real, a_imag);
+  std::complex<double> b(b_real, b_imag);
+  return a / b;
+}
+
+static SymbolMap GetListOfLibcNonsharedSymbols(const LLJIT& Jit) {
+  // Inject a number of symbols that may be in libc_nonshared.a where they are
+  // not found automatically. Before DefinitionGenerators in ORCv2, this used
+  // to be done by RTDyldMemoryManager::getSymbolAddressInProcess See also the
+  // upstream issue https://github.com/llvm/llvm-project/issues/61289.
+
+  static const std::pair<const char*, const void*> NamePtrList[] = {
+      {"__divdc3", (void*)&__divdc3},
+      // TODO: Add more here to be checked: (__divsc3 ..)
+  };
+
+  SymbolMap LibcNonsharedSymbols;
+  for (const auto& NamePtr : NamePtrList) {
+    LibcNonsharedSymbols[Jit.mangleAndIntern(NamePtr.first)] = {
+        orc::ExecutorAddr::fromPtr(NamePtr.second), JITSymbolFlags::Exported};
+  }
+  return LibcNonsharedSymbols;
+}
+#endif
+
 #if defined(__linux__) && defined(__GLIBC__)
 static SymbolMap GetListOfLibcNonsharedSymbols(const LLJIT& Jit) {
   // Inject a number of symbols that may be in libc_nonshared.a where they are
@@ -569,6 +601,12 @@ IncrementalJIT::IncrementalJIT(
     });
 
 #if defined(__linux__) && defined(__GLIBC__)
+  // See comment in ListOfLibcNonsharedSymbols.
+  cantFail(Jit->getProcessSymbolsJITDylib()->define(
+      absoluteSymbols(GetListOfLibcNonsharedSymbols(*Jit))));
+#endif
+
+#if defined(__APPLE__)
   // See comment in ListOfLibcNonsharedSymbols.
   cantFail(Jit->getProcessSymbolsJITDylib()->define(
       absoluteSymbols(GetListOfLibcNonsharedSymbols(*Jit))));

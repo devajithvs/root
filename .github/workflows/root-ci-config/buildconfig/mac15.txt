@@ -1,4 +1,4 @@
-adaptivecpp=OFF
+expadaptivecpp=OFF
 builtin_cfitsio=ON
 builtin_cppzmq=ON
 builtin_davix=ON

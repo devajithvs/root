@@ -111,6 +111,7 @@ add_cling_library(clingInterpreter OBJECT
 
 
 if (UNIX)
+  message(WARNING "OSX: ${CMAKE_OSX_SYSROOT}")
   set_source_files_properties(Exception.cpp COMPILE_FLAGS "-fexceptions -frtti")
   set_source_files_properties(Interpreter.cpp COMPILE_FLAGS "-fexceptions")
 

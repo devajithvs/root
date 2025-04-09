@@ -109,7 +109,7 @@ if (clad)
     set(CLING_PLUGIN_LINK_LIBS -Wl,--whole-archive cladPlugin cladDifferentiator -Wl,--no-whole-archive)
   endif()
   # This will cause a cyclic dependency in adaptiveCpp, as it requires clang to build
-  if(TARGET clang AND NOT adaptivecpp)
+  if(TARGET clang AND NOT expadaptivecpp)
     # Link our clad libraries to clang. If users use the clang from ROOT they will
     # also be able to use clad out of the box.
     add_dependencies(clang clad)

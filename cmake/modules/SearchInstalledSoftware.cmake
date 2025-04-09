@@ -62,8 +62,8 @@ macro(ROOT_CHECK_CONNECTION_AND_DISABLE_OPTION option_name)
 endmacro()
 
 # Building adaptivecpp requires an internet connection, if we're not side-loading the source directory
-if(adaptivecpp AND NOT DEFINED ADAPTIVECPP_SOURCE_DIR)
-  ROOT_CHECK_CONNECTION_AND_DISABLE_OPTION("adaptivecpp")
+if(expadaptivecpp AND NOT DEFINED ADAPTIVECPP_SOURCE_DIR)
+  ROOT_CHECK_CONNECTION_AND_DISABLE_OPTION("expadaptivecpp")
 endif()
 
 # Building Clad requires an internet connection, if we're not side-loading the source directory

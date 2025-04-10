@@ -573,7 +573,7 @@ if(experimental_adaptivecpp)
     FetchContent_Declare(
       AdaptiveCpp
       GIT_REPOSITORY https://github.com/devajithvs/AdaptiveCpp.git
-      GIT_TAG 3fb375fdc84ad0423139e05167739e9e906ca183
+      GIT_TAG a0f4683b015d43db8bc657c0bd2e8c3d275508f3
     )
     FetchContent_GetProperties(AdaptiveCpp)
     if(NOT AdaptiveCpp_POPULATED)

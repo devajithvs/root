@@ -11,71 +11,71 @@ class ImportLoadLibs(unittest.TestCase):
     # The whitelist is a list of regex expressions that mark wanted libraries
     # Note that the regex has to result in an exact match with the library name.
     known_libs = [
-            # libCore and dependencies
-            'libCore',
-            'libm',
-            'liblz4',
-            'libxxhash',
-            'liblzma',
-            'libzstd',
-            'libz',
-            'libpthread',
-            'libc',
-            'libdl',
-            'libpcre',
-            'libpcre2-8',
-            # libCling and dependencies
-            'libCling.*',
-            'librt',
-            'libncurses.*',
-            'libtinfo', # by libncurses (on some older platforms)
-            # libTree and dependencies
-            'libTree',
-            'libThread',
-            'libRIO',
-            'libNet',
-            'libImt',
-            'libMathCore',
-            'libMultiProc',
-            'libssl',
-            'libcrypt.*', # by libssl
-            'libtbb',
-            'libtbb_debug',
-            'libtbbmalloc',
-            'liburing', # by libRIO if uring option is enabled
-            'libgomp', # by adaptivecpp
-            # On centos7 libssl links against kerberos pulling in all dependencies below, removed with libssl1.1.0
-            'libgssapi_krb5',
-            'libkrb5',
-            'libk5crypto',
-            'libkrb5support',
-            'libselinux',
-            'libkeyutils',
-            'libcom_err',
-            'libresolv',
-            # cppyy and Python libraries
-            'libcppyy.*',
-            'libROOTPythonizations.*',
-            'libpython.*',
-            'libutil.*',
-            '.*cpython.*',
-            '_.*',
-            '.*module',
-            'operator',
-            'cStringIO',
-            'binascii',
-            'libbz2',
-            'libexpat',
-            'ISO8859-1',
-            # System libraries and others
-            'libnss_.*',
-            'ld.*',
-            'libffi',
-            'libgcc_s',
-            # AddressSanitizer runtime and ROOT configuration
-            'libclang_rt.asan-.*',
-            'libROOTSanitizerConfig',
-            ]
+        # libCore and dependencies
+        "libCore",
+        "libm",
+        "liblz4",
+        "libxxhash",
+        "liblzma",
+        "libzstd",
+        "libz",
+        "libpthread",
+        "libc",
+        "libdl",
+        "libpcre",
+        "libpcre2-8",
+        # libCling and dependencies
+        "libCling.*",
+        "librt",
+        "libncurses.*",
+        "libtinfo",  # by libncurses (on some older platforms)
+        # libTree and dependencies
+        "libTree",
+        "libThread",
+        "libRIO",
+        "libNet",
+        "libImt",
+        "libMathCore",
+        "libMultiProc",
+        "libssl",
+        "libcrypt.*",  # by libssl
+        "libtbb",
+        "libtbb_debug",
+        "libtbbmalloc",
+        "liburing",  # by libRIO if uring option is enabled
+        "libgomp",  # by adaptivecpp
+        # On centos7 libssl links against kerberos pulling in all dependencies below, removed with libssl1.1.0
+        "libgssapi_krb5",
+        "libkrb5",
+        "libk5crypto",
+        "libkrb5support",
+        "libselinux",
+        "libkeyutils",
+        "libcom_err",
+        "libresolv",
+        # cppyy and Python libraries
+        "libcppyy.*",
+        "libROOTPythonizations.*",
+        "libpython.*",
+        "libutil.*",
+        ".*cpython.*",
+        "_.*",
+        ".*module",
+        "operator",
+        "cStringIO",
+        "binascii",
+        "libbz2",
+        "libexpat",
+        "ISO8859-1",
+        # System libraries and others
+        "libnss_.*",
+        "ld.*",
+        "libffi",
+        "libgcc_s",
+        # AddressSanitizer runtime and ROOT configuration
+        "libclang_rt.asan-.*",
+        "libROOTSanitizerConfig",
+    ]
 
     # Verbose mode of the test
     verbose = False

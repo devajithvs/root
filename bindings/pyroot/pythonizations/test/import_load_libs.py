@@ -1,6 +1,6 @@
-import unittest
-import re
 import os
+import re
+import unittest
 
 
 class ImportLoadLibs(unittest.TestCase):
@@ -96,30 +96,30 @@ class ImportLoadLibs(unittest.TestCase):
         libs = libs.split(' ')
 
         # Get library name without full path and .so* suffix
-        libs = [os.path.basename(l).split('.so')[0] for l in libs \
-                if not l.startswith('-l') and not l.startswith('-L')]
+        libs = [os.path.basename(lib).split('.so')[0] for lib in libs \
+                if not lib.startswith('-l') and not lib.startswith('-L')]
 
         # Check that the loaded libraries are white listed
         bad_libs = []
         good_libs = []
         matched_re = []
-        for l in libs:
+        for lib in libs:
             matched = False
             for r in self.known_libs:
-                m = re.match(r, l)
+                m = re.match(r, lib)
                 if m:
-                    if m.group(0) == l:
+                    if m.group(0) == lib:
                         matched = True
-                        good_libs.append(l)
+                        good_libs.append(lib)
                         matched_re.append(r)
                         break
             if not matched:
-                bad_libs.append(l)
+                bad_libs.append(lib)
 
         if self.verbose:
             print('Found whitelisted libraries after importing ROOT with the shown regex match:')
-            for l, r in zip(good_libs, matched_re):
-                print(' - {} ({})'.format(l, r))
+            for lib, r in zip(good_libs, matched_re):
+                print(' - {} ({})'.format(lib, r))
             import sys
             sys.stdout.flush()
 

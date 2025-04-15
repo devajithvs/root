@@ -855,7 +855,6 @@ namespace cling {
   // Add the input to the memory buffer, parse it, and add it to the AST.
   IncrementalParser::EParseResult
   IncrementalParser::ParseInternal(llvm::StringRef input) {
-    llvm::errs() << "ParseInternal: " << input << "\n";
     if (input.empty()) return IncrementalParser::kSuccess;
 
     Sema& S = getCI()->getSema();
@@ -897,15 +896,9 @@ namespace cling {
     FileID FID;
     // Create FileEntry and FileID for the current buffer.
     // Enabling the completion point only works on FileEntries.
-    time_t FakeModTime = std::time(nullptr);
     FileEntryRef FE =
         SM.getFileManager().getVirtualFileRef(source_name.str(), InputSize,
-                                              FakeModTime /* mod time*/);
-    // Force creation of HeaderFileInfo for the virtual file.
-    // This ensures that when the virtual file is used as the includer,
-    // Clang will find a valid HeaderFileInfo.
-    m_CI->getPreprocessor().getHeaderSearchInfo().getFileInfo(FE);
-
+                                              0 /* mod time*/);
     SM.overrideFileContents(FE, std::move(MB));
     FID = SM.createFileID(FE, NewLoc, SrcMgr::C_User);
     if (CO.CodeCompletionOffset != -1) {
@@ -947,7 +940,6 @@ namespace cling {
     else if (Diags.getNumWarnings())
       return kSuccessWithWarnings;
 
-      llvm::errs() << "ParseInternal: done!\n";
     return kSuccess;
   }
 

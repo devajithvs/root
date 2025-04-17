@@ -14,6 +14,7 @@ if(NOT _adaptivecpp_build_type STREQUAL "" AND NOT _adaptivecpp_build_type STREQ
   set(EXTRA_BUILD_ARGS --config ${_adaptivecpp_build_type})
 endif()
 
+set(ADAPTIVE_CPP_SOURCE_DIR "/home/dvalapar/work/root/dev.adaptivecpp-proto/interpreter/cling/AdaptiveCpp")
 if(DEFINED ADAPTIVE_CPP_SOURCE_DIR)
   list(APPEND _adaptivecpp_settings SOURCE_DIR ${ADAPTIVE_CPP_SOURCE_DIR})
 else()

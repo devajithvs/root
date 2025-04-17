@@ -275,8 +275,6 @@ class ClassDefGenerateInitInstanceLocalInjector:
 /// associating as class title the comment string found right after the macro.
 #define _ClassDefBase_(name, id, virtual_keyword, overrd)                                                       \
 private:                                                                                                        \
-   static_assert(std::is_integral<decltype(id)>::value,                                                         \
-   "ClassDef(Inline) macro: the specified class version number is not an integer.");                            \
    /** \cond HIDDEN_SYMBOLS */ virtual_keyword Bool_t CheckTObjectHashConsistency() const overrd                \
    {                                                                                                            \
       static std::atomic<UChar_t> recurseBlocker(0);                                                            \

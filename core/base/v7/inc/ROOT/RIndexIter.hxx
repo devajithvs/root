@@ -17,6 +17,7 @@
 #define ROOT7_RIndexIter
 
 #include <iterator>
+#include <type_traits>
 
 namespace ROOT {
 namespace Experimental {

@@ -79,6 +79,8 @@ module std_expected [system] {
 }
 module std_filesystem [system] {
   header "filesystem"
+  // make sure the clock definition comes in together with <filesystem>
+  export std_private_chrono_file_clock
   export *
 }
 module std_format [system] {

@@ -191,6 +191,7 @@ inline Int_t TParameter<Bool_t>::Merge(TCollection *in)
 //
 // In case we are building with -fmodules, we need to forward declare the
 // specialization in order to compile the dictionary G__Core.cxx.
+#include <chrono> // ensures _FilesystemClock is defined
 template <> void TParameter<Long64_t>::Streamer(TBuffer &R__b);
 template<> TClass *TParameter<Long64_t>::Class();
 

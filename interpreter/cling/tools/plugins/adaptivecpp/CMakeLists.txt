@@ -14,13 +14,12 @@ if(NOT _adaptivecpp_build_type STREQUAL "" AND NOT _adaptivecpp_build_type STREQ
   set(EXTRA_BUILD_ARGS --config ${_adaptivecpp_build_type})
 endif()
 
-set(ADAPTIVE_CPP_SOURCE_DIR "/home/dvalapar/work/root/dev.adaptivecpp-proto/interpreter/cling/AdaptiveCpp")
 if(DEFINED ADAPTIVE_CPP_SOURCE_DIR)
   list(APPEND _adaptivecpp_settings SOURCE_DIR ${ADAPTIVE_CPP_SOURCE_DIR})
 else()
   list(APPEND _adaptivecpp_settings
     GIT_REPOSITORY https://github.com/devajithvs/AdaptiveCpp.git
-    GIT_TAG 3fb375fdc84ad0423139e05167739e9e906ca183
+    GIT_TAG fbc807e495cc86e1a4fd982c309742a05ecac2de
   )
 endif()
 

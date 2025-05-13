@@ -568,5 +568,7 @@ if(experimental_adaptivecpp)
   # endif()
 
   add_dependencies(clingInterpreter adaptivecpp)
+  cmake_policy(SET CMP0079 NEW)
+  target_link_libraries(clingInterpreter PUBLIC /home/dvalapar/work/root/dev.adaptivecpp-proto/builddir/etc/cling/lib/libacpp-rt.so)
   target_include_directories(clingInterpreter PRIVATE /home/dvalapar/work/root/dev.adaptivecpp-proto/builddir/etc/cling/include/AdaptiveCpp)
 endif()

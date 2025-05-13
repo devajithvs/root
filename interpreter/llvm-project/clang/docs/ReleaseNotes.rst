@@ -923,6 +923,7 @@ Bug Fixes in This Version
   signed char values (#GH102798).
 - Fix crash due to unknown references and pointer implementation and handling of
   base classes. (GH139452)
+- Fixed assertion failures when generating name lookup table in modules. (#GH61065, #GH134739)
 
 Bug Fixes to Compiler Builtins
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^

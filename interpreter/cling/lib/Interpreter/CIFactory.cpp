@@ -1400,10 +1400,9 @@ namespace {
     }
 
 #ifdef CLING_WITH_ADAPTIVECPP
+    llvm::errs() << "Header: " << "/home/dvalapar/work/root/dev.adaptivecpp-proto/builddir/etc/cling/include/AdaptiveCpp" << "\n";
     llvm::SmallString<256> adaptiveCppIncludePath(
-        ADAPTIVE_CPP_HEADER_INSTALL_PATH);
-    if (!llvm::sys::fs::exists(adaptiveCppIncludePath))
-      adaptiveCppIncludePath = ADAPTIVE_CPP_HEADER_BUILD_PATH;
+        "/home/dvalapar/work/root/dev.adaptivecpp-proto/builddir/etc/cling/include/AdaptiveCpp");
     argvCompile.push_back("-isystem");
     argvCompile.push_back(adaptiveCppIncludePath.c_str());
     argvCompile.push_back("-D__ACPP_ENABLE_LLVM_SSCP_TARGET__");

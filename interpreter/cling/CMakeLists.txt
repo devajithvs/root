@@ -485,76 +485,6 @@ if (TARGET clang-headers)
   list(APPEND LLVM_COMMON_DEPENDS clang-headers)
 endif()
 
-if(experimental_adaptivecpp)
-  set(HIPSYCL_NO_FIBERS ON)
-  set(WITH_OPENCL_BACKEND OFF)
-  set(WITH_LEVEL_ZERO_BACKEND OFF)
-
-  add_compile_definitions(CLING_WITH_ADAPTIVECPP)
-
-  # Use ADAPTIVE_CPP_SOURCE_DIR variable if it is defined in the CMake
-  # configuration
-  if(NOT DEFINED ADAPTIVE_CPP_SOURCE_DIR)
-    include(FetchContent)
-    set(ADAPTIVE_CPP_SOURCE_DIR "${CMAKE_BINARY_DIR}/AdaptiveCpp")
-    FetchContent_Declare(
-      AdaptiveCpp
-      GIT_REPOSITORY https://github.com/devajithvs/AdaptiveCpp.git
-      GIT_TAG 3fb375fdc84ad0423139e05167739e9e906ca183
-    )
-    FetchContent_GetProperties(AdaptiveCpp)
-    if(NOT AdaptiveCpp_POPULATED)
-      FetchContent_Populate(AdaptiveCpp)
-    endif()
-
-    set(ADAPTIVE_CPP_SOURCE_DIR "${adaptivecpp_SOURCE_DIR}")
-  endif()
-
-  list(INSERT CMAKE_MODULE_PATH 0 "${ADAPTIVE_CPP_SOURCE_DIR}/cmake/")
-
-  set(ADAPTIVE_CPP_HEADER_BUILD_PATH
-      "${CMAKE_CURRENT_BINARY_DIR}/include/AdaptiveCpp")
-  set(ADAPTIVE_CPP_HEADER_INSTALL_PATH
-      "${CMAKE_INSTALL_PREFIX}/include/AdaptiveCpp")
-
-  add_subdirectory(
-    ${ADAPTIVE_CPP_SOURCE_DIR}
-    ${adaptivecpp_BINARY_DIR}
-  )
-
-  set(ACPP_EXPORTS
-      acpp-common
-      acpp-rt
-      acpp-clang-cbs
-      acpp-clang
-      llvm-to-backend
-      llvm-to-host
-      rt-backend-omp)
-
-  if(WITH_CUDA_BACKEND)
-    list(APPEND ACPP_EXPORTS llvm-to-ptx rt-backend-cuda)
-  endif()
-
-  if(WITH_OPENCL_BACKEND)
-    list(APPEND ACPP_EXPORTS llvm-to-spirv rt-backend-ocl ocl-cxx-headers ocl-headers)
-  endif()
-
-  if(WITH_ROCM_BACKEND)
-    list(APPEND ACPP_EXPORTS llvm-to-amdgpu rt-backend-hip)
-  endif()
-
-  foreach(target IN LISTS ACPP_EXPORTS)
-    install(TARGETS ${target} EXPORT ClingTargets)
-  endforeach()
-
-  set_property(GLOBAL APPEND PROPERTY CLING_EXPORTS ${ACPP_EXPORTS})
-
-  if(TARGET intrinsics_gen)
-    add_dependencies(acpp-clang-cbs intrinsics_gen)
-    add_dependencies(llvm-to-backend intrinsics_gen)
-  endif()
-endif()
-
 add_subdirectory(include/cling/Interpreter)
 add_subdirectory(lib)
 
@@ -599,3 +529,44 @@ set(CLING_ORDER_FILE "" CACHE FILEPATH
   "Order file to use when compiling cling in order to improve startup time.")
 
 add_subdirectory(cmake/modules)
+
+if(experimental_adaptivecpp)
+  add_compile_definitions(CLING_WITH_ADAPTIVECPP)
+  add_subdirectory(tools/plugins/adaptivecpp)
+  list(INSERT CMAKE_MODULE_PATH 0 "${ADAPTIVE_CPP_SOURCE_DIR}/cmake/")
+
+  # set(ACPP_EXPORTS
+  #     acpp-common
+  #     acpp-rt
+  #     acpp-clang-cbs
+  #     acpp-clang
+  #     llvm-to-backend
+  #     llvm-to-host
+  #     rt-backend-omp)
+
+  # if(WITH_CUDA_BACKEND)
+  #   list(APPEND ACPP_EXPORTS llvm-to-ptx rt-backend-cuda)
+  # endif()
+
+  # if(WITH_OPENCL_BACKEND)
+  #   list(APPEND ACPP_EXPORTS llvm-to-spirv rt-backend-ocl ocl-cxx-headers ocl-headers)
+  # endif()
+
+  # if(WITH_ROCM_BACKEND)
+  #   list(APPEND ACPP_EXPORTS llvm-to-amdgpu rt-backend-hip)
+  # endif()
+
+  # foreach(target IN LISTS ACPP_EXPORTS)
+  #   install(TARGETS ${target} EXPORT ClingTargets)
+  # endforeach()
+
+  # set_property(GLOBAL APPEND PROPERTY CLING_EXPORTS ${ACPP_EXPORTS})
+
+  # if(TARGET intrinsics_gen)
+  #   add_dependencies(acpp-clang-cbs intrinsics_gen)
+  #   add_dependencies(llvm-to-backend intrinsics_gen)
+  # endif()
+
+  add_dependencies(clingInterpreter adaptivecpp)
+  target_include_directories(clingInterpreter PRIVATE /home/dvalapar/work/root/dev.adaptivecpp-proto/builddir/etc/cling/include/AdaptiveCpp)
+endif()

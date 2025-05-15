@@ -491,6 +491,7 @@ if(experimental_adaptivecpp)
   set(WITH_LEVEL_ZERO_BACKEND OFF)
 
   add_compile_definitions(CLING_WITH_ADAPTIVECPP)
+  set(ADAPTIVE_CPP_SOURCE_DIR "/home/dvalapar/work/root/dev.adaptivecpp-proto/interpreter/cling/AdaptiveCpp")
 
   # Use ADAPTIVE_CPP_SOURCE_DIR variable if it is defined in the CMake
   # configuration

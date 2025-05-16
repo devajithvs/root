@@ -23,9 +23,9 @@ set(LIBS
   clangLex
 )
 
-if(experimental_adaptivecpp)
-  list(APPEND LIBS acpp-clang acpp-rt)
-endif()
+# if(experimental_adaptivecpp)
+#   list(APPEND LIBS acpp-frontend acpp-rt)
+# endif()
 
 set(LLVM_LINK_COMPONENTS
   analysis

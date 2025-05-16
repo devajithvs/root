@@ -28,12 +28,14 @@
 #include "llvm/Transforms/IPO/Inliner.h"
 #include "llvm/Transforms/Scalar.h"
 #include "llvm/Transforms/Utils.h"
+#include "clang/Frontend/FrontendPluginRegistry.h"
 
-#ifdef CLING_WITH_ADAPTIVECPP
-#include "hipSYCL/compiler/GlobalsPruningPass.hpp"
-#include "hipSYCL/compiler/SMCPCompatPass.hpp"
-#include "hipSYCL/compiler/sscp/TargetSeparationPass.hpp"
-#endif
+
+// #ifdef CLING_WITH_ADAPTIVECPP
+// #include "hipSYCL/compiler/GlobalsPruningPass.hpp"
+// #include "hipSYCL/compiler/SMCPCompatPass.hpp"
+// #include "hipSYCL/compiler/sscp/TargetSeparationPass.hpp"
+// #endif
 
 //#include "clang/Basic/LangOptions.h"
 //#include "clang/Basic/TargetOptions.h"
@@ -517,25 +519,34 @@ void BackendPasses::CreatePasses(int OptLevel, llvm::ModulePassManager& MPM,
   std::optional<PGOOptions> PGOOpt;
   PassBuilder PB(&m_TM, PTO, PGOOpt, &PIC);
 
-#ifdef CLING_WITH_ADAPTIVECPP
-  PB.registerOptimizerLastEPCallback(
-      [](llvm::ModulePassManager& MPM, OptimizationLevel) {
-        MPM.addPass(hipsycl::compiler::SMCPCompatPass{});
-        MPM.addPass(hipsycl::compiler::GlobalsPruningPass{});
-      });
+// #ifdef CLING_WITH_ADAPTIVECPP
+//   PB.registerOptimizerLastEPCallback(
+//       [](llvm::ModulePassManager& MPM, OptimizationLevel) {
+//         MPM.addPass(hipsycl::compiler::SMCPCompatPass{});
+//         MPM.addPass(hipsycl::compiler::GlobalsPruningPass{});
+//       });
 
-  PB.registerPipelineStartEPCallback(
-      [&](llvm::ModulePassManager& MPM, OptimizationLevel Level) {
-        MPM.addPass(hipsycl::compiler::TargetSeparationPass{""});
-      });
-#endif
+//   PB.registerPipelineStartEPCallback(
+//       [&](llvm::ModulePassManager& MPM, OptimizationLevel Level) {
+//         MPM.addPass(hipsycl::compiler::TargetSeparationPass{"", false});
+//       });
+// #endif
 
+for (const auto &Plugin : clang::FrontendPluginRegistry::entries()) {
+  llvm::errs() << "Plugin name: " << Plugin.getName() << "\n";
+  llvm::errs() << "Description: " << Plugin.getDesc() << "\n";
+}
   // Attempt to load pass plugins and register their callbacks with PB.
   for (auto& PluginFN : m_CGOpts.PassPlugins) {
     auto PassPlugin = PassPlugin::Load(PluginFN);
     if (PassPlugin) {
       PassPlugin->registerPassBuilderCallbacks(PB);
     }
+  }
+
+  for (const auto &Plugin : clang::FrontendPluginRegistry::entries()) {
+    llvm::errs() << "Plugin name: " << Plugin.getName() << "\n";
+    llvm::errs() << "Description: " << Plugin.getDesc() << "\n";
   }
 
   if (!m_CGOpts.DisableLLVMPasses) {
@@ -564,7 +575,7 @@ void BackendPasses::CreatePasses(int OptLevel, llvm::ModulePassManager& MPM,
   PB.crossRegisterProxies(LAM, FAM, CGAM, MAM);
 }
 
-void BackendPasses::runOnModule(Module& M, int OptLevel) {
+void BackendPasses::runOnModule(llvm::Module& M, int OptLevel) {
 
   if (OptLevel < 0)
     OptLevel = 0;

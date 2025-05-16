@@ -115,6 +115,23 @@ if (clad)
     add_dependencies(clang clad)
     target_link_libraries(clang PUBLIC ${CLING_PLUGIN_LINK_LIBS})
   endif()
+    # add_dependencies(clang  adaptivecpp)
+    # target_link_libraries(clang PUBLIC adaptivecpp)
+    
+endif()
+
+if (experimental_adaptivecpp)
+  set(ACPP_LINK_LIBS -Wl,--whole-archive adaptivecppPlugin)
+  # This will cause a cyclic dependency in adaptiveCpp, as it requires clang to build
+  if(TARGET clang AND NOT experimental_adaptivecpp)
+    # Link our clad libraries to clang. If users use the clang from ROOT they will
+    # also be able to use clad out of the box.
+    add_dependencies(clang clad)
+    target_link_libraries(clang PUBLIC ${ACPP_LINK_LIBS})
+  endif()
+    # add_dependencies(clang  adaptivecpp)
+    # target_link_libraries(clang PUBLIC adaptivecpp)
+    
 endif()
 
 ROOT_LINKER_LIBRARY(Cling
@@ -122,7 +139,8 @@ ROOT_LINKER_LIBRARY(Cling
         $<TARGET_OBJECTS:Dictgen>
         $<TARGET_OBJECTS:MetaCling>
         $<TARGET_OBJECTS:clangCppInterOp>
-        LIBRARIES ${CLING_LIBRARIES} ${LINK_LIBS} ${CLING_PLUGIN_LINK_LIBS})
+        # $<TARGET_OBJECTS:acpp-frontend>
+        LIBRARIES ${CLING_LIBRARIES} ${LINK_LIBS} ${CLING_PLUGIN_LINK_LIBS} ${ACPP_LINK_LIBS})
 
 # When these two link at the same time, they can exhaust the RAM on many machines, since they both link against llvm.
 add_dependencies(Cling rootcling_stage1)

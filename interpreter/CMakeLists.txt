@@ -60,7 +60,7 @@ endif()
 
 # will be set again in case NOT builtin_llvm
 set(LLVM_DIR "${CMAKE_CURRENT_BINARY_DIR}/llvm-project/llvm")
-if (clad)
+if (clad OR experimental_adaptivecpp)
   set(CLING_BUILD_PLUGINS ON)
 endif()
 
@@ -523,6 +523,19 @@ else()
   set(CLING_DEPEND_LIBS ${link_libs} CACHE STRING "")
 endif(builtin_cling)
 
+set(hipSYCL_VERSION "git")
+list(INSERT CMAKE_MODULE_PATH 0 "${ADAPTIVE_CPP_SOURCE_DIR}/cmake/")
+set(LLVM_ADAPTIVECPP_LINK_INTO_TOOLS "ON")
+
+
+include_directories("/home/dvalapar/work/root/dev.adaptivecpp-proto/builddir/interpreter/cling/AdaptiveCpp/include")
+include_directories("/home/dvalapar/work/root/dev.adaptivecpp-proto/interpreter/llvm-project/llvm/include")
+include_directories("/home/dvalapar/work/root/dev.adaptivecpp-proto/builddir/interpreter/llvm-project/llvm/include")
+message(WARNING "Path to llvm/include: ${LLVM_INCLUDE_DIR}")
+include_directories(/home/dvalapar/work/root/dev.adaptivecpp-proto/interpreter/llvm-project/clang/include)
+include_directories(/home/dvalapar/work/root/dev.adaptivecpp-proto/builddir/interpreter/llvm-project/llvm/tools/clang/include)
+
+add_subdirectory(/home/dvalapar/work/root/dev.adaptivecpp-proto/interpreter/cling/AdaptiveCpp)
 
 
 #---Avoid to dependencies to system (e.g. atomic) libraries without modifying the LLVM code----------

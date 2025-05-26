@@ -214,6 +214,13 @@ if(builtin_llvm)
 
   set(LLVM_ENABLE_PROJECTS "clang" CACHE STRING "")
 
+  if(experimental_adaptivecpp)
+    # Register AdaptiveCpp as an external project
+    set(LLVM_EXTERNAL_PROJECTS "AdaptiveCpp" CACHE STRING "")
+    set(LLVM_EXTERNAL_ADAPTIVECPP_SOURCE_DIR "${ADAPTIVE_CPP_SOURCE_DIR}" CACHE STRING "")
+    set(LLVM_ADAPTIVECPP_LINK_INTO_TOOLS ON CACHE BOOL "") # To force-link the plugin into clang
+  endif()
+
   # Always build LLVM with C++17. It is not necessary to compile with the same
   # C++ standard as the rest of ROOT and sometimes it doesn't even work.
   set(_cxx_standard ${CMAKE_CXX_STANDARD})
@@ -410,6 +417,9 @@ if (builtin_clang)
     ${CLANG_BINARY_DIR}/include
     CACHE STRING "Clang include directories.")
   set(CLANG_CMAKE_DIR "${CMAKE_BINARY_DIR}/lib${LLVM_LIBDIR_SUFFIX}/cmake/clang/")
+  set(CLANG_EXECUTABLE_PATH
+  "${LLVM_BINARY_DIR}/bin/clang${CMAKE_EXECUTABLE_SUFFIX}"
+  CACHE STRING "Path to just‐built clang (if builtin_clang).")
 else()
   find_package(Clang REQUIRED CONFIG)
   message(STATUS "Found Clang ${CLANG_PACKAGE_VERSION} in ${CLANG_CMAKE_DIR}")

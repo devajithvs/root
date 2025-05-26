@@ -214,6 +214,12 @@ if(builtin_llvm)
 
   set(LLVM_ENABLE_PROJECTS "clang" CACHE STRING "")
 
+  # Register AdaptiveCpp as an external project
+  set(LLVM_EXTERNAL_PROJECTS "AdaptiveCpp" CACHE STRING "")
+  set(LLVM_EXTERNAL_ADAPTIVECPP_SOURCE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/AdaptiveCpp" CACHE STRING "")
+  set(LLVM_ADAPTIVECPP_LINK_INTO_TOOLS ON CACHE BOOL "") # To force-link the plugin into clang
+  message(WARNING "AdaptiveCpp is being built")
+
   # Always build LLVM with C++17. It is not necessary to compile with the same
   # C++ standard as the rest of ROOT and sometimes it doesn't even work.
   set(_cxx_standard ${CMAKE_CXX_STANDARD})

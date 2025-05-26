@@ -23,6 +23,8 @@ set(LIBS
   clangLex
 )
 
+list(APPEND LIBS acpp-rt)
+
 set(LLVM_LINK_COMPONENTS
   analysis
   core
@@ -105,9 +107,11 @@ add_cling_library(clingInterpreter OBJECT
   ${CLING_DEPENDS}
 
   LINK_LIBS
+  AdaptiveCpp
   ${LIBS}
   ${CMAKE_DL_LIBS}
   )
+target_link_libraries(clingInterpreter PRIVATE AdaptiveCpp)
 
 
 if (UNIX)

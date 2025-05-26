@@ -10,7 +10,7 @@
     ROOT_EXECUTABLE(testGenvectorSYCL testGenVectorSYCL.cxx) # LIBRARIES GenVectorSYCL)
 
     target_link_libraries(testGenvectorSYCL PUBLIC GenVectorSYCL )
-   
+
     add_sycl_to_target(TARGET testGenvectorSYCL SOURCES testGenVectorSYCL.cxx)
     target_link_libraries(testGenvectorSYCL INTERFACE GenVectorSYCL AdaptiveCpp::acpp-rt)
     target_compile_options(testGenvectorSYCL PUBLIC ${SYCL_COMPILER_FLAGS})

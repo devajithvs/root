@@ -25,6 +25,16 @@ set(LIBS
 
 list(APPEND LIBS acpp-rt)
 
+set(ACPP_EXPORTS
+   acpp-rt
+   acpp-common
+   llvm-to-backend
+   llvm-to-host)
+
+foreach(target IN LISTS ACPP_EXPORTS)
+   install(TARGETS ${target} EXPORT ClingTargets)
+endforeach()
+
 set(LLVM_LINK_COMPONENTS
   analysis
   core

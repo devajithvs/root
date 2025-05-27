@@ -220,6 +220,16 @@ if(builtin_llvm)
   set(LLVM_ADAPTIVECPP_LINK_INTO_TOOLS ON CACHE BOOL "") # To force-link the plugin into clang
   message(WARNING "AdaptiveCpp is being built")
 
+  add_custom_target(install-adaptivecpp
+  COMMAND ${CMAKE_COMMAND} --install
+          ${CMAKE_BINARY_DIR}/interpreter/llvm-project/llvm/tools/AdaptiveCpp
+          --prefix ${CMAKE_BINARY_DIR}/interpreter/llvm-project/llvm/tools/AdaptiveCpp/acpp-build
+  COMMENT "Installing AdaptiveCpp runtime and CMake package"
+  DEPENDS clang llvm-to-host-tool libkernel-sscp-spirv libkernel-sscp-host libkernel-sscp-host-fast acpp-hcf-tool acpp-appdb-tool acpp-frontend acpp-info acpp-pcuda-pp
+  USES_TERMINAL)
+
+  # add_dependencies(install install-adaptivecpp)
+
   # Always build LLVM with C++17. It is not necessary to compile with the same
   # C++ standard as the rest of ROOT and sometimes it doesn't even work.
   set(_cxx_standard ${CMAKE_CXX_STANDARD})
@@ -416,6 +426,9 @@ if (builtin_clang)
     ${CLANG_BINARY_DIR}/include
     CACHE STRING "Clang include directories.")
   set(CLANG_CMAKE_DIR "${CMAKE_BINARY_DIR}/lib${LLVM_LIBDIR_SUFFIX}/cmake/clang/")
+  set(CLANG_EXECUTABLE_PATH
+  "${LLVM_BINARY_DIR}/bin/clang${CMAKE_EXECUTABLE_SUFFIX}"
+  CACHE STRING "Path to just‐built clang (if builtin_clang).")
 else()
   find_package(Clang REQUIRED CONFIG)
   message(STATUS "Found Clang ${CLANG_PACKAGE_VERSION} in ${CLANG_CMAKE_DIR}")

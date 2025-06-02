@@ -108,7 +108,7 @@ if (clad)
   else()
     set(CLING_PLUGIN_LINK_LIBS -Wl,--whole-archive cladPlugin cladDifferentiator -Wl,--no-whole-archive)
   endif()
-  if(TARGET clang)
+  if(TARGET clang AND NOT experimental_adaptivecpp)
     # Link our clad libraries to clang. If users use the clang from ROOT they will
     # also be able to use clad out of the box.
     add_dependencies(clang clad)
@@ -116,12 +116,14 @@ if (clad)
   endif()
 endif()
 
+set(ACPP_PLUGIN_LINK_LIBS -Wl,--whole-archive acpp-frontend AdaptiveCpp -Wl,--no-whole-archive)
+
 ROOT_LINKER_LIBRARY(Cling
         $<TARGET_OBJECTS:ClingUtils>
         $<TARGET_OBJECTS:Dictgen>
         $<TARGET_OBJECTS:MetaCling>
         $<TARGET_OBJECTS:clangCppInterOp>
-        LIBRARIES ${CLING_LIBRARIES} ${LINK_LIBS} ${CLING_PLUGIN_LINK_LIBS})
+        LIBRARIES ${ACPP_PLUGIN_LINK_LIBS} ${CLING_LIBRARIES} ${LINK_LIBS} ${CLING_PLUGIN_LINK_LIBS})
 
 # When these two link at the same time, they can exhaust the RAM on many machines, since they both link against llvm.
 add_dependencies(Cling rootcling_stage1)

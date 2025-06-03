@@ -56,6 +56,16 @@ add_sycl_to_target(
     src/VectorUtil.cxx
 )
 
+set(ACPP_EXPORTS acpp-rt acpp-common)
+
+foreach(target IN LISTS ACPP_EXPORTS)
+   install(TARGETS ${target} EXPORT ROOTExports)
+endforeach()
+
+target_include_directories(GenVectorSYCL SYSTEM PUBLIC
+  $<BUILD_INTERFACE:${ADAPTIVE_CPP_BINARY_DIR}/include/AdaptiveCpp>
+  $<INSTALL_INTERFACE:include/AdaptiveCpp>)
+
 target_link_libraries(GenVectorSYCL INTERFACE AdaptiveCpp::acpp-rt)
 target_compile_options(GenVectorSYCL PUBLIC ${SYCL_COMPILER_FLAGS})
 target_compile_definitions(GenVectorSYCL PUBLIC ROOT_MATH_SYCL)

@@ -6,7 +6,7 @@ if (NOT DEFINED ADAPTIVE_CPP_SOURCE_DIR)
     FetchContent_Declare(
         AdaptiveCpp
         GIT_REPOSITORY https://github.com/devajithvs/AdaptiveCpp.git
-        GIT_TAG ddb346a95f3a85ffca302ba62bb07c2a0a3bcb10
+        GIT_TAG f6cc28db2ac363546a2176047dfee153801ca062
     )
     FetchContent_GetProperties(AdaptiveCpp)
     if(NOT AdaptiveCpp_POPULATED)
@@ -26,7 +26,7 @@ CACHE STRING "Path to just‐built clang (if builtin_clang).")
 
 # Standard path for LLVM external projects
 set(ADAPTIVE_CPP_BINARY_DIR "${LLVM_BINARY_DIR}/tools/AdaptiveCpp")
-message(STATUS "AdaptiveCpp will be built in: ${ADAPTIVE_CPP_TOOLS_DIR}")
+message(STATUS "AdaptiveCpp will be built in: ${ADAPTIVE_CPP_BINARY_DIR}")
 
 list(APPEND CMAKE_PREFIX_PATH "${ADAPTIVE_CPP_BINARY_DIR}")
 message(STATUS "Added ${ADAPTIVE_CPP_BINARY_DIR} to CMAKE_PREFIX_PATH.")
@@ -70,7 +70,7 @@ set_target_properties(AdaptiveCpp::acpp-common PROPERTIES
 # Import target "AdaptiveCpp::acpp-rt" for configuration "Release"
 set_property(TARGET AdaptiveCpp::acpp-rt APPEND PROPERTY IMPORTED_CONFIGURATIONS RELEASE)
 set_target_properties(AdaptiveCpp::acpp-rt PROPERTIES
-  IMPORTED_LOCATION_RELEASE "${LLVM_BINARY_DIR}/lib/libacpp-rt.so"
+  IMPORTED_LOCATION_RELEASE "${ADAPTIVE_CPP_BINARY_DIR}/lib/libacpp-rt.so"
   IMPORTED_SONAME_RELEASE "libacpp-rt.so"
   )
 

@@ -44,25 +44,11 @@ set(ADAPTIVECPP_INSTALL_COMPILER_DIR "${ADAPTIVE_CPP_BINARY_DIR}/bin")
 set(ADAPTIVECPP_INSTALL_LAUNCHER_DIR "${ADAPTIVE_CPP_SOURCE_DIR}/cmake")
 set(ADAPTIVECPP_INSTALL_LAUNCHER_RULE_DIR "${ADAPTIVE_CPP_SOURCE_DIR}/cmake")
 
-# Make a config file to make this usable as a CMake Package
-# Start by adding the version in a CMake understandable way
-include(CMakePackageConfigHelpers)
-
-configure_package_config_file(
-    ${ADAPTIVE_CPP_SOURCE_DIR}/cmake/adaptivecpp-config.cmake.in
-    ${ADAPTIVE_CPP_BINARY_DIR}/adaptivecpp-config.cmake
-    INSTALL_DESTINATION ${ADAPTIVECPP_INSTALL_CMAKE_DIR}
-    PATH_VARS
-    ADAPTIVECPP_INSTALL_COMPILER_DIR
-    ADAPTIVECPP_INSTALL_LAUNCHER_DIR
-    ADAPTIVECPP_INSTALL_LAUNCHER_RULE_DIR
-)
-
 # Create imported target AdaptiveCpp::acpp-common
 add_library(AdaptiveCpp::acpp-common STATIC IMPORTED)
 
 set_target_properties(AdaptiveCpp::acpp-common PROPERTIES
-  INTERFACE_INCLUDE_DIRECTORIES "${ADAPTIVE_CPP_SOURCE_DIR}/include"
+  INTERFACE_INCLUDE_DIRECTORIES "${ADAPTIVE_CPP_BINARY_DIR}/include;${ADAPTIVE_CPP_BINARY_DIR}/include/AdaptiveCpp"
   INTERFACE_LINK_LIBRARIES "-Wl,-Bsymbolic-functions;\$<LINK_ONLY:dl>"
 )
 
@@ -70,7 +56,7 @@ set_target_properties(AdaptiveCpp::acpp-common PROPERTIES
 add_library(AdaptiveCpp::acpp-rt SHARED IMPORTED)
 
 set_target_properties(AdaptiveCpp::acpp-rt PROPERTIES
-  INTERFACE_INCLUDE_DIRECTORIES "${ADAPTIVE_CPP_SOURCE_DIR}/include"
+  INTERFACE_INCLUDE_DIRECTORIES "${ADAPTIVE_CPP_BINARY_DIR}/include;${ADAPTIVE_CPP_BINARY_DIR}/include/AdaptiveCpp"
   INTERFACE_LINK_LIBRARIES "AdaptiveCpp::acpp-common"
 )
 
@@ -92,3 +78,17 @@ set(AdaptiveCpp_INCLUDE_DIRS
   "${ADAPTIVE_CPP_SOURCE_DIR}/include"
   "${ADAPTIVE_CPP_BINARY_DIR}/include/AdaptiveCpp" # For build-generated headers, if any
   CACHE STRING "Include directories for AdaptiveCpp" FORCE)
+
+# Make a config file to make this usable as a CMake Package
+# Start by adding the version in a CMake understandable way
+include(CMakePackageConfigHelpers)
+
+configure_package_config_file(
+    ${ADAPTIVE_CPP_SOURCE_DIR}/cmake/adaptivecpp-config.cmake.in
+    ${ADAPTIVE_CPP_BINARY_DIR}/adaptivecpp-config.cmake
+    INSTALL_DESTINATION ${ADAPTIVECPP_INSTALL_CMAKE_DIR}
+    PATH_VARS
+    ADAPTIVECPP_INSTALL_COMPILER_DIR
+    ADAPTIVECPP_INSTALL_LAUNCHER_DIR
+    ADAPTIVECPP_INSTALL_LAUNCHER_RULE_DIR
+)

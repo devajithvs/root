@@ -62,6 +62,8 @@ foreach(target IN LISTS ACPP_EXPORTS)
    install(TARGETS ${target} EXPORT ROOTExports)
 endforeach()
 
+target_link_libraries(GenVectorSYCL PUBLIC m stdc++)
+
 target_include_directories(GenVectorSYCL SYSTEM PUBLIC
   $<BUILD_INTERFACE:${ADAPTIVE_CPP_BINARY_DIR}/include/AdaptiveCpp>
   $<INSTALL_INTERFACE:include/AdaptiveCpp>)

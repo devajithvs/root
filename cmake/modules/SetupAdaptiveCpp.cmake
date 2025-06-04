@@ -6,7 +6,7 @@ if (NOT DEFINED ADAPTIVE_CPP_SOURCE_DIR)
     FetchContent_Declare(
         AdaptiveCpp
         GIT_REPOSITORY https://github.com/devajithvs/AdaptiveCpp.git
-        GIT_TAG f6cc28db2ac363546a2176047dfee153801ca062
+        GIT_TAG 867536b9d5085f658406855f0b22a436c818305b
     )
     FetchContent_GetProperties(AdaptiveCpp)
     if(NOT AdaptiveCpp_POPULATED)
@@ -64,7 +64,7 @@ set_target_properties(AdaptiveCpp::acpp-rt PROPERTIES
 set_property(TARGET AdaptiveCpp::acpp-common APPEND PROPERTY IMPORTED_CONFIGURATIONS RELEASE)
 set_target_properties(AdaptiveCpp::acpp-common PROPERTIES
   IMPORTED_LINK_INTERFACE_LANGUAGES_RELEASE "CXX"
-  IMPORTED_LOCATION_RELEASE "${LLVM_BINARY_DIR}/lib/libacpp-common.a"
+  IMPORTED_LOCATION_RELEASE "${ADAPTIVE_CPP_BINARY_DIR}/lib/libacpp-common.a"
   )
 
 # Import target "AdaptiveCpp::acpp-rt" for configuration "Release"
@@ -73,11 +73,6 @@ set_target_properties(AdaptiveCpp::acpp-rt PROPERTIES
   IMPORTED_LOCATION_RELEASE "${ADAPTIVE_CPP_BINARY_DIR}/lib/libacpp-rt.so"
   IMPORTED_SONAME_RELEASE "libacpp-rt.so"
   )
-
-set(AdaptiveCpp_INCLUDE_DIRS
-  "${ADAPTIVE_CPP_SOURCE_DIR}/include"
-  "${ADAPTIVE_CPP_BINARY_DIR}/include/AdaptiveCpp" # For build-generated headers, if any
-  CACHE STRING "Include directories for AdaptiveCpp" FORCE)
 
 # Make a config file to make this usable as a CMake Package
 # Start by adding the version in a CMake understandable way

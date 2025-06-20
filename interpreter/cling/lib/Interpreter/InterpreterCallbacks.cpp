@@ -100,6 +100,18 @@ namespace cling {
       return m_Source->GetExternalCXXCtorInitializers(Offset);
     }
 
+    virtual bool LoadExternalSpecializations(
+        const Decl *D, bool OnlyPartial) override {
+                return m_Source->LoadExternalSpecializations(D, OnlyPartial);
+
+    }
+
+    virtual bool LoadExternalSpecializations(
+        const Decl *D, ArrayRef<TemplateArgument> TemplateArgs) override {
+                    return m_Source->LoadExternalSpecializations(D, TemplateArgs);
+
+    }
+
     virtual CXXBaseSpecifier*
     GetExternalCXXBaseSpecifiers(uint64_t Offset) override {
       return m_Source->GetExternalCXXBaseSpecifiers(Offset);

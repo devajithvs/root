@@ -602,7 +602,8 @@ namespace cling {
     // llvm::Module cannot contain:
     // * variables and parameters with dependent context;
     // * mangled names for parameters;
-    if (!isa<ParmVarDecl>(VD) && !VD->getDeclContext()->isDependentContext()) {
+    if (!isa<ParmVarDecl>(VD) && !VD->getDeclContext()->isDependentContext() &&
+        VD->getIdentifier()) {
       // Cleanup the module if the transaction was committed and code was
       // generated. This has to go first, because it may need the AST
       // information which we will remove soon. (Eg. mangleDeclName iterates the

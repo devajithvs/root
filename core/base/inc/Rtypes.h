@@ -202,9 +202,6 @@ typedef std::atomic<TClass*> atomic_TClass_ptr;
 #include "TIsAProxy.h"
 #include <string>
 
-class testClass;
-static_assert(std::is_copy_assignable_v<testClass*>, "Should be copy-assignable");
-
 namespace ROOT { namespace Internal {
 
 class TCDGIILIBase {
@@ -280,17 +277,16 @@ class ClassDefGenerateInitInstanceLocalInjector:
 private:                                                                                                        \
    /** \cond HIDDEN_SYMBOLS */ virtual_keyword Bool_t CheckTObjectHashConsistency() const overrd                \
    {                                                                                                            \
-      static UChar_t localVal = 0;                                                                              \
-      if (R__likely(localVal >= 2)) {                                                                           \
+      static std::atomic<UChar_t> recurseBlocker(0);                                                            \
+      if (R__likely(recurseBlocker >= 2)) {                                                                     \
          return ::ROOT::Internal::THashConsistencyHolder<decltype(*this)>::fgHashConsistency;                   \
-      } else if (localVal == 1) {                                                                               \
+      } else if (recurseBlocker == 1) {                                                                         \
          return false;                                                                                          \
-      } else if (localVal == 0) {                                                                               \
-         localVal = 1;                                                                                          \
+      } else if (recurseBlocker++ == 0) {                                                                       \
          ::ROOT::Internal::THashConsistencyHolder<decltype(*this)>::fgHashConsistency =                         \
             ::ROOT::Internal::HasConsistentHashMember(_QUOTE_(name)) ||                                         \
             ::ROOT::Internal::HasConsistentHashMember(*IsA());                                                  \
-            localVal = 2;                                                                                       \
+         ++recurseBlocker;                                                                                      \
          return ::ROOT::Internal::THashConsistencyHolder<decltype(*this)>::fgHashConsistency;                   \
       }                                                                                                         \
       return false; /* unreachable */                                                                           \

@@ -319,18 +319,6 @@ void Sema::inferLifetimeCaptureByAttribute(FunctionDecl *FD) {
   Annotate(MD);
 }
 
-void Sema::inferNullableClassAttribute(CXXRecordDecl *CRD) {
-  static const llvm::StringSet<> Nullable{
-      "auto_ptr",         "shared_ptr", "unique_ptr",         "exception_ptr",
-      "coroutine_handle", "function",   "move_only_function",
-  };
-
-  if (CRD->isInStdNamespace() && Nullable.count(CRD->getName()) &&
-      !CRD->hasAttr<TypeNullableAttr>())
-    for (Decl *Redecl : CRD->redecls())
-      Redecl->addAttr(TypeNullableAttr::CreateImplicit(Context));
-}
-
 void Sema::ActOnPragmaOptionsAlign(PragmaOptionsAlignKind Kind,
                                    SourceLocation PragmaLoc) {
   PragmaMsStackAction Action = Sema::PSK_Reset;

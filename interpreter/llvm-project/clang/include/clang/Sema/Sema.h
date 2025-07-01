@@ -1780,9 +1780,6 @@ public:
   // do this lazily instead of processing while parsing the annotation itself.
   void LazyProcessLifetimeCaptureByParams(FunctionDecl *FD);
 
-  /// Add _Nullable attributes for std:: types.
-  void inferNullableClassAttribute(CXXRecordDecl *CRD);
-
   enum PragmaOptionsAlignKind {
     POAK_Native,  // #pragma options align=native
     POAK_Natural, // #pragma options align=natural

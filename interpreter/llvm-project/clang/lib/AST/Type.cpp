@@ -4811,10 +4811,7 @@ bool Type::canHaveNullability(bool ResultIfUnknown) const {
                 ->getTemplateName()
                 .getAsTemplateDecl())
       if (auto *CTD = dyn_cast<ClassTemplateDecl>(templateDecl))
-        return llvm::any_of(
-            CTD->redecls(), [](const RedeclarableTemplateDecl *RTD) {
-              return RTD->getTemplatedDecl()->hasAttr<TypeNullableAttr>();
-            });
+        return false;
     return ResultIfUnknown;
 
   case Type::Builtin:
@@ -4876,21 +4873,6 @@ bool Type::canHaveNullability(bool ResultIfUnknown) const {
     }
     llvm_unreachable("unknown builtin type");
 
-  case Type::Record: {
-    const RecordDecl *RD = cast<RecordType>(type)->getDecl();
-    // For template specializations, look only at primary template attributes.
-    // This is a consistent regardless of whether the instantiation is known.
-    if (const auto *CTSD = dyn_cast<ClassTemplateSpecializationDecl>(RD))
-      return llvm::any_of(
-          CTSD->getSpecializedTemplate()->redecls(),
-          [](const RedeclarableTemplateDecl *RTD) {
-            return RTD->getTemplatedDecl()->hasAttr<TypeNullableAttr>();
-          });
-    return llvm::any_of(RD->redecls(), [](const TagDecl *RD) {
-      return RD->hasAttr<TypeNullableAttr>();
-    });
-  }
-
   // Non-pointer types.
   case Type::Complex:
   case Type::LValueReference:
@@ -4908,6 +4890,7 @@ bool Type::canHaveNullability(bool ResultIfUnknown) const {
   case Type::DependentAddressSpace:
   case Type::FunctionProto:
   case Type::FunctionNoProto:
+  case Type::Record:
   case Type::DeducedTemplateSpecialization:
   case Type::Enum:
   case Type::InjectedClassName:

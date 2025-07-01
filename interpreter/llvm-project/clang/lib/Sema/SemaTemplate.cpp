@@ -2188,7 +2188,6 @@ DeclResult Sema::CheckClassTemplate(
 
   AddPushedVisibilityAttribute(NewClass);
   inferGslOwnerPointerAttribute(NewClass);
-  inferNullableClassAttribute(NewClass);
 
   if (TUK != TagUseKind::Friend) {
     // Per C++ [basic.scope.temp]p2, skip the template parameter scopes.

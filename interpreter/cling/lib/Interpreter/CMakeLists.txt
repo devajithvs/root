@@ -21,6 +21,7 @@ set(LIBS
   clangAST
   clangBasic
   clangLex
+  clangInterpreter
 )
 
 set(LLVM_LINK_COMPONENTS

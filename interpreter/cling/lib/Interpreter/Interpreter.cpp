@@ -57,6 +57,12 @@
 #include "clang/Sema/Sema.h"
 #include "clang/Sema/SemaDiagnostic.h"
 
+#include "clang/Interpreter/Interpreter.h"
+#include "clang/Frontend/ASTUnit.h"
+#include "clang/AST/DeclLookups.h"
+#include "clang/Frontend/FrontendActions.h"
+#include "clang/AST/ASTImporter.h"
+
 #include "llvm/IR/LLVMContext.h"
 #include "llvm/IR/Module.h"
 #include "llvm/Support/Path.h"
@@ -95,6 +101,144 @@ namespace {
 } // unnamed namespace
 
 namespace cling {
+
+  class IncrementalSyntaxOnlyAction : public clang::SyntaxOnlyAction {
+  const CompilerInstance *ParentCI;
+
+  public:
+    IncrementalSyntaxOnlyAction(const CompilerInstance *ParentCI)
+        : ParentCI(ParentCI) {}
+
+  protected:
+    void ExecuteAction() override;
+  };
+
+  class ExternalSource : public clang::ExternalASTSource {
+    TranslationUnitDecl *ChildTUDeclCtxt;
+    ASTContext &ParentASTCtxt;
+    TranslationUnitDecl *ParentTUDeclCtxt;
+
+    std::unique_ptr<ASTImporter> Importer;
+
+  public:
+    ExternalSource(ASTContext &ChildASTCtxt, FileManager &ChildFM,
+                  ASTContext &ParentASTCtxt, FileManager &ParentFM);
+    bool FindExternalVisibleDeclsByName(const DeclContext *DC,
+                                        DeclarationName Name) override;
+    void
+    completeVisibleDeclsMap(const clang::DeclContext *childDeclContext) override;
+  };
+
+  // This method is intended to set up `ExternalASTSource` to the running
+  // compiler instance before the super `ExecuteAction` triggers parsing
+  void IncrementalSyntaxOnlyAction::ExecuteAction() {
+    CompilerInstance &CI = getCompilerInstance();
+    ExternalSource *myExternalSource =
+        new ExternalSource(CI.getASTContext(), CI.getFileManager(),
+                          ParentCI->getASTContext(), ParentCI->getFileManager());
+    llvm::IntrusiveRefCntPtr<clang::ExternalASTSource> astContextExternalSource(
+        myExternalSource);
+    CI.getASTContext().setExternalSource(astContextExternalSource);
+    CI.getASTContext().getTranslationUnitDecl()->setHasExternalVisibleStorage(
+        true);
+
+    // Load all external decls into current context. Under the hood, it calls
+    // ExternalSource::completeVisibleDeclsMap, which make all decls on the redecl
+    // chain visible.
+    //
+    // This is crucial to code completion on dot members, since a bound variable
+    // before "." would be otherwise treated out-of-scope.
+    //
+    // clang-repl> Foo f1;
+    // clang-repl> f1.<tab>
+    CI.getASTContext().getTranslationUnitDecl()->lookups();
+    SyntaxOnlyAction::ExecuteAction();
+  }
+
+  ExternalSource::ExternalSource(ASTContext &ChildASTCtxt, FileManager &ChildFM,
+                               ASTContext &ParentASTCtxt, FileManager &ParentFM)
+      : ChildTUDeclCtxt(ChildASTCtxt.getTranslationUnitDecl()),
+        ParentASTCtxt(ParentASTCtxt),
+        ParentTUDeclCtxt(ParentASTCtxt.getTranslationUnitDecl()) {
+    clang::ASTImporter *importer =
+        new clang::ASTImporter(ChildASTCtxt, ChildFM, ParentASTCtxt, ParentFM,
+                        /*MinimalImport : ON*/ true);
+    Importer.reset(importer);
+  }
+
+  bool ExternalSource::FindExternalVisibleDeclsByName(const DeclContext *DC,
+                                                      DeclarationName Name) {
+
+    IdentifierTable &ParentIdTable = ParentASTCtxt.Idents;
+
+    auto ParentDeclName =
+        DeclarationName(&(ParentIdTable.get(Name.getAsString())));
+
+    DeclContext::lookup_result lookup_result =
+        ParentTUDeclCtxt->lookup(ParentDeclName);
+
+    if (!lookup_result.empty()) {
+      return true;
+    }
+    return false;
+  }
+
+  void ExternalSource::completeVisibleDeclsMap(
+      const DeclContext *ChildDeclContext) {
+    assert(ChildDeclContext && ChildDeclContext == ChildTUDeclCtxt &&
+          "No child decl context!");
+
+    if (!ChildDeclContext->hasExternalVisibleStorage())
+      return;
+
+    for (auto *DeclCtxt = ParentTUDeclCtxt; DeclCtxt != nullptr;
+        DeclCtxt = DeclCtxt->getPreviousDecl()) {
+      for (auto &IDeclContext : DeclCtxt->decls()) {
+        if (!llvm::isa<NamedDecl>(IDeclContext))
+          continue;
+
+        NamedDecl *Decl = llvm::cast<NamedDecl>(IDeclContext);
+
+        auto DeclOrErr = Importer->Import(Decl);
+        if (!DeclOrErr) {
+          // if an error happens, it usually means the decl has already been
+          // imported or the decl is a result of a failed import.  But in our
+          // case, every import is fresh each time code completion is
+          // triggered. So Import usually doesn't fail. If it does, it just means
+          // the related decl can't be used in code completion and we can safely
+          // drop it.
+          llvm::consumeError(DeclOrErr.takeError());
+          continue;
+        }
+
+        if (!llvm::isa<NamedDecl>(*DeclOrErr))
+          continue;
+
+        NamedDecl *importedNamedDecl = llvm::cast<NamedDecl>(*DeclOrErr);
+
+        SetExternalVisibleDeclsForName(ChildDeclContext,
+                                      importedNamedDecl->getDeclName(),
+                                      importedNamedDecl);
+
+        if (!llvm::isa<CXXRecordDecl>(importedNamedDecl))
+          continue;
+
+        auto *Record = llvm::cast<CXXRecordDecl>(importedNamedDecl);
+
+        if (auto Err = Importer->ImportDefinition(Decl)) {
+          // the same as above
+          llvm::consumeError(std::move(Err));
+          continue;
+        }
+
+        Record->setHasLoadedFieldsFromExternalStorage(true);
+        for (auto *Meth : Record->methods())
+          SetExternalVisibleDeclsForName(ChildDeclContext, Meth->getDeclName(),
+                                        Meth);
+      }
+      ChildDeclContext->setHasExternalLexicalStorage(false);
+    }
+  }
 
   Interpreter::PushTransactionRAII::PushTransactionRAII(const Interpreter* i)
     : m_Interpreter(i) {
@@ -1026,52 +1170,44 @@ namespace cling {
   Interpreter::codeComplete(const std::string& line, size_t& cursor,
                             std::vector<std::string>& completions) const {
 
-    const char * const argV = "cling";
-    std::string resourceDir = this->getCI()->getHeaderSearchOpts().ResourceDir;
-    // Remove the extra 3 directory names "/lib/clang/3.9.0"
-    StringRef parentResourceDir = llvm::sys::path::parent_path(
-                                  llvm::sys::path::parent_path(
-                                  llvm::sys::path::parent_path(resourceDir)));
-    std::string llvmDir = parentResourceDir.str();
+    const std::string CodeCompletionFileName = "input_line_[Completion]";
 
-    Interpreter childInterpreter(*this, 1, &argV, llvmDir.c_str());
-    if (!childInterpreter.isValid())
+    auto ParentCI = this->getCI();
+
+    clang::IncrementalCompilerBuilder CB;
+    auto CI = CB.CreateCpp();
+    if (auto Err = CI.takeError()) {
       return kFailure;
+    }
 
-    auto childCI = childInterpreter.getCI();
-    clang::Sema &childSemaRef = childCI->getSema();
+    std::unique_ptr<clang::CompilerInstance> InterpCI = std::move(*CI);
 
-    // Create the CodeCompleteConsumer with InterpreterCallbacks
-    // from the parent interpreter and set the consumer for the child
-    // interpreter.
-    ClingCodeCompleteConsumer* consumer = new ClingCodeCompleteConsumer(
-                getCI()->getFrontendOpts().CodeCompleteOpts, completions);
-    // Child interpreter CI will own consumer!
-    childCI->setCodeCompletionConsumer(consumer);
-    childSemaRef.CodeCompleter = consumer;
+    auto DiagOpts = DiagnosticOptions();
+    auto consumer = ClingCodeCompleteConsumer(getCI()->getFrontendOpts().CodeCompleteOpts, completions);;
 
-    // Ignore diagnostics when we tab complete.
-    // This is because we get redefinition errors due to the import of the decls.
-    clang::IgnoringDiagConsumer* ignoringDiagConsumer =
-                                            new clang::IgnoringDiagConsumer();
-    childSemaRef.getDiagnostics().setClient(ignoringDiagConsumer, true);
-    DiagnosticsEngine& parentDiagnostics = this->getCI()->getSema().getDiagnostics();
+    auto diag = InterpCI->getDiagnosticsPtr();
+    std::unique_ptr<clang::ASTUnit> AU(clang::ASTUnit::LoadFromCompilerInvocationAction(
+        InterpCI->getInvocationPtr(), std::make_shared<PCHContainerOperations>(),
+        diag));
+    llvm::SmallVector<clang::StoredDiagnostic, 8> sd = {};
+    llvm::SmallVector<const llvm::MemoryBuffer *, 1> tb = {};
+    InterpCI->getFrontendOpts().Inputs[0] = FrontendInputFile(
+        CodeCompletionFileName, Language::CXX, InputKind::Source);
+    auto Act = std::unique_ptr<IncrementalSyntaxOnlyAction>(
+        new IncrementalSyntaxOnlyAction(ParentCI));
+    std::unique_ptr<llvm::MemoryBuffer> MB =
+        llvm::MemoryBuffer::getMemBufferCopy(line, CodeCompletionFileName);
+    llvm::SmallVector<ASTUnit::RemappedFile, 4> RemappedFiles;
 
-    std::unique_ptr<DiagnosticConsumer> ownerDiagConsumer =
-                                                parentDiagnostics.takeClient();
-    auto clientDiagConsumer = parentDiagnostics.getClient();
-    parentDiagnostics.setClient(ignoringDiagConsumer, /*owns*/ false);
-
-    // The child will desirialize decls from *this. We need a transaction RAII.
-    PushTransactionRAII RAII(this);
-
-    // Triger the code completion.
-    childInterpreter.CodeCompleteInternal(line, cursor);
-
-    // Restore the original diagnostics client for parent interpreter.
-    parentDiagnostics.setClient(clientDiagConsumer,
-                                ownerDiagConsumer.release() != nullptr);
-    parentDiagnostics.Reset(/*soft=*/true);
+    RemappedFiles.push_back(std::make_pair(CodeCompletionFileName, MB.get()));
+    // we don't want the AU destructor to release the memory buffer that MB
+    // owns twice, because MB handles its resource on its own.
+    AU->setOwnsRemappedFileBuffers(false);
+    AU->CodeComplete(CodeCompletionFileName, 1, cursor + 1, RemappedFiles, false, false,
+                    false, consumer,
+                    std::make_shared<clang::PCHContainerOperations>(), *diag,
+                    InterpCI->getLangOpts(), InterpCI->getSourceManager(),
+                    InterpCI->getFileManager(), sd, tb, std::move(Act));
 
     return kSuccess;
   }

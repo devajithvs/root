@@ -46,6 +46,9 @@ namespace cling {
              const char* LLVMDir, std::unique_ptr<clang::ASTConsumer> consumer,
              const ModuleFileExtensions& moduleExtensions,
              bool OnlyLex = false);
+
+    llvm::Expected<std::unique_ptr<clang::CompilerInstance>> CreateCpp();
+    llvm::Expected<std::unique_ptr<clang::CompilerInstance>> create(std::vector<const char *> &);
   } // namespace CIFactory
 } // namespace cling
 #endif // CLING_CIFACTORY_H

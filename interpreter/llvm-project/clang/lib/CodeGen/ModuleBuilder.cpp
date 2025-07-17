@@ -29,14 +29,14 @@
 using namespace clang;
 using namespace CodeGen;
 
-namespace clang {
+namespace {
   class CodeGeneratorImpl : public CodeGenerator {
     DiagnosticsEngine &Diags;
     ASTContext *Ctx;
     IntrusiveRefCntPtr<llvm::vfs::FileSystem> FS; // Only used for debug info.
     const HeaderSearchOptions &HeaderSearchOpts; // Only used for debug info.
     const PreprocessorOptions &PreprocessorOpts; // Only used for debug info.
-    CodeGenOptions CodeGenOpts;  // Intentionally copied in.
+    const CodeGenOptions &CodeGenOpts;
 
     unsigned HandlingTopLevelDecls;
 
@@ -107,11 +107,6 @@ namespace clang {
     }
 
     llvm::Module *ReleaseModule() {
-      // Remove pending etc decls in case of error; the asserts in StartModule()
-      // will rightfully be confused otherwise, as none of the decls were
-      // emitted.
-      if (Diags.hasErrorOccurred())
-        Builder->clear();
       return M.release();
     }
 
@@ -138,119 +133,6 @@ namespace clang {
       return Builder->GetAddrOfGlobal(global, ForDefinition_t(isForDefinition));
     }
 
-    void print(llvm::raw_ostream& out) {
-      out << "\n\nCodeGen:\n";
-      //llvm::SmallPtrSet<llvm::GlobalValue*, 10> WeakRefReferences;
-      out << " WeakRefReferences (llvm::SmallPtrSet<llvm::GlobalValue*, 10>)\n";
-      for(auto I = Builder->WeakRefReferences.begin(),
-            E = Builder->WeakRefReferences.end(); I != E; ++I) {
-        (*I)->print(out);
-        out << "\n";
-      }
-
-      //llvm::StringMap<GlobalDecl> DeferredDecls;
-      out << " DeferredDecls (llvm::StringMap<GlobalDecl>)\n";
-      for(auto I = Builder->DeferredDecls.begin(),
-            E = Builder->DeferredDecls.end(); I != E; ++I) {
-        out << I->first.str().c_str();
-        I->second.getDecl()->print(out);
-        out << "\n";
-      }
-
-      //std::vector<DeferredGlobal> DeferredDeclsToEmit;
-      out << " DeferredDeclsToEmit (std::vector<DeferredGlobal>)\n";
-      for(auto I = Builder->DeferredDeclsToEmit.begin(),
-            E = Builder->DeferredDeclsToEmit.end(); I != E; ++I) {
-        I->getDecl()->print(out);
-        out << "\n";
-      }
-
-      //std::vector<GlobalDecl> Aliases;
-      out << " Aliases (std::vector<GlobalDecl>)\n";
-      for(auto I = Builder->Aliases.begin(),
-            E = Builder->Aliases.end(); I != E; ++I) {
-        I->getDecl()->print(out);
-        out << "\n";
-      }
-      //typedef llvm::StringMap<llvm::TrackingVH<llvm::Constant> >
-      // ReplacementsTy;
-      //ReplacementsTy Replacements;
-      out
-        << " Replacements (llvm::StringMap<llvm::TrackingVH<llvm::Constant>>\n";
-      for(auto I = Builder->Replacements.begin(),
-            E = Builder->Replacements.end(); I != E; ++I) {
-        out << I->first.str().c_str();
-        (*I->second).print(out);
-        out << "\n";
-      }
-
-      //std::vector<const CXXRecordDecl*> DeferredVTables;
-      out << " DeferredVTables (std::vector<const CXXRecordDecl*>\n";
-      for(auto I = Builder->DeferredVTables.begin(),
-            E = Builder->DeferredVTables.end(); I != E; ++I) {
-        (*I)->print(out);
-        out << "\n";
-      }
-
-      //std::vector<llvm::WeakVH> LLVMUsed;
-      out << " LLVMUsed (std::vector<llvm::WeakVH> >\n";
-      for(auto I = Builder->LLVMUsed.begin(),
-            E = Builder->LLVMUsed.end(); I != E; ++I) {
-        (*I)->print(out);
-        out << "\n";
-      }
-
-      // typedef std::vector<std::pair<llvm::Constant*, int> > CtorList;
-      //CtorList GlobalCtors;
-      out << " GlobalCtors (std::vector<std::pair<llvm::Constant*, int> >\n";
-      for(auto I = Builder->GlobalCtors.begin(),
-            E = Builder->GlobalCtors.end(); I != E; ++I) {
-        out << I->Initializer << " : " << I->AssociatedData;
-        out << "\n";
-      }
-
-      //CtorList GlobalDtors;
-      out << " GlobalDtors (std::vector<std::pair<llvm::Constant*, int> >\n";
-      for(auto I = Builder->GlobalDtors.begin(),
-            E = Builder->GlobalDtors.end(); I != E; ++I) {
-        out << I->Initializer << " : " << I->AssociatedData;
-        out << "\n";
-      }
-
-      //llvm::DenseMap<GlobalDecl, StringRef> MangledDeclNames;
-      //std::vector<llvm::Constant*> Annotations;
-      //llvm::StringMap<llvm::Constant*> AnnotationStrings;
-      //llvm::StringMap<llvm::Constant*> CFConstantStringMap;
-      //llvm::StringMap<llvm::GlobalVariable*> ConstantStringMap;
-      out << " ConstantStringMap (llvm::DenseMap<llvm::Constant *, "
-             "llvm::GlobalVariable *>)\n";
-      for(auto I = Builder->ConstantStringMap.begin(),
-            E = Builder->ConstantStringMap.end(); I != E; ++I) {
-        I->first->print(out);
-        I->second->print(out);
-        out << "\n";
-      }
-
-      //llvm::DenseMap<const Decl*, llvm::Constant *> StaticLocalDeclMap;
-      //llvm::DenseMap<const Decl*, llvm::GlobalVariable*> StaticLocalDeclGuardMap;
-      //llvm::DenseMap<const Expr*, llvm::Constant *> MaterializedGlobalTemporaryMap;
-      //llvm::DenseMap<QualType, llvm::Constant *> AtomicSetterHelperFnMap;
-      //llvm::DenseMap<QualType, llvm::Constant *> AtomicGetterHelperFnMap;
-      //llvm::DenseMap<QualType, llvm::Constant *> TypeDescriptorMap;
-      //StaticExternCMap StaticExternCValues;
-      //std::vector<std::pair<const VarDecl *, llvm::GlobalVariable *> >
-      // CXXThreadLocals;
-      //std::vector<llvm::Constant*> CXXThreadLocalInits;
-      //std::vector<llvm::Constant*> CXXGlobalInits;
-      //llvm::DenseMap<const Decl*, unsigned> DelayedCXXInitPosition;
-      //SmallVector<GlobalInitData, 8> PrioritizedCXXGlobalInits;
-      //std::vector<std::pair<llvm::WeakVH,llvm::Constant*> > CXXGlobalDtors;
-      //llvm::SetVector<clang::Module *> ImportedModules;
-      //SmallVector<llvm::Value *, 16> LinkerOptionsMetadata;
-      //
-      out.flush();
-    }
-
     llvm::Module *StartModule(llvm::StringRef ModuleName,
                               llvm::LLVMContext &C) {
       assert(!M && "Replacing existing Module?");
@@ -264,28 +146,6 @@ namespace clang {
         OldBuilder->moveLazyEmissionStates(Builder.get());
 
       return M.get();
-    }
-
-    llvm::Module *StartModule(llvm::StringRef ModuleName,
-                              llvm::LLVMContext& C,
-                              const CodeGenOptions& CGO) {
-      CodeGenOpts = CGO;
-      return StartModule(ModuleName, C);
-    }
-
-    void forgetGlobal(llvm::GlobalValue* GV) {
-      for (auto I = Builder->ConstantStringMap.begin(),
-            E = Builder->ConstantStringMap.end(); I != E; ++I) {
-        if (I->second == GV) {
-          Builder->ConstantStringMap.erase(I);
-          break;
-        }
-      }
-    }
-
-    void forgetDecl(llvm::StringRef MangledName) {
-      Builder->DeferredDecls.erase(MangledName);
-      Builder->Manglings.erase(MangledName);
     }
 
     void Initialize(ASTContext &Context) override {
@@ -320,7 +180,7 @@ namespace clang {
 
     bool HandleTopLevelDecl(DeclGroupRef DG) override {
       // FIXME: Why not return false and abort parsing?
-      if (Diags.hasErrorOccurred())
+      if (Diags.hasUnrecoverableErrorOccurred())
         return true;
 
       HandlingTopLevelDeclRAII HandlingDecl(*this);
@@ -346,7 +206,7 @@ namespace clang {
     }
 
     void HandleInlineFunctionDefinition(FunctionDecl *D) override {
-      if (Diags.hasErrorOccurred())
+      if (Diags.hasUnrecoverableErrorOccurred())
         return;
 
       assert(D->doesThisDeclarationHaveABody());
@@ -373,7 +233,7 @@ namespace clang {
     /// client hack on the type, which can occur at any point in the file
     /// (because these can be defined in declspecs).
     void HandleTagDeclDefinition(TagDecl *D) override {
-      if (Diags.hasErrorOccurred())
+      if (Diags.hasUnrecoverableErrorOccurred())
         return;
 
       // Don't allow re-entrant calls to CodeGen triggered by PCH
@@ -409,7 +269,7 @@ namespace clang {
     }
 
     void HandleTagDeclRequiredDefinition(const TagDecl *D) override {
-      if (Diags.hasErrorOccurred())
+      if (Diags.hasUnrecoverableErrorOccurred())
         return;
 
       // Don't allow re-entrant calls to CodeGen triggered by PCH
@@ -423,7 +283,7 @@ namespace clang {
 
     void HandleTranslationUnit(ASTContext &Ctx) override {
       // Release the Builder when there is no error.
-      if (!Diags.hasErrorOccurred() && Builder)
+      if (!Diags.hasUnrecoverableErrorOccurred() && Builder)
         Builder->Release();
 
       // If there are errors before or when releasing the Builder, reset
@@ -437,25 +297,25 @@ namespace clang {
     }
 
     void AssignInheritanceModel(CXXRecordDecl *RD) override {
-      if (Diags.hasErrorOccurred())
+      if (Diags.hasUnrecoverableErrorOccurred())
         return;
 
       Builder->RefreshTypeCacheForClass(RD);
     }
 
     void CompleteTentativeDefinition(VarDecl *D) override {
-      if (Diags.hasErrorOccurred())
+      if (Diags.hasUnrecoverableErrorOccurred())
         return;
 
       Builder->EmitTentativeDefinition(D);
     }
 
-    void CompleteExternalDeclaration(VarDecl *D) override {
+    void CompleteExternalDeclaration(DeclaratorDecl *D) override {
       Builder->EmitExternalDeclaration(D);
     }
 
     void HandleVTable(CXXRecordDecl *RD) override {
-      if (Diags.hasErrorOccurred())
+      if (Diags.hasUnrecoverableErrorOccurred())
         return;
 
       Builder->EmitVTable(RD);
@@ -495,27 +355,9 @@ llvm::Constant *CodeGenerator::GetAddrOfGlobal(GlobalDecl global,
            ->GetAddrOfGlobal(global, isForDefinition);
 }
 
-void CodeGenerator::print(llvm::raw_ostream& out) {
-  static_cast<CodeGeneratorImpl*>(this)->print(out);
-}
-
 llvm::Module *CodeGenerator::StartModule(llvm::StringRef ModuleName,
                                          llvm::LLVMContext &C) {
   return static_cast<CodeGeneratorImpl*>(this)->StartModule(ModuleName, C);
-}
-
-llvm::Module *CodeGenerator::StartModule(llvm::StringRef ModuleName,
-                                         llvm::LLVMContext& C,
-                                         const CodeGenOptions& CGO) {
-  return static_cast<CodeGeneratorImpl*>(this)->StartModule(ModuleName, C, CGO);
-}
-
-void CodeGenerator::forgetGlobal(llvm::GlobalValue* GV) {
-  static_cast<CodeGeneratorImpl*>(this)->forgetGlobal(GV);
-}
-
-void CodeGenerator::forgetDecl(llvm::StringRef MangledName) {
-  static_cast<CodeGeneratorImpl*>(this)->forgetDecl(MangledName);
 }
 
 CodeGenerator *

@@ -29,10 +29,7 @@
 #include "clang/Basic/SourceLocation.h"
 #include "llvm/ADT/APSInt.h"
 #include "llvm/ADT/FoldingSet.h"
-#include "llvm/ADT/SmallString.h"
 #include "llvm/ADT/StringExtras.h"
-#include "llvm/ADT/StringRef.h"
-#include "llvm/Support/Casting.h"
 #include "llvm/Support/Compiler.h"
 #include "llvm/Support/ErrorHandling.h"
 #include "llvm/Support/raw_ostream.h"
@@ -133,14 +130,8 @@ static void printIntegral(const TemplateArgument &TemplArg, raw_ostream &Out,
     } else
       Out << "(" << T->getCanonicalTypeInternal().getAsString(Policy) << ")"
           << Val;
-  } else {
+  } else
     Out << Val;
-    // Handle cases where the value is too large to fit into the underlying type
-    // i.e. where the unsignedness matters.
-    if (T->isBuiltinType())
-      if (Val.isUnsigned() && Val.getBitWidth() == 64 && Val.countLeadingOnes())
-        Out << "ull";
-  }
 }
 
 static unsigned getArrayDepth(QualType type) {
@@ -227,8 +218,13 @@ static const ValueDecl *getAsSimpleValueDeclRef(const ASTContext &Ctx,
 
   // We model class non-type template parameters as their template parameter
   // object declaration.
-  if (V.isStruct() || V.isUnion())
+  if (V.isStruct() || V.isUnion()) {
+    // Dependent types are not supposed to be described as
+    // TemplateParamObjectDecls.
+    if (T->isDependentType() || T->isInstantiationDependentType())
+      return nullptr;
     return Ctx.getTemplateParamObjectDecl(T, V);
+  }
 
   // Pointers and references with an empty path use the special 'Declaration'
   // representation.
@@ -519,19 +515,17 @@ void TemplateArgument::print(const PrintingPolicy &Policy, raw_ostream &Out,
   }
 
   case Declaration: {
-    NamedDecl *ND = getAsDecl();
+    ValueDecl *VD = getAsDecl();
     if (getParamTypeForDecl()->isRecordType()) {
-      if (auto *TPO = dyn_cast<TemplateParamObjectDecl>(ND)) {
+      if (auto *TPO = dyn_cast<TemplateParamObjectDecl>(VD)) {
         TPO->getType().getUnqualifiedType().print(Out, Policy);
         TPO->printAsInit(Out, Policy);
         break;
       }
     }
-    if (auto *VD = dyn_cast<ValueDecl>(ND)) {
-      if (needsAmpersandOnTemplateArg(getParamTypeForDecl(), VD->getType()))
-        Out << "&";
-    }
-    ND->printQualifiedName(Out);
+    if (needsAmpersandOnTemplateArg(getParamTypeForDecl(), VD->getType()))
+      Out << "&";
+    VD->printQualifiedName(Out);
     break;
   }
 
@@ -544,9 +538,10 @@ void TemplateArgument::print(const PrintingPolicy &Policy, raw_ostream &Out,
     Out << "nullptr";
     break;
 
-  case Template:
-    getAsTemplate().print(Out, Policy, TemplateName::Qualified::Fully);
+  case Template: {
+    getAsTemplate().print(Out, Policy);
     break;
+  }
 
   case TemplateExpansion:
     getAsTemplateOrTemplatePattern().print(Out, Policy);
@@ -576,15 +571,6 @@ void TemplateArgument::print(const PrintingPolicy &Policy, raw_ostream &Out,
     break;
   }
 }
-
-void TemplateArgument::dump(raw_ostream &Out) const {
-  LangOptions LO; // FIXME! see also TemplateName::dump().
-  LO.CPlusPlus = true;
-  LO.Bool = true;
-  print(PrintingPolicy(LO), Out, /*IncludeType*/ true);
-}
-
-LLVM_DUMP_METHOD void TemplateArgument::dump() const { dump(llvm::errs()); }
 
 //===----------------------------------------------------------------------===//
 // TemplateArgumentLoc Implementation

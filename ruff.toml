@@ -1,5 +1,8 @@
 line-length = 120
 
+# Skip ruff formatting for files in LLVM and other external projects
+extend-exclude = ["interpreter/CppInterOp", "interpreter/llvm-project"]
+
 [lint]
 select = [
     # Pyflakes

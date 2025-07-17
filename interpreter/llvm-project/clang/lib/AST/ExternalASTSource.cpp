@@ -15,11 +15,9 @@
 #include "clang/AST/ExternalASTSource.h"
 #include "clang/AST/ASTContext.h"
 #include "clang/AST/DeclarationName.h"
-#include "clang/Basic/FileManager.h"
+#include "clang/Basic/ASTSourceDescriptor.h"
 #include "clang/Basic/IdentifierTable.h"
 #include "clang/Basic/LLVM.h"
-#include "clang/Basic/Module.h"
-#include "clang/Basic/SourceManager.h"
 #include "llvm/Support/ErrorHandling.h"
 #include <cstdint>
 #include <optional>
@@ -29,10 +27,6 @@ using namespace clang;
 char ExternalASTSource::ID;
 
 ExternalASTSource::~ExternalASTSource() = default;
-
-uint32_t ExternalASTSource::getGeneration(const ASTContext &C) const {
-  return C.getGeneration();
-}
 
 std::optional<ASTSourceDescriptor>
 ExternalASTSource::getSourceDescriptor(unsigned ID) {
@@ -72,9 +66,7 @@ bool ExternalASTSource::layoutRecordType(
   return false;
 }
 
-Decl *ExternalASTSource::GetExternalDecl(uint32_t ID) {
-  return nullptr;
-}
+Decl *ExternalASTSource::GetExternalDecl(GlobalDeclID ID) { return nullptr; }
 
 Selector ExternalASTSource::GetExternalSelector(uint32_t ID) {
   return Selector();
@@ -98,9 +90,9 @@ ExternalASTSource::GetExternalCXXBaseSpecifiers(uint64_t Offset) {
   return nullptr;
 }
 
-bool
-ExternalASTSource::FindExternalVisibleDeclsByName(const DeclContext *DC,
-                                                  DeclarationName Name) {
+bool ExternalASTSource::FindExternalVisibleDeclsByName(
+    const DeclContext *DC, DeclarationName Name,
+    const DeclContext *OriginalDC) {
   return false;
 }
 
@@ -122,5 +114,19 @@ void ExternalASTSource::FindExternalLexicalDecls(
 void ExternalASTSource::getMemoryBufferSizes(MemoryBufferSizes &sizes) const {}
 
 uint32_t ExternalASTSource::incrementGeneration(ASTContext &C) {
-  return C.incrementGeneration();
+  uint32_t OldGeneration = CurrentGeneration;
+
+  // Make sure the generation of the topmost external source for the context is
+  // incremented. That might not be us.
+  auto *P = C.getExternalSource();
+  if (P && P != this)
+    CurrentGeneration = P->incrementGeneration(C);
+  else {
+    // FIXME: Only bump the generation counter if the current generation number
+    // has been observed?
+    if (!++CurrentGeneration)
+      llvm::report_fatal_error("generation counter overflowed", false);
+  }
+
+  return OldGeneration;
 }

@@ -15,19 +15,21 @@
 
 #include "clang/AST/ASTConsumer.h"
 #include "clang/Basic/LLVM.h"
+#include "llvm/ADT/StringRef.h"
 
 namespace llvm {
   class Constant;
-  class GlobalValue;
   class LLVMContext;
   class Module;
   class StringRef;
-  class raw_ostream;
 
   namespace vfs {
   class FileSystem;
   }
 }
+
+// Prefix of the name of the artificial inline frame.
+inline constexpr llvm::StringRef ClangTrapPrefix = "__clang_trap_msg";
 
 namespace clang {
   class CodeGenOptions;
@@ -95,18 +97,9 @@ public:
   ///   definition has been registered with this code generator.
   llvm::Constant *GetAddrOfGlobal(GlobalDecl decl, bool isForDefinition);
 
-  void print(llvm::raw_ostream& out);
-
   /// Create a new \c llvm::Module after calling HandleTranslationUnit. This
   /// enable codegen in interactive processing environments.
   llvm::Module* StartModule(llvm::StringRef ModuleName, llvm::LLVMContext &C);
-
-  llvm::Module* StartModule(llvm::StringRef ModuleName,
-                            llvm::LLVMContext& C,
-                            const CodeGenOptions& CGO);
-
-  void forgetGlobal(llvm::GlobalValue* GV);
-  void forgetDecl(llvm::StringRef MangledName);
 };
 
 /// CreateLLVMCodeGen - Create a CodeGenerator instance.

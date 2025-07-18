@@ -1041,6 +1041,10 @@ namespace cling {
            E = CTD->loaded_spec_end(); I != E; ++I)
       Successful &=
           VisitClassTemplateSpecializationDecl(*I, /*RemoveSpec=*/false);
+ 
+    // for (auto *Redecl : CTD->redecls()) {
+    //   VisitRedeclarableTemplateDecl(const_cast<RedeclarableTemplateDecl *>(Redecl));
+    // }
 
     Successful &= VisitRedeclarableTemplateDecl(CTD);
     Successful &= Visit(CTD->getTemplatedDecl());
@@ -1061,6 +1065,35 @@ namespace cling {
       else
         ClassTemplateDeclExt::removeSpecialization(
             CTSD->getSpecializedTemplate(), CanonCTSD);
+    }
+    std::set<const void*> Seen;
+    unsigned i = 0;
+
+    if (CTSD && CTSD->getQualifiedNameAsString() == "edmNew::DetSetVector") {
+      llvm::errs() << "[DEBUG - unloader(): VisitClassTemplateSpecializationDecl edmNew::DetSetVector at ";
+      CTSD->getSpecializedTemplate()->getLocation().print(llvm::errs(), CTSD->getSpecializedTemplate()->getASTContext().getSourceManager());
+      llvm::errs() << "\nRedecl chain:\n";
+
+      unsigned i = 0;
+      std::set<const void*> Seen;
+      for (const auto *R : CTSD->getSpecializedTemplate()->redecls()) {
+        if (!R) break;
+        llvm::errs() << "  [" << i++ << "] " << R->getDeclName()
+                    << " at ";
+        R->getLocation().print(llvm::errs(), R->getASTContext().getSourceManager());
+        llvm::errs() << "  ptr=" << (const void*)R;
+
+        auto firstDecl = R->getFirstDecl();
+        llvm::errs() << "First Decl :" << firstDecl << "\n";
+ 
+        if (!Seen.insert(R).second) {
+          llvm::errs() << "  [!!! DUPLICATE]\n";
+          R->dump();
+          assert(true && "Duplicate in redecl chain of edmNew::DetSetVector");
+        } else {
+          llvm::errs() << "\n";
+        }
+      }
     }
     return Successful;
   }

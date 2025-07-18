@@ -1069,8 +1069,8 @@ namespace cling {
     std::set<const void*> Seen;
     unsigned i = 0;
 
-    if (CTSD && CTSD->getQualifiedNameAsString() == "edmNew::DetSetVector") {
-      llvm::errs() << "[DEBUG - unloader(): VisitClassTemplateSpecializationDecl edmNew::DetSetVector at ";
+    if (CTSD && CTSD->getQualifiedNameAsString() == "RandomClass") {
+      llvm::errs() << "[DEBUG - unloader(): VisitClassTemplateSpecializationDecl RandomClass at ";
       CTSD->getSpecializedTemplate()->getLocation().print(llvm::errs(), CTSD->getSpecializedTemplate()->getASTContext().getSourceManager());
       llvm::errs() << "\nRedecl chain:\n";
 
@@ -1089,7 +1089,7 @@ namespace cling {
         if (!Seen.insert(R).second) {
           llvm::errs() << "  [!!! DUPLICATE]\n";
           R->dump();
-          assert(true && "Duplicate in redecl chain of edmNew::DetSetVector");
+          assert(true && "Duplicate in redecl chain of edmNew::RandomClass");
         } else {
           llvm::errs() << "\n";
         }

@@ -1069,8 +1069,8 @@ namespace cling {
     std::set<const void*> Seen;
     unsigned i = 0;
 
-    if (CTSD && CTSD->getQualifiedNameAsString() == "RandomClass") {
-      llvm::errs() << "[DEBUG - unloader(): VisitClassTemplateSpecializationDecl RandomClass at ";
+    if (CTSD && CTSD->getQualifiedNameAsString() == "SomeRandomClass") {
+      llvm::errs() << "[DEBUG - unloader(): VisitClassTemplateSpecializationDecl SomeRandomClass at ";
       CTSD->getSpecializedTemplate()->getLocation().print(llvm::errs(), CTSD->getSpecializedTemplate()->getASTContext().getSourceManager());
       llvm::errs() << "\nRedecl chain:\n";
 

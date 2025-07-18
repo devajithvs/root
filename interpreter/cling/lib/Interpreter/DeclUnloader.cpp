@@ -1042,6 +1042,10 @@ namespace cling {
       Successful &=
           VisitClassTemplateSpecializationDecl(*I, /*RemoveSpec=*/false);
 
+    // for (auto *Redecl : CTD->redecls()) {
+    //   VisitRedeclarableTemplateDecl(const_cast<RedeclarableTemplateDecl *>(Redecl));
+    // }
+
     Successful &= VisitRedeclarableTemplateDecl(CTD);
     Successful &= Visit(CTD->getTemplatedDecl());
     return Successful;

@@ -360,7 +360,7 @@ static bool UseJITLink(const Triple& TT) {
   if (const char* clingJitLink = std::getenv("CLING_JITLINK")) {
     jitLink = cling::utils::ConvertEnvValueToBool(clingJitLink);
   }
-  return jitLink;
+  return true;
 }
 
 static std::unique_ptr<TargetMachine>
@@ -591,9 +591,9 @@ IncrementalJIT::IncrementalJIT(
     });
 
 #if defined(__linux__) && defined(__GLIBC__)
-  // See comment in ListOfLibcNonsharedSymbols.
-  cantFail(Jit->getProcessSymbolsJITDylib()->define(
-      absoluteSymbols(GetListOfLibcNonsharedSymbols(*Jit))));
+  // // See comment in ListOfLibcNonsharedSymbols.
+  // cantFail(Jit->getProcessSymbolsJITDylib()->define(
+  //     absoluteSymbols(GetListOfLibcNonsharedSymbols(*Jit))));
 #endif
 
 #if defined(__APPLE__)

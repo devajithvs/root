@@ -1850,6 +1850,119 @@ namespace {
     return CI.release(); // Passes over the ownership to the caller.
   }
 
+  static llvm::Expected<std::unique_ptr<CompilerInstance>>
+  CreateCI(const llvm::opt::ArgStringList &Argv) {
+    std::unique_ptr<CompilerInstance> Clang(new CompilerInstance());
+    IntrusiveRefCntPtr<DiagnosticIDs> DiagID(new DiagnosticIDs());
+
+    // Register the support for object-file-wrapped Clang modules.
+    // FIXME: Clang should register these container operations automatically.
+    auto PCHOps = Clang->getPCHContainerOperations();
+    PCHOps->registerWriter(std::make_unique<ObjectFilePCHContainerWriter>());
+    PCHOps->registerReader(std::make_unique<ObjectFilePCHContainerReader>());
+
+    // Buffer diagnostics from argument parsing so that we can output them using
+    // a well formed diagnostic object.
+    IntrusiveRefCntPtr<DiagnosticOptions> DiagOpts = new DiagnosticOptions();
+    TextDiagnosticBuffer *DiagsBuffer = new TextDiagnosticBuffer;
+    DiagnosticsEngine Diags(DiagID, &*DiagOpts, DiagsBuffer);
+    bool Success = CompilerInvocation::CreateFromArgs(
+        Clang->getInvocation(), llvm::ArrayRef(Argv.begin(), Argv.size()), Diags);
+
+    // Infer the builtin include path if unspecified.
+    if (Clang->getHeaderSearchOpts().UseBuiltinIncludes &&
+        Clang->getHeaderSearchOpts().ResourceDir.empty())
+      Clang->getHeaderSearchOpts().ResourceDir =
+          CompilerInvocation::GetResourcesPath(Argv[0], nullptr);
+
+    // Create the actual diagnostics engine.
+    Clang->createDiagnostics();
+    if (!Clang->hasDiagnostics())
+      return llvm::createStringError(llvm::errc::not_supported,
+                                    "Initialization failed. "
+                                    "Unable to create diagnostics engine");
+
+    DiagsBuffer->FlushDiagnostics(Clang->getDiagnostics());
+    if (!Success)
+      return llvm::createStringError(llvm::errc::not_supported,
+                                    "Initialization failed. "
+                                    "Unable to flush diagnostics");
+
+    // FIXME: Merge with CompilerInstance::ExecuteAction.
+    llvm::MemoryBuffer *MB = llvm::MemoryBuffer::getMemBuffer("").release();
+    Clang->getPreprocessorOpts().addRemappedFile("<<< inputs >>>", MB);
+
+    Clang->setTarget(TargetInfo::CreateTargetInfo(
+        Clang->getDiagnostics(), Clang->getInvocation().TargetOpts));
+    if (!Clang->hasTarget())
+      return llvm::createStringError(llvm::errc::not_supported,
+                                    "Initialization failed. "
+                                    "Target is missing");
+
+    Clang->getTarget().adjust(Clang->getDiagnostics(), Clang->getLangOpts());
+
+    // Don't clear the AST before backend codegen since we do codegen multiple
+    // times, reusing the same AST.
+    Clang->getCodeGenOpts().ClearASTBeforeBackend = false;
+
+    Clang->getFrontendOpts().DisableFree = false;
+    Clang->getCodeGenOpts().DisableFree = false;
+    return std::move(Clang);
+  }
+
+  llvm::Expected<std::unique_ptr<CompilerInstance>>
+  createImpl(std::vector<const char *> &ClangArgv) {
+
+    // If we don't know ClangArgv0 or the address of main() at this point, try
+    // to guess it anyway (it's possible on some platforms).
+    std::string MainExecutableName =
+        llvm::sys::fs::getMainExecutable(nullptr, nullptr);
+
+    ClangArgv.insert(ClangArgv.begin(), MainExecutableName.c_str());
+
+    // Prepending -c to force the driver to do something if no action was
+    // specified. By prepending we allow users to override the default
+    // action and use other actions in incremental mode.
+    // FIXME: Print proper driver diagnostics if the driver flags are wrong.
+    // We do C++ by default; append right after argv[0] if no "-x" given
+    ClangArgv.insert(ClangArgv.end(), "-Xclang");
+    ClangArgv.insert(ClangArgv.end(), "-fincremental-extensions");
+    ClangArgv.insert(ClangArgv.end(), "-c");
+
+    // Put a dummy C++ file on to ensure there's at least one compile job for the
+    // driver to construct.
+    ClangArgv.push_back("<<< inputs >>>");
+
+    // Buffer diagnostics from argument parsing so that we can output them using a
+    // well formed diagnostic object.
+    IntrusiveRefCntPtr<DiagnosticIDs> DiagID(new DiagnosticIDs());
+    IntrusiveRefCntPtr<DiagnosticOptions> DiagOpts =
+        CreateAndPopulateDiagOpts(ClangArgv);
+    TextDiagnosticBuffer *DiagsBuffer = new TextDiagnosticBuffer;
+    DiagnosticsEngine Diags(DiagID, &*DiagOpts, DiagsBuffer);
+
+    driver::Driver Driver(/*MainBinaryName=*/ClangArgv[0],
+                          llvm::sys::getProcessTriple(), Diags);
+    Driver.setCheckInputsExist(false); // the input comes from mem buffers
+    llvm::ArrayRef<const char *> RF = llvm::ArrayRef(ClangArgv);
+    std::unique_ptr<driver::Compilation> Compilation(Driver.BuildCompilation(RF));
+
+    if (Compilation->getArgs().hasArg(driver::options::OPT_v))
+      Compilation->getJobs().Print(llvm::errs(), "\n", /*Quote=*/false);
+
+
+    const llvm::opt::ArgStringList* CC1Args =
+        GetCC1Arguments(Compilation.get());
+    if (!CC1Args) {
+      cling::errs() << "Could not get cc1 arguments.\n";
+      return llvm::createStringError(llvm::errc::not_supported,
+                                   "Driver initialization failed. "
+                                   "Unable to create a driver job");
+    }
+
+    return CreateCI(*CC1Args);
+  }
+
 } // unnamed namespace
 
 namespace cling {
@@ -1867,7 +1980,9 @@ namespace cling {
   }
 
   llvm::Expected<std::unique_ptr<CompilerInstance>>
-  CIFactory::create(std::vector<const char *> &ClangArgv);
+  CIFactory::create(std::vector<const char *> &ClangArgv) {
+    return createImpl(ClangArgv);
+  };
 
 CompilerInstance* CIFactory::createCI(
     MemBufPtr_t Buffer, int argc, const char* const* argv, const char* LLVMDir,

@@ -375,13 +375,20 @@ public:
   }
 };
 
+  llvm::ExitOnError ExitOnErr;
   IncrementalParser::IncrementalParser(Interpreter* interp, const char* llvmdir,
                                    const ModuleFileExtensions& moduleExtensions)
       : m_Interpreter(interp) {
     std::unique_ptr<cling::DeclCollector> consumer;
     consumer.reset(m_Consumer = new cling::DeclCollector());
-    m_CI.reset(CIFactory::createCI("\n", interp->getOptions(), llvmdir,
-                                   std::move(consumer), moduleExtensions));
+    
+    std::vector<const char *> Argv;
+    Argv.reserve(5 + 1);
+    Argv.push_back("-xc++");
+    m_CI = ExitOnErr(CIFactory::create(Argv));
+
+    // m_CI.reset(CIFactory::createCI("\n", interp->getOptions(), llvmdir,
+    //                                std::move(consumer), moduleExtensions));
 
     if (!m_CI) {
       cling::errs() << "Compiler instance could not be created.\n";

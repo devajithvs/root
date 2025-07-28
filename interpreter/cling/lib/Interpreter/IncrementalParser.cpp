@@ -37,6 +37,8 @@
 #include "clang/Basic/Diagnostic.h"
 #include "clang/Basic/FileManager.h"
 #include "clang/CodeGen/ModuleBuilder.h"
+#include "clang/CodeGen/CodeGenAction.h"
+#include "clang/FrontendTool/Utils.h"
 #include "clang/Frontend/CompilerInstance.h"
 #include "clang/Frontend/FrontendDiagnostic.h"
 #include "clang/Frontend/FrontendPluginRegistry.h"
@@ -287,6 +289,92 @@ static void HandlePlugins(CompilerInstance& CI,
 }
 
 namespace cling {
+/// A custom action enabling the incremental processing functionality.
+///
+/// The usual \p FrontendAction expects one call to ExecuteAction and once it
+/// sees a call to \p EndSourceFile it deletes some of the important objects
+/// such as \p Preprocessor and \p Sema assuming no further input will come.
+///
+/// \p IncrementalAction ensures it keep its underlying action's objects alive
+/// as long as the \p IncrementalParser needs them.
+///
+class IncrementalAction : public WrapperFrontendAction {
+private:
+  bool IsTerminating = false;
+
+public:
+  IncrementalAction(CompilerInstance &CI, llvm::LLVMContext &LLVMCtx,
+                    llvm::Error &Err)
+      : WrapperFrontendAction([&]() {
+          llvm::ErrorAsOutParameter EAO(&Err);
+          std::unique_ptr<FrontendAction> Act;
+          switch (CI.getFrontendOpts().ProgramAction) {
+          default:
+            Err = llvm::createStringError(
+                std::errc::state_not_recoverable,
+                "Driver initialization failed. "
+                "Incremental mode for action %d is not supported",
+                CI.getFrontendOpts().ProgramAction);
+            return Act;
+          case frontend::ASTDump:
+            [[fallthrough]];
+          case frontend::ASTPrint:
+            [[fallthrough]];
+          case frontend::ParseSyntaxOnly:
+            Act = CreateFrontendAction(CI);
+            break;
+          case frontend::PluginAction:
+            [[fallthrough]];
+          case frontend::EmitAssembly:
+            [[fallthrough]];
+          case frontend::EmitBC:
+            [[fallthrough]];
+          case frontend::EmitObj:
+            [[fallthrough]];
+          case frontend::PrintPreprocessedInput:
+            [[fallthrough]];
+          case frontend::EmitLLVMOnly:
+            Act.reset(new EmitLLVMOnlyAction(&LLVMCtx));
+            break;
+          }
+          return Act;
+        }()) {}
+  FrontendAction *getWrapped() const { return WrappedAction.get(); }
+  TranslationUnitKind getTranslationUnitKind() override {
+    return TU_Incremental;
+  }
+
+  void ExecuteAction() override {
+    CompilerInstance &CI = getCompilerInstance();
+    assert(CI.hasPreprocessor() && "No PP!");
+
+    // Use a code completion consumer?
+    CodeCompleteConsumer *CompletionConsumer = nullptr;
+    if (CI.hasCodeCompletionConsumer())
+      CompletionConsumer = &CI.getCodeCompletionConsumer();
+
+    Preprocessor &PP = CI.getPreprocessor();
+    PP.EnterMainSourceFile();
+
+    if (!CI.hasSema())
+      CI.createSema(getTranslationUnitKind(), CompletionConsumer);
+  }
+
+  // Do not terminate after processing the input. This allows us to keep various
+  // clang objects alive and to incrementally grow the current TU.
+  void EndSourceFile() override {
+    // The WrappedAction can be nullptr if we issued an error in the ctor.
+    if (IsTerminating && getWrapped())
+      WrapperFrontendAction::EndSourceFile();
+  }
+
+  void FinalizeAction() {
+    assert(!IsTerminating && "Already finalized!");
+    IsTerminating = true;
+    EndSourceFile();
+  }
+};
+
   IncrementalParser::IncrementalParser(Interpreter* interp, const char* llvmdir,
                                    const ModuleFileExtensions& moduleExtensions)
       : m_Interpreter(interp) {
@@ -307,7 +395,14 @@ namespace cling {
       cling::errs() << "No AST consumer available.\n";
       return;
     }
-
+    
+    llvm::Error Err = llvm::Error::success();
+    Act = std::make_unique<IncrementalAction>(*m_CI.get(), *m_Interpreter->getLLVMContext(), Err);
+    handleAllErrors(std::move(Err), [&](llvm::ErrorInfoBase &EIB) {
+        llvm::errs() << "Error setting up ThinLTO save-temps: " << EIB.message()
+               << '\n';
+      });
+    m_CI->ExecuteAction(*Act);
 
     std::vector<std::unique_ptr<ASTConsumer>> Consumers;
     HandlePlugins(*m_CI, Consumers);
@@ -462,6 +557,7 @@ namespace cling {
   }
 
   IncrementalParser::~IncrementalParser() {
+    // Act->FinalizeAction();
     Transaction* T = const_cast<Transaction*>(getFirstTransaction());
     while (T) {
       assert((T->getState() == Transaction::kCommitted

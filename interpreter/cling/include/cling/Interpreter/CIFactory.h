@@ -41,6 +41,8 @@ namespace cling {
              const ModuleFileExtensions& moduleExtensions,
              bool AutoComplete = false);
 
+    llvm::Expected<std::unique_ptr<clang::CompilerInstance>> create(std::vector<const char *> &ClangArgv);
+
     clang::CompilerInstance*
     createCI(MemBufPtr_t Buffer, int Argc, const char* const* Argv,
              const char* LLVMDir, std::unique_ptr<clang::ASTConsumer> consumer,

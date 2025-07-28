@@ -44,6 +44,7 @@ namespace cling {
   class ExecutionContext;
   class Interpreter;
   class Transaction;
+  class IncrementalAction;
   class TransactionPool;
   class ASTTransformer;
 
@@ -61,6 +62,9 @@ namespace cling {
 
     // compiler instance.
     std::unique_ptr<clang::CompilerInstance> m_CI;
+
+    /// Long-lived, incremental parsing action.
+    std::unique_ptr<IncrementalAction> Act;
 
     // parser (incremental)
     std::unique_ptr<clang::Parser> m_Parser;

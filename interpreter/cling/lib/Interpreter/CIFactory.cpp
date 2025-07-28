@@ -38,6 +38,8 @@
 #include "clang/Serialization/ASTReader.h"
 #include "clang/Serialization/ASTWriter.h"
 #include "clang/Serialization/SerializationDiagnostic.h"
+#include "clang/CodeGen/ObjectFilePCHContainerOperations.h"
+#include "clang/Frontend/TextDiagnosticBuffer.h"
 
 #include "llvm/Config/llvm-config.h"
 #include "llvm/IR/LLVMContext.h"
@@ -1261,20 +1263,28 @@ namespace {
   static llvm::Expected<std::unique_ptr<CompilerInstance>>
   CreateCI(const std::vector<const char*>& ClangArgv, std::string ExeName,
            std::unique_ptr<clang::driver::Compilation>& Compilation) {
-    auto InvocationPtr = std::make_shared<clang::CompilerInvocation>();
 
-    // The compiler invocation is the owner of the diagnostic options.
-    // Everything else points to them.
-    DiagnosticOptions& DiagOpts = InvocationPtr->getDiagnosticOpts();
-    llvm::IntrusiveRefCntPtr<DiagnosticsEngine> Diags =
-        SetupDiagnostics(DiagOpts, ExeName);
-    if (!Diags) {
-      cling::errs() << "Could not setup diagnostic engine.\n";
-      return nullptr;
-    }
+    IntrusiveRefCntPtr<DiagnosticIDs> DiagID(new DiagnosticIDs());
+    // Buffer diagnostics from argument parsing so that we can output them using
+    // a well formed diagnostic object.
+    IntrusiveRefCntPtr<DiagnosticOptions> DiagOpts = new DiagnosticOptions();
+    TextDiagnosticBuffer *DiagsBuffer = new TextDiagnosticBuffer;
+    DiagnosticsEngine Diags(DiagID, &*DiagOpts, DiagsBuffer);
+    
+    // auto InvocationPtr = std::make_shared<clang::CompilerInvocation>();
+
+    // // The compiler invocation is the owner of the diagnostic options.
+    // // Everything else points to them.
+    // DiagnosticOptions& DiagOpts = InvocationPtr->getDiagnosticOpts();
+    // llvm::IntrusiveRefCntPtr<DiagnosticsEngine> Diags =
+    //     SetupDiagnostics(DiagOpts, ExeName);
+    // if (!Diags) {
+    //   cling::errs() << "Could not setup diagnostic engine.\n";
+    //   return nullptr;
+    // }
 
     llvm::Triple TheTriple(llvm::sys::getProcessTriple());
-    clang::driver::Driver Drvr(ClangArgv[0], TheTriple.getTriple(), *Diags);
+    clang::driver::Driver Drvr(ClangArgv[0], TheTriple.getTriple(), Diags);
     // Drvr.setWarnMissingInput(false);
     Drvr.setCheckInputsExist(false); // think foo.C(12)
     llvm::ArrayRef<const char*> RF(&(ClangArgv[0]), ClangArgv.size());
@@ -1291,16 +1301,40 @@ namespace {
       return nullptr;
     }
 
-    clang::CompilerInvocation::CreateFromArgs(*InvocationPtr, *CC1Args, *Diags);
-    // We appreciate the error message about an unknown flag (or do we? if not
-    // we should switch to a different DiagEngine for parsing the flags).
-    // But in general we'll happily go on.
-    Diags->Reset();
-
     // Create and setup a compiler instance.
     std::unique_ptr<CompilerInstance> CI(new CompilerInstance());
-    CI->setInvocation(InvocationPtr);
-    CI->setDiagnostics(Diags.get()); // Diags is ref-counted
+
+
+    CI->createDiagnostics();
+    DiagsBuffer->FlushDiagnostics(CI->getDiagnostics());
+
+    // Register the support for object-file-wrapped Clang modules.
+    // FIXME: Clang should register these container operations automatically.
+    auto PCHOps = CI->getPCHContainerOperations();
+    PCHOps->registerWriter(std::make_unique<ObjectFilePCHContainerWriter>());
+    PCHOps->registerReader(std::make_unique<ObjectFilePCHContainerReader>());
+
+    clang::CompilerInvocation::CreateFromArgs(CI->getInvocation(), *CC1Args, Diags);
+
+    // FIXME: Merge with CompilerInstance::ExecuteAction.
+    llvm::MemoryBuffer *MB = llvm::MemoryBuffer::getMemBuffer("").release();
+    CI->getPreprocessorOpts().addRemappedFile("<<< inputs >>>", MB);
+
+    CI->setTarget(TargetInfo::CreateTargetInfo(
+        CI->getDiagnostics(), CI->getInvocation().TargetOpts));
+    if (!CI->hasTarget())
+      return llvm::createStringError(llvm::errc::not_supported,
+                                    "Initialization failed. "
+                                    "Target is missing");
+
+    CI->getTarget().adjust(CI->getDiagnostics(), CI->getLangOpts());
+
+    // Don't clear the AST before backend codegen since we do codegen multiple
+    // times, reusing the same AST.
+    CI->getCodeGenOpts().ClearASTBeforeBackend = false;
+
+    CI->getFrontendOpts().DisableFree = false;
+    CI->getCodeGenOpts().DisableFree = false;
 
     return CI;
   }
@@ -1457,9 +1491,9 @@ namespace {
   #endif
     }
 #endif
-    if ((!COpts.HasOutput || !HasInput) && !AutoComplete) {
-      argvCompile.push_back("-");
-    }
+    // if ((!COpts.HasOutput || !HasInput) && !AutoComplete) {
+    //   argvCompile.push_back("-");
+    // }
 
     if (AutoComplete) {
       // Put a dummy C++ file on to ensure there's at least one compile job for
@@ -1477,6 +1511,9 @@ namespace {
 
     std::unique_ptr<clang::driver::Compilation> Compilation;
 
+    // Put a dummy C++ file on to ensure there's at least one compile job for the
+    // driver to construct.
+    argvCompile.push_back("<<< inputs >>>");
     auto CIOrErr = CreateCI(argvCompile, ExeName, Compilation);
     if (!CIOrErr) {
       cling::errs() << "Could not create CI: " << CIOrErr.takeError() << "\n";
@@ -1632,24 +1669,24 @@ namespace {
     const char* Filename = "<<< cling interactive line includer >>>";
     FileEntryRef FE = FM.getVirtualFileRef(Filename, 1U << 15U, time(0));
 
-    // Tell ASTReader to create a FileID even if this file does not exist:
-    SM->setFileIsTransient(FE);
-    FileID MainFileID = SM->createFileID(FE, SourceLocation(), SrcMgr::C_User);
-    SM->setMainFileID(MainFileID);
-    const SrcMgr::SLocEntry& MainFileSLocE = SM->getSLocEntry(MainFileID);
-    const SrcMgr::FileInfo& MainFileFI = MainFileSLocE.getFile();
-    SrcMgr::ContentCache& MainFileCC
-      = const_cast<SrcMgr::ContentCache&>(MainFileFI.getContentCache());
-    if (!Buffer)
-      Buffer = llvm::MemoryBuffer::getMemBuffer("/*CLING DEFAULT MEMBUF*/;\n");
-    if (AutoComplete) {
-      // Adapted from upstream clang/lib/Interpreter/Interpreter.cpp
-      // FIXME: Merge with CompilerInstance::ExecuteAction.
-      llvm::MemoryBuffer* MB = Buffer.release();
-      CI->getPreprocessorOpts().addRemappedFile(Filename, MB);
-    } else {
-      MainFileCC.setBuffer(std::move(Buffer));
-    }
+    // // Tell ASTReader to create a FileID even if this file does not exist:
+    // SM->setFileIsTransient(FE);
+    // FileID MainFileID = SM->createFileID(FE, SourceLocation(), SrcMgr::C_User);
+    // SM->setMainFileID(MainFileID);
+    // const SrcMgr::SLocEntry& MainFileSLocE = SM->getSLocEntry(MainFileID);
+    // const SrcMgr::FileInfo& MainFileFI = MainFileSLocE.getFile();
+    // SrcMgr::ContentCache& MainFileCC
+    //   = const_cast<SrcMgr::ContentCache&>(MainFileFI.getContentCache());
+    // if (!Buffer)
+    //   Buffer = llvm::MemoryBuffer::getMemBuffer("/*CLING DEFAULT MEMBUF*/;\n");
+    // if (AutoComplete) {
+    //   // Adapted from upstream clang/lib/Interpreter/Interpreter.cpp
+    //   // FIXME: Merge with CompilerInstance::ExecuteAction.
+    //   llvm::MemoryBuffer* MB = Buffer.release();
+    //   CI->getPreprocessorOpts().addRemappedFile(Filename, MB);
+    // } else {
+    //   MainFileCC.setBuffer(std::move(Buffer));
+    // }
 
     // Create TargetInfo for the other side of CUDA and OpenMP compilation.
     if ((CI->getLangOpts().CUDA || CI->getLangOpts().OpenMPIsTargetDevice) &&
@@ -1808,7 +1845,7 @@ namespace {
       PP.getHeaderSearchInfo().loadModuleMapFile(*File, /*IsSystem*/ false);
     }
 
-    HandleProgramActions(*CI);
+    // HandleProgramActions(*CI);
 
     return CI.release(); // Passes over the ownership to the caller.
   }
@@ -1828,6 +1865,9 @@ namespace cling {
                         moduleExtensions, false /*OnlyLex*/,
                         !Opts.IsInteractive(), AutoComplete);
   }
+
+  llvm::Expected<std::unique_ptr<CompilerInstance>>
+  CIFactory::create(std::vector<const char *> &ClangArgv);
 
 CompilerInstance* CIFactory::createCI(
     MemBufPtr_t Buffer, int argc, const char* const* argv, const char* LLVMDir,

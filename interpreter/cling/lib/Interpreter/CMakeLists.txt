@@ -11,6 +11,7 @@ set(LIBS
   clangCodeGen
   clangDriver
   clangFrontend
+  clangFrontendTool
   clangParse
   clangSema
   clangAnalysis

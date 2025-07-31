@@ -30,4 +30,7 @@ if(NOT builtin_clang)
   link_directories("${LLVM_LIBRARY_DIR}")
 endif()
 
+add_executable(TClingUtilsTests TClingUtilsTests.cxx)
+target_link_libraries(TClingUtilsTests PRIVATE Core RIO ${CLING_LIBRARIES} $<TARGET_OBJECTS:ClingUtils>)
+
 ROOT_ADD_UNITTEST_DIR(Core RIO ${CLING_LIBRARIES} $<TARGET_OBJECTS:ClingUtils>)

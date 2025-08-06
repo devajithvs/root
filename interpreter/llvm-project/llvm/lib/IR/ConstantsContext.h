@@ -341,6 +341,7 @@ struct InlineAsmKeyType {
   bool HasSideEffects;
   bool IsAlignStack;
   InlineAsm::AsmDialect AsmDialect;
+  ArrayRef<Constant *> Operands;
   bool CanThrow;
 
   InlineAsmKeyType(StringRef AsmString, StringRef Constraints,
@@ -387,13 +388,14 @@ struct InlineAsmKeyType {
 };
 
 struct ConstantExprKeyType {
-private:
+public:
   uint8_t Opcode;
   uint8_t SubclassOptionalData;
   ArrayRef<Constant *> Ops;
   ArrayRef<int> ShuffleMask;
   Type *ExplicitTy;
   std::optional<ConstantRange> InRange;
+  ArrayRef<Constant *> Operands = Ops;
 
   static ArrayRef<int> getShuffleMaskIfValid(const ConstantExpr *CE) {
     if (CE->getOpcode() == Instruction::ShuffleVector)
@@ -577,6 +579,7 @@ private:
     static unsigned getHashValue(const ConstantClass *CP) {
       SmallVector<Constant *, 32> Storage;
       return getHashValue(LookupKey(CP->getType(), ValType(CP, Storage)));
+      // return ConstantClassInfo::getHashValue(CP);
     }
 
     static bool isEqual(const ConstantClass *LHS, const ConstantClass *RHS) {
@@ -630,19 +633,100 @@ private:
   }
 
 public:
+  void dump() {
+    llvm::errs() << "[ConstantUniqueMap::dump] Map address: "
+          << (const void *)&Map << "\n";
+    llvm::errs() << " Dumping all map entries:\n";
+
+    unsigned Index = 0;
+    for (const auto &Entry : Map) {
+      SmallVector<Constant *, 32> Storage;
+      LookupKey Val(Entry->getType(), ValType(Entry, Storage));
+
+      // ConstantExprKeyType value = Val.second;
+      auto value = Val.second;
+
+      unsigned hash;
+      
+      llvm::errs() << "  [" << Index++ << "] "
+                  << *Entry << " @ " << (const void *)Entry
+                  << " [ValueID: " << Entry->getValueID() << "] "
+                  << " [Val.first: " << Val.first << "] "
+                  << " [hash_combine: " << hash_combine(Val.first, Val.second.getHash()) << "] "
+                  << " Hash: " << MapInfo::getHashValue(Entry) << "\n";
+
+        llvm::errs() << "hash_combine_range(Operands.begin(), Operands.end()): " << hash_combine_range(value.Operands.begin(), value.Operands.end()) << "\n";
+        llvm::errs() << "value.Operands.size(): " << value.Operands.size() << "\n";
+        llvm::errs() << "llvm::hashing::detail::get_execution_seed(): " << llvm::hashing::detail::get_execution_seed() << "\n";
+        // if (value.Operands.size() > 0) {
+        //   llvm::errs() << "value.Operands: " << value.Operands[0] << "\n";
+        //   auto first = value.Operands.begin();
+        //   auto last = value.Operands.end();
+        //   const char *s_begin = reinterpret_cast<const char *>(first);
+        //   const char *s_end = reinterpret_cast<const char *>(last);
+          // const uint64_t seed = llvm::hashing::detail::get_execution_seed();
+        //   const size_t length = std::distance(s_begin, s_end);
+        //   if (length <= 64)
+        //     hash = llvm::hashing::detail::hash_short(s_begin, length, seed);
+
+        //   const char *s_aligned_end = s_begin + (length & ~63);
+        //   llvm::hashing::detail::hash_state state = state.create(s_begin, seed);
+        //   s_begin += 64;
+        //   while (s_begin != s_aligned_end) {
+        //     state.mix(s_begin);
+        //     s_begin += 64;
+        //   }
+        //   if (length & 63)
+        //     state.mix(s_end - 64);
+
+        //   hash = state.finalize(length);
+
+        //   llvm::errs() << "hash_combine_range(Operands.begin(), Operands.end()): " << hash << "\n";
+        // }
+        // else
+        //   llvm::errs() << "value.Operands: NULL" << "\n";
+
+        // llvm::errs() << "hash_combine_range(Ops.begin(), Ops.end()): " << hash_combine_range(value.Ops.begin(), value.Ops.end()) << ", ";
+        // llvm::errs() << "hash_combine_range(Ops.begin(), Ops.end()): " << hash_combine_range(value.ShuffleMask.begin(), value.ShuffleMask.end()) << ", ";
+        // llvm::errs() << "hash_combine(value.Opcode, value.ExplicitTy): " << hash_combine(value.SubclassOptionalData, value.Opcode, value.ExplicitTy) << ", ";
+      // return hash_combine(
+      //   Opcode, SubclassOptionalData,
+      //   hash_combine_range(Ops.begin(), Ops.end()),
+      //   hash_combine_range(ShuffleMask.begin(), ShuffleMask.end()), ExplicitTy);
+    }
+
+    llvm::errs() << "[END DUMP] \n";
+  }
+
   /// Return the specified constant from the map, creating it if necessary.
   ConstantClass *getOrCreate(TypeClass *Ty, ValType V) {
     LookupKey Key(Ty, V);
-    /// Hash once, and reuse it for the lookup and the insertion if needed.
     LookupKeyHashed Lookup(MapInfo::getHashValue(Key), Key);
 
-    ConstantClass *Result = nullptr;
+    llvm::errs() << "[ConstantUniqueMap::getOrCreate] Map address: "
+                << (const void *)&Map << "\n";
 
+    ConstantClass *Result = nullptr;
     auto I = Map.find_as(Lookup);
-    if (I == Map.end())
+
+    if (I == Map.end()) {
       Result = create(Ty, V, Lookup);
-    else
+      llvm::errs() << "[ConstantUniqueMap::getOrCreate] Created new constant: "
+                  << *Result << " @ " << (const void *)Result
+                  << " [ValueID: " << Result->getValueID() << "]\n";
+    } else {
       Result = *I;
+      llvm::errs() << "[ConstantUniqueMap::getOrCreate] Reused existing constant: "
+                  << *Result << " @ " << (const void *)Result
+                  << " [ValueID: " << Result->getValueID() << "]\n";
+    }
+
+    llvm::errs() << "[ConstantUniqueMap::getOrCreate] Hash Value: " 
+              <<  MapInfo::getHashValue(Key) << "\n";
+    llvm::errs() << "[ConstantUniqueMap::getOrCreate] Hash Value: Result: " 
+              <<  MapInfo::getHashValue(Result) << "\n";
+    dump();
+
     assert(Result && "Unexpected nullptr");
 
     return Result;
@@ -650,7 +734,29 @@ public:
 
   /// Remove this constant from the map
   void remove(ConstantClass *CP) {
+    llvm::errs() << "[ConstantUniqueMap::remove] Map address: "
+                << (const void *)&Map << "\n";
+
+    llvm::errs() << "[ConstantUniqueMap::remove] Attempting to remove constant: " 
+                << *CP << " @ " << (const void *)CP 
+                << " [ValueID: " << CP->getValueID() << "]\n";
+    llvm::errs() << "[ConstantUniqueMap::remove] Hash Value: " 
+                 <<  MapInfo::getHashValue(CP) << "\n";
+
     typename MapTy::iterator I = Map.find(CP);
+    dump();
+
+    // auto It = llvm::find(Map, CP);
+    // if (It != Map.end())
+    //   Map.erase(It);
+
+    // for (auto It = Map.begin(); It != Map.end(); ++It) {
+    //   if (*It == CP) {
+    //     Map.erase(It);
+    //     dump();
+    //     return;
+    //   }
+    // }
     assert(I != Map.end() && "Constant not found in constant table!");
     assert(*I == CP && "Didn't find correct element?");
     Map.erase(I);

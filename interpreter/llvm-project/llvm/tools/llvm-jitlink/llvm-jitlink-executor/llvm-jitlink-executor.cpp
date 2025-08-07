@@ -120,7 +120,7 @@ int openListener(std::string Host, std::string PortStr) {
 
 // JITLink debug support plugins put information about JITed code in this GDB
 // JIT Interface global from OrcTargetProcess.
-extern "C" LLVM_ABI struct jit_descriptor __jit_debug_descriptor;
+extern "C" struct jit_descriptor __jit_debug_descriptor;
 
 static void *findLastDebugDescriptorEntryPtr() {
   struct jit_code_entry *Last = __jit_debug_descriptor.first_entry;

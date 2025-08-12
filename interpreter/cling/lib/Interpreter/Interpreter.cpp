@@ -45,7 +45,6 @@
 #include "cling/Interpreter/CIFactory.h"
 #include "clang/AST/ASTContext.h"
 #include "clang/AST/GlobalDecl.h"
-#include "clang/AST/QualTypeNames.h"
 #include "clang/Basic/SourceManager.h"
 #include "clang/Basic/TargetInfo.h"
 #include "clang/CodeGen/ModuleBuilder.h"
@@ -1325,13 +1324,9 @@ namespace cling {
     funcname << "__cling_Destruct_" << RD;
 
     largestream code;
-    const clang::ASTContext &Context = RD->getASTContext();
-    clang::PrintingPolicy Policy(Context.getPrintingPolicy());
-    Policy.SuppressScope = false;
-    Policy.AnonymousTagLocations = true;
     code << "extern \"C\" void " << funcname.str() << "(void* obj){(("
-         << clang::TypeName::getFullyQualifiedName(
-                clang::QualType(RD->getTypeForDecl(), 0), Context, Policy, /*WithGlobalNsPrefix=*/false)
+         << utils::TypeName::GetFullyQualifiedName(
+                clang::QualType(RD->getTypeForDecl(), 0), RD->getASTContext())
          << "*)obj)->~" << RD->getNameAsString() << "();}";
 
     // ifUniq = false: we know it's unique, no need to check.

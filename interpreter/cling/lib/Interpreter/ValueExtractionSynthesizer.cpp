@@ -21,7 +21,6 @@
 #include "clang/Sema/Lookup.h"
 #include "clang/Sema/Sema.h"
 #include "clang/Sema/SemaDiagnostic.h"
-#include "clang/AST/QualTypeNames.h"
 
 using namespace clang;
 
@@ -395,11 +394,8 @@ namespace {
                                    locStart, CallArgs, locEnd);
       }
       else {
-        clang::PrintingPolicy Policy(m_Context->getPrintingPolicy());
-        Policy.SuppressScope = false;
-        Policy.AnonymousTagLocations = true;
         m_Sema->Diag(locStart, diag::err_unsupported_unknown_any_decl) <<
-          clang::TypeName::getFullyQualifiedName(desugaredTy, *m_Context, Policy, /*WithGlobalNsPrefix=*/false) <<
+          utils::TypeName::GetFullyQualifiedName(desugaredTy, *m_Context) <<
           SourceRange(locStart, locEnd);
       }
     }

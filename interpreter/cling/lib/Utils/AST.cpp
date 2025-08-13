@@ -1286,8 +1286,15 @@ namespace utils {
 
         if (I->getKind() == TemplateArgument::Template) {
           TemplateName tname = I->getAsTemplate();
+          bool changed = false;
+          if (std::optional<TemplateName> UnderlyingOrNone = tname.desugar(/*IgnoreDeduced=*/false)) {
+            if (*UnderlyingOrNone != tname) {
+              tname = *UnderlyingOrNone;
+              changed = true;
+            }
+          }
           // Note: should we not also desugar?
-          bool changed = GetFullyQualifiedTemplateName(Ctx, tname);
+          changed |= GetFullyQualifiedTemplateName(Ctx, tname);
           if (changed) {
             desArgs.push_back(TemplateArgument(tname));
             mightHaveChanged = true;

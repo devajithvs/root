@@ -15,7 +15,6 @@
 #define XSTR(x) STR(x)
 #define STR(x) #x
 
-using namespace __gnu_cxx;
 
 // Include files
 #include <vector>

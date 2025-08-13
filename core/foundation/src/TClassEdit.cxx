@@ -2013,30 +2013,22 @@ string TClassEdit::InsertStd(const char *tname)
       "wstring"
    };
 
-   // Minimal set of libstdc++ internals we want to qualify.
-   // Add more here if you run into them.
-   static const char* sGNUtypes[] = {
-      "__mt_alloc",
-      "__common_pool_policy",
-      "__pool"
-      // "__per_type_pool_policy", "__debug_alloc", … (add as needed)
-   };
-
    if (!tname || *tname == 0) return "";
 
-   auto initSet = [](auto&& arr) {
-      std::set<std::string> s;
-      const size_t n = sizeof(arr) / sizeof(arr[0]);
-      for (size_t i = 0; i < n; ++i) s.insert(arr[i]);
-      return s;
+   auto initSetSTLtypes = []() {
+      std::set<std::string> iSetSTLtypes;
+      // set up static set
+      const size_t nSTLtypes = sizeof(sSTLtypes) / sizeof(const char*);
+      for (size_t i = 0; i < nSTLtypes; ++i)
+         iSetSTLtypes.insert(sSTLtypes[i]);
+      return iSetSTLtypes;
    };
-   static ShuttingDownSignaler<std::set<std::string>> sSetSTLtypes{ initSet(sSTLtypes) };
-   static ShuttingDownSignaler<std::set<std::string>> sSetGNUtypes{ initSet(sGNUtypes) };
+   static ShuttingDownSignaler<std::set<std::string>> sSetSTLtypes{ initSetSTLtypes() };
 
    size_t b = 0;
    size_t len = strlen(tname);
    string ret;
-   ret.reserve(len + 32); // a little extra room
+   ret.reserve(len + 20); // expect up to 4 extra "std::" to insert
    string id;
    while (b < len) {
       // find beginning of next identifier
@@ -2046,9 +2038,8 @@ string TClassEdit::InsertStd(const char *tname)
          if (precScope) {
             ret += "::";
             b += 2;
-         } else {
+         } else
             ret += tname[b++];
-         }
       }
 
       // now b is at the beginning of an identifier or len
@@ -2059,14 +2050,9 @@ string TClassEdit::InsertStd(const char *tname)
          id += tname[e++];
       if (!id.empty()) {
          if (!precScope) {
-            // std:: types
-            if (sSetSTLtypes.find(id) != sSetSTLtypes.end()) {
+            set<string>::const_iterator iSTLtype = sSetSTLtypes.find(id);
+            if (iSTLtype != sSetSTLtypes.end())
                ret += "std::";
-            }
-            // __gnu_cxx internals we care about
-            else if (sSetGNUtypes.find(id) != sSetGNUtypes.end()) {
-               ret += "__gnu_cxx::";
-            }
          }
 
          ret += id;

@@ -15,97 +15,71 @@
 #define XSTR(x) STR(x)
 #define STR(x) #x
 
+typedef double         Double32_t;
 
-// Include files
-#include <vector>
+// namespace blah {
+//   template<typename T>
+//   class __pool_base {};
+  
+//   template<bool _Thread>
+//   class __pool : public __pool_base<Double32_t> {};
+//   template<template <bool> class _PoolTp, typename T>
+//   struct __common_pool_policy {};
+//   template<typename _Tp, typename _Poolp = __common_pool_policy<__pool, Double32_t> >
+//   class __mt_alloc {};
+// }
 
-// need to use macro as template typedefs don't work yet :(
 
-// Check if memory pools are isabled completely
-#ifndef GOD_NOALLOC
+typedef double Double32_t;
 
-#if defined(__GNUC__) && !defined( _LIBCPP_VERSION )
+namespace blah {
+  template<typename D> struct __pool_base {};
 
-   #if __GNUC__ > 3
-      // This is GCC 4 and above. Use the allocators
-      #include <ext/mt_allocator.h>
-      #define LHCb_FastAllocVector_allocator(TYPE) __gnu_cxx::__mt_alloc< TYPE >
-   #else
-
-   #if __GNUC_MINOR__ > 3
-      // This is gcc 3.4.X so has the custom allocators
-      #include <ext/mt_allocator.h>
-      #define LHCb_FastAllocVector_allocator(TYPE) __gnu_cxx::__mt_alloc< TYPE >
-
-   #else
-      // This is older than gcc 3.4.X so use standard allocator
-      #define LHCb_FastAllocVector_allocator(TYPE) std::allocator< TYPE >
-      #endif
-#endif
-
-// GOD_NOALLOC DEFINED
-#else
-   // Not GNUC, so disable allocators
-   #define LHCb_FastAllocVector_allocator(TYPE) std::allocator< TYPE >
-#endif
-
-#else
-
-// GOD NOALLOC - Disable memory pools completely
-#define LHCb_FastAllocVector_allocator(TYPE) std::allocator< TYPE >
-
-#endif
-
-namespace LHCb
-{
-
-  //--------------------------------------------------------------------------------
-  /** @class FastAllocVector FastAllocVector.h Kernel/FastAllocVector.h
-   *
-   *  Vector with fast allocator
-   *
-   *  @author Chris Jones   Christopher.Rob.Jones@cern.ch
-   *  @date   29/03/2007
-   */
-  //--------------------------------------------------------------------------------
-
-  template < typename TYPE, typename ALLOC = LHCb_FastAllocVector_allocator(TYPE) >
-  class FastAllocVector : public std::vector<TYPE,ALLOC>
-  {
-
-  public:
-
-    /// Default constructor
-    FastAllocVector( ) { }
-
-    /** Constructor with initial size
-     *  @param size Initialisation size for vector */
-    FastAllocVector( const typename std::vector<TYPE,ALLOC>::size_type size )
-      : std::vector<TYPE,ALLOC> (size) { }
-
-    /** Constructor with initial size and initialisation value
-     *  @param size Initialisation size for vector
-     *  @param init Initialisation value
-     */
-    FastAllocVector( const typename std::vector<TYPE,ALLOC>::size_type size,
-                     const TYPE & init ) : std::vector<TYPE,ALLOC> (size,init) { }
-
-    /// Copy Constructor
-    FastAllocVector( const FastAllocVector & init ) : std::vector<TYPE,ALLOC> (init) { }
-
-    /// Operator overloading for ostream
-    friend inline std::ostream& operator << ( std::ostream& str ,
-                                              const FastAllocVector<TYPE,ALLOC> & /*v*/ )
-    {
-//       str << "[ ";
-//       for ( typename FastAllocVector<TYPE,ALLOC>::const_iterator i = v.begin(); i != v.end(); ++i )
-//       { str << *i << " "; }
-//       return str << "]";
-      return str;
-    }
-
+  // Note the extra defaulted parameter D = Double32_t
+  template<bool _Thread, typename D = Double32_t>
+  struct __pool : __pool_base<D> {
+    using element_type = D; // expose it so tooling can “see” Double32_t
   };
 
+  // Must stay exactly this shape:
+  template<typename T, template <bool, typename D> class _PoolTp>
+  struct __common_pool_policy {
+    using pool_true     = _PoolTp<true, Double32_t>;                 // forces an instantiation
+    using element_type  = typename pool_true::element_type; // pulls Double32_t into the AST
+  };
+
+  // Must stay exactly this shape:
+  template<typename _Poolp>
+  struct __common_pool_policy2 {
+   //  using pool_true     = _PoolTp<true, Double32_t>;                 // forces an instantiation
+   //  using element_type  = typename pool_true::element_type; // pulls Double32_t into the AST
+  };
+
+
+  template<typename _Tp,
+           typename _Poolp = __common_pool_policy2<__common_pool_policy<Double32_t, __pool>> >
+  struct __mt_alloc {};
 }
+
+namespace LHCb {
+  template <typename TYPE,
+            typename ALLOC = blah::__mt_alloc<TYPE>>
+  struct FastAllocVector {};
+
+  // Example that threads the policy carrying Double32_t
+  using VecD32 =
+      FastAllocVector<int,
+        blah::__mt_alloc<
+          int,
+          blah::__common_pool_policy2<blah::__common_pool_policy<Double32_t, blah::__pool>>
+        >
+      >;
+}
+
+// namespace LHCb {
+//   template < typename TYPE, typename ALLOC = blah::__mt_alloc< TYPE > >
+//   class FastAllocVector {};
+
+// }
 
 #endif // KERNEL_FastAllocVector_H

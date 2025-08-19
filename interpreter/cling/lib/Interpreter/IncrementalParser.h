@@ -33,6 +33,7 @@ namespace clang {
   class CompilerInstance;
   class DiagnosticConsumer;
   class Decl;
+  class TranslationUnitDecl;
   class FileID;
   class ModuleFileExtension;
   class Parser;
@@ -204,6 +205,7 @@ namespace cling {
     ///
     const Transaction* getCurrentTransaction() const;
 
+    void cleanupTU(clang::TranslationUnitDecl* MostRecentTU);
 
     ///\brief Add a user-generated transaction.
     void addTransaction(Transaction* T);

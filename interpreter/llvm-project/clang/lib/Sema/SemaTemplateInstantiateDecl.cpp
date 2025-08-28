@@ -5549,13 +5549,6 @@ void Sema::BuildVariableInstantiation(
 void Sema::InstantiateVariableInitializer(
     VarDecl *Var, VarDecl *OldVar,
     const MultiLevelTemplateArgumentList &TemplateArgs) {
-
-  llvm::errs() << "InstantiateVariableInitializer: Var=";
-  Var->print(llvm::errs());
-  llvm::errs() << " OldVar=";
-  OldVar->print(llvm::errs());
-  llvm::errs() << "\n";
-
   if (ASTMutationListener *L = getASTContext().getASTMutationListener())
     L->VariableDefinitionInstantiated(Var);
 
@@ -5568,9 +5561,6 @@ void Sema::InstantiateVariableInitializer(
     Var->setImplicitlyInline();
 
   if (OldVar->getInit()) {
-    llvm::errs() << "OldVar has initializer: ";
-    OldVar->getInit()->printPretty(llvm::errs(), nullptr, getPrintingPolicy());
-    llvm::errs() << "\n";
     EnterExpressionEvaluationContext Evaluated(
         *this, Sema::ExpressionEvaluationContext::PotentiallyEvaluated, Var);
 
@@ -5589,30 +5579,17 @@ void Sema::InstantiateVariableInitializer(
 
     if (!Init.isInvalid()) {
       Expr *InitExpr = Init.get();
-      llvm::errs() << "SubstInitializer produced ";
-      if (InitExpr) {
-        InitExpr->printPretty(llvm::errs(), nullptr, getPrintingPolicy());
-        llvm::errs() << "\n";
-      } else {
-        llvm::errs() << "nullptr\n";
-      }
 
       if (Var->hasAttr<DLLImportAttr>() &&
           (!InitExpr ||
            !InitExpr->isConstantInitializer(getASTContext(), false))) {
-        llvm::errs() << "Skipping dynamic init for dllimport variable.\n";
         // Do not dynamically initialize dllimport variables.
       } else if (InitExpr) {
         bool DirectInit = OldVar->isDirectInit();
-        llvm::errs() << "Adding initializer to decl. DirectInit="
-                     << DirectInit << "\n";
         AddInitializerToDecl(Var, InitExpr, DirectInit);
-      } else {
-        llvm::errs() << "Initializer missing, treating as uninitialized.\n";
+      } else
         ActOnUninitializedDecl(Var);
-      }
     } else {
-      llvm::errs() << "SubstInitializer returned invalid, marking Var invalid.\n";
       // FIXME: Not too happy about invalidating the declaration
       // because of a bogus initializer.
       Var->setInvalidDecl();

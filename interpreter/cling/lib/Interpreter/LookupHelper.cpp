@@ -95,6 +95,14 @@ namespace cling {
     assert(!code.empty() &&
            "prepareForParsing should only be called when need");
 
+    //
+    // Tell the parser to parse without RecoveryExpr nodes.
+    // This restores old (LLVM 18) behavior: error -> ExprError (invalid),
+    // without a "recoverable" initializer that later trips CodeGen.
+    // https://github.com/llvm/llvm-project/commit/fd87d765c0455265aea4595a3741a96b4c078fbc
+    //
+    const_cast<LangOptions&>(PP.getLangOpts()).RecoveryAST = 0;
+
     // Create a fake file to parse the type name.
     FileID FID;
     llvm::hash_code hashedCode = llvm::hash_value(code);

@@ -24,6 +24,8 @@
 
 #include "MathX/GenVectorX/GenVectorIO.h"
 
+#include "TMath.h"
+
 #include "MathX/GenVectorX/MathHeaders.h"
 
 #include "MathX/GenVectorX/AccHeaders.h"
@@ -363,6 +365,29 @@ public:
       \f[ \eta = - \ln { \tan { \frac { \theta} {2} } } \f]
    */
    Scalar Eta() const { return fCoordinates.Eta(); }
+
+   /**
+      deltaRapidity between this and vector v
+      \f[ \Delta R = \sqrt { \Delta \eta ^2 + \Delta \phi ^2 } \f]
+      \param useRapidity true to use Rapidity(), false to use Eta()
+   */
+   template <class OtherLorentzVector>
+   Scalar DeltaR(const OtherLorentzVector &v, const bool useRapidity = false) const
+   {
+      const double delta = useRapidity ? Rapidity() - v.Rapidity() : Eta() - v.Eta();
+      double dphi = Phi() - v.Phi();
+      // convert dphi angle to the interval (-PI,PI]
+      if (dphi > TMath::Pi() || dphi <= -TMath::Pi()) {
+         if (dphi > 0) {
+            int n = static_cast<int>(dphi / TMath::TwoPi() + 0.5);
+            dphi -= TMath::TwoPi() * n;
+         } else {
+            int n = static_cast<int>(0.5 - dphi / TMath::TwoPi());
+            dphi += TMath::TwoPi() * n;
+         }
+      }
+      return math_sqrt(delta * delta + dphi * dphi);
+   }
 
    /**
       get the spatial components of the Vector in a

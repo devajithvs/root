@@ -17,7 +17,7 @@
 #ifndef ROOT_MathX_GenVectorX_VectorUtil
 #define ROOT_MathX_GenVectorX_VectorUtil 1
 
-#include "TMath.h"
+#include "Math/Math.h"
 
 #include "MathX/GenVectorX/Boost.h"
 
@@ -61,10 +61,10 @@ template <class Vector1, class Vector2>
 inline typename Vector1::Scalar DeltaPhi(const Vector1 &v1, const Vector2 &v2)
 {
    typename Vector1::Scalar dphi = v2.Phi() - v1.Phi();
-   if (dphi > TMath::Pi()) {
-      dphi -= 2.0 * TMath::Pi();
-   } else if (dphi <= -TMath::Pi()) {
-      dphi += 2.0 * TMath::Pi();
+   if (dphi > M_PI) {
+      dphi -= 2.0 * M_PI;
+   } else if (dphi <= -M_PI) {
+      dphi += 2.0 * M_PI;
    }
    return dphi;
 }

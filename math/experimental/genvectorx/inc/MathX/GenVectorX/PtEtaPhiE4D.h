@@ -20,7 +20,6 @@
 #define ROOT_MathX_GenVectorX_PtEtaPhiE4D 1
 
 #include "Math/Math.h"
-#include "TMath.h"
 
 #include "MathX/GenVectorX/etaMax.h"
 
@@ -278,7 +277,7 @@ public:
    }
 
 private:
-   inline static Scalar pi() { return TMath::Pi(); }
+   inline static Scalar pi() { return M_PI; }
    inline void Restrict()
    {
       if (fPhi <= -pi() || fPhi > pi())

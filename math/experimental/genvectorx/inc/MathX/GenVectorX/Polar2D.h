@@ -20,7 +20,6 @@
 #define ROOT_MathX_GenVectorX_Polar2D 1
 
 #include "Math/Math.h"
-#include "TMath.h"
 
 #include "MathX/GenVectorX/etaMax.h"
 
@@ -135,7 +134,7 @@ public:
    void SetXY(Scalar a, Scalar b);
 
 private:
-   inline static double pi() { return TMath::Pi(); }
+   inline static double pi() { return M_PI; }
 
    /**
       restrict abgle hi to be between -PI and PI

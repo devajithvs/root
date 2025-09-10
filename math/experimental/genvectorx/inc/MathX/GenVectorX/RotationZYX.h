@@ -30,8 +30,6 @@
 
 #include "MathX/GenVectorX/3DConversions.h"
 
-#include "TMath.h"
-
 #include <algorithm>
 #include <cassert>
 #include <iostream>
@@ -350,7 +348,7 @@ private:
    double fTheta; // Y' rotation angle (pitch) defined in [-PI/2,PI/2]
    double fPsi;   // X'' rotation angle (roll) defined in (-PI,PI]
 
-   static double Pi() { return TMath::Pi(); }
+   static double Pi() { return M_PI; }
 
 }; // RotationZYX
 

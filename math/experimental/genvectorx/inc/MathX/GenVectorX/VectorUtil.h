@@ -291,7 +291,7 @@ inline typename Vector1::Scalar InvariantMass2(const Vector1 &v1, const Vector2 
 template <class Vector>
 Vector RotateX(const Vector &v, double alpha)
 {
-   if (math_fmod(alpha, 2 * TMath::Pi()) == 0.)
+   if (math_fmod(alpha, 2 * M_PI) == 0.)
       return v;
    double sina = math_sin(alpha);
    double cosa = math_cos(alpha);
@@ -311,7 +311,7 @@ Vector RotateX(const Vector &v, double alpha)
 template <class Vector>
 Vector RotateY(const Vector &v, double alpha)
 {
-   if (math_fmod(alpha, 2 * TMath::Pi()) == 0.)
+   if (math_fmod(alpha, 2 * M_PI) == 0.)
       return v;
    double sina = math_sin(alpha);
    double cosa = math_cos(alpha);
@@ -331,7 +331,7 @@ Vector RotateY(const Vector &v, double alpha)
 template <class Vector>
 Vector RotateZ(const Vector &v, double alpha)
 {
-   if (math_fmod(alpha, 2 * TMath::Pi()) == 0.)
+   if (math_fmod(alpha, 2 * M_PI) == 0.)
       return v;
    double sina = math_sin(alpha);
    double cosa = math_cos(alpha);
@@ -351,7 +351,7 @@ Vector RotateZ(const Vector &v, double alpha)
 template <class Vector>
 Vector Rotate(const Vector &v, double alpha, const Vector &axis)
 {
-   if (math_fmod(alpha, 2 * TMath::Pi()) == 0.)
+   if (math_fmod(alpha, 2 * M_PI) == 0.)
       return v;
    const double ll = math_sqrt(axis.X() * axis.X() + axis.Y() * axis.Y() + axis.Z() * axis.Z());
    if (ll == 0.)

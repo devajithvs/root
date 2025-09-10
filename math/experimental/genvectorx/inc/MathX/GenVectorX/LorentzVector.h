@@ -23,8 +23,6 @@
 #include "MathX/GenVectorX/GenVectorIO.h"
 #include "MathX/Vector2D.h"
 
-#include "TMath.h"
-
 #include "MathX/GenVectorX/MathHeaders.h"
 
 #include "MathX/GenVectorX/AccHeaders.h"
@@ -377,13 +375,13 @@ public:
       const double delta = useRapidity ? Rapidity() - v.Rapidity() : Eta() - v.Eta();
       double dphi = Phi() - v.Phi();
       // convert dphi angle to the interval (-PI,PI]
-      if (dphi > TMath::Pi() || dphi <= -TMath::Pi()) {
+      if (dphi > M_PI || dphi <= -M_PI) {
          if (dphi > 0) {
-            int n = static_cast<int>(dphi / TMath::TwoPi() + 0.5);
-            dphi -= TMath::TwoPi() * n;
+            int n = static_cast<int>(dphi / (2 * M_PI) + 0.5);
+            dphi -= (2 * M_PI) * n;
          } else {
-            int n = static_cast<int>(0.5 - dphi / TMath::TwoPi());
-            dphi += TMath::TwoPi() * n;
+            int n = static_cast<int>(0.5 - dphi / (2 * M_PI));
+            dphi += (2 * M_PI) * n;
          }
       }
       return math_sqrt(delta * delta + dphi * dphi);
@@ -800,16 +798,16 @@ Acoplanarity(LorentzVector<CoordSystem> const &pp, LorentzVector<CoordSystem> co
 {
    auto dphi = pp.Phi() - pm.Phi();
    // convert dphi angle to the interval (-PI,PI]
-   if (dphi > TMath::Pi() || dphi <= -TMath::Pi()) {
+   if (dphi > M_PI || dphi <= -M_PI) {
       if (dphi > 0) {
-         int n = static_cast<int>(dphi / TMath::TwoPi() + 0.5);
-         dphi -= TMath::TwoPi() * n;
+         int n = static_cast<int>(dphi / (2 * M_PI) + 0.5);
+         dphi -= (2 * M_PI) * n;
       } else {
-         int n = static_cast<int>(0.5 - dphi / TMath::TwoPi());
-         dphi += TMath::TwoPi() * n;
+         int n = static_cast<int>(0.5 - dphi / (2 * M_PI));
+         dphi += (2 * M_PI) * n;
       }
    }
-   return 1 - math_fabs(dphi) / TMath::Pi();
+   return 1 - math_fabs(dphi) / M_PI;
 }
 
 /**

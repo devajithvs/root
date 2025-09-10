@@ -824,8 +824,8 @@ template <class CoordSystem>
 typename LorentzVector<CoordSystem>::Scalar
 AsymmetryVectorial(LorentzVector<CoordSystem> const &pp, LorentzVector<CoordSystem> const &pm)
 {
-   ROOT::Math::XYVector vp(pp.Px(), pp.Py());
-   ROOT::Math::XYVector vm(pm.Px(), pm.Py());
+   ROOT::ROOT_MATH_ARCH::XYVector vp(pp.Px(), pp.Py());
+   ROOT::ROOT_MATH_ARCH::XYVector vm(pm.Px(), pm.Py());
    auto denom = (vp + vm).R();
    if (denom == 0.)
       return -1;

@@ -354,8 +354,8 @@ Vector Rotate(const Vector &v, double alpha, const Vector &axis)
    if (math_fmod(alpha, 2 * M_PI) == 0.)
       return v;
    const double ll = math_sqrt(axis.X() * axis.X() + axis.Y() * axis.Y() + axis.Z() * axis.Z());
-   if (ll == 0.)
 #if !defined(ROOT_MATH_SYCL) && !defined(ROOT_MATH_CUDA)
+   if (ll == 0.)
       GenVector_Throw("Axis Vector has zero magnitude");
 #endif
    const double sa = math_sin(alpha);

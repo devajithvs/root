@@ -16,7 +16,7 @@
 #ifndef ROOT_MathX_GenVectorX_Cylindrical3D
 #define ROOT_MathX_GenVectorX_Cylindrical3D 1
 
-#include "Math/Math.h"
+#include "TMath.h"
 
 #include "MathX/GenVectorX/eta.h"
 
@@ -132,7 +132,7 @@ public:
    }
 
 private:
-   inline static Scalar pi() { return Scalar(M_PI); }
+   inline static Scalar pi() { return Scalar(TMath::Pi()); }
    inline void Restrict()
    {
       if (fPhi <= -pi() || fPhi > pi())

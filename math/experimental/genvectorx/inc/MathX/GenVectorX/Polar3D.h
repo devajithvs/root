@@ -29,6 +29,7 @@
 
 using namespace ROOT::ROOT_MATH_ARCH;
 
+#include "TMath.h"
 #include <cmath>
 
 namespace ROOT {
@@ -172,7 +173,7 @@ public:
    void SetXYZ(Scalar x, Scalar y, Scalar z);
 
 private:
-   inline static Scalar pi() { return M_PI; }
+   inline static Scalar pi() { return TMath::Pi(); }
    inline void Restrict()
    {
       if (fPhi <= -pi() || fPhi > pi())

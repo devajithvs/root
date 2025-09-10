@@ -21,7 +21,7 @@
 
 #include "MathX/GenVectorX/3DConversions.h"
 
-#include "Math/Math.h"
+#include "TMath.h"
 
 #include "MathX/GenVectorX/Rotation3D.h"
 #include "MathX/GenVectorX/AxisAngle.h"
@@ -80,7 +80,7 @@ void convert(Rotation3D const &from, AxisAngle &to)
 
    u.SetCoordinates(uX, uY, uZ);
 
-   static const double pi = M_PI;
+   static const double pi = TMath::Pi();
 
    double angle;
    const double cosdelta = (m[kXX] + m[kYY] + m[kZZ] - 1.0) / 2.0;
@@ -100,7 +100,7 @@ void convert(Rotation3D const &from, AxisAngle &to)
 
 static void correctByPi(double &psi, double &phi)
 {
-   static const double pi = M_PI;
+   static const double pi = TMath::Pi();
    if (psi > 0) {
       psi -= pi;
    } else {
@@ -124,8 +124,8 @@ void convert(Rotation3D const &from, EulerAngles &to)
 
    double phi, theta, psi;
    double psiPlusPhi, psiMinusPhi;
-   static const double pi = M_PI;
-   static const double pi_2 = M_PI_2;
+   static const double pi = TMath::Pi();
+   static const double pi_2 = TMath::PiOver2();
 
    theta = (math_fabs(r[kZZ]) <= 1.0) ? math_acos(r[kZZ]) : (r[kZZ] > 0.0) ? 0 : pi;
 
@@ -279,7 +279,7 @@ void convert(Rotation3D const &from, RotationZYX &to)
    // theta is assumed to be in range [-PI/2,PI/2].
    // this is guaranteed by the Rectify function
 
-   static const double pi_2 = M_PI_2;
+   static const double pi_2 = TMath::PiOver2();
 
    double r[9];
    from.GetComponents(r, r + 9);

@@ -22,6 +22,7 @@
 #include "MathX/GenVectorX/PositionVector3D.h"
 #include "MathX/GenVectorX/LorentzVector.h"
 #include "MathX/GenVectorX/3DConversions.h"
+#include "TMath.h"
 #include <algorithm>
 #include <cassert>
 
@@ -377,7 +378,7 @@ private:
    double fTheta; // X rotation angle (second) defined only [0,PI]
    double fPsi;   // Z rotation angle (third)  defined in [-PI,PI]
 
-   static double Pi() { return M_PI; }
+   static double Pi() { return TMath::Pi(); }
 
 }; // EulerAngles
 

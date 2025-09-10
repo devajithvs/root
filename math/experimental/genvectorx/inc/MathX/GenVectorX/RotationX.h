@@ -25,6 +25,8 @@
 
 #include "MathX/GenVectorX/RotationXfwd.h"
 
+#include "TMath.h"
+
 #include "MathX/GenVectorX/AccHeaders.h"
 
 #include "MathX/GenVectorX/MathHeaders.h"
@@ -66,9 +68,9 @@ public:
    */
    void Rectify()
    {
-      if (math_fabs(fAngle) >= M_PI) {
-         double x = fAngle / (2.0 * M_PI);
-         fAngle = (2.0 * M_PI) * (x + math_floor(.5 - x));
+      if (math_fabs(fAngle) >= TMath::Pi()) {
+         double x = fAngle / (2.0 * TMath::Pi());
+         fAngle = (2.0 * TMath::Pi()) * (x + math_floor(.5 - x));
          fSin = math_sin(fAngle);
          fCos = math_cos(fAngle);
       }
@@ -198,8 +200,8 @@ public:
    RotationX operator*(const RotationX &r) const
    {
       RotationX ans;
-      double x = (fAngle + r.fAngle) / (2.0 * M_PI);
-      ans.fAngle = (2.0 * M_PI) * (x + math_floor(.5 - x));
+      double x = (fAngle + r.fAngle) / (2.0 * TMath::Pi());
+      ans.fAngle = (2.0 * TMath::Pi()) * (x + math_floor(.5 - x));
       ans.fSin = fSin * r.fCos + fCos * r.fSin;
       ans.fCos = fCos * r.fCos - fSin * r.fSin;
       return ans;

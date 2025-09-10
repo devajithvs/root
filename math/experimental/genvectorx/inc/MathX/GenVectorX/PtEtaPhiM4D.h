@@ -35,6 +35,7 @@ using namespace ROOT::ROOT_MATH_ARCH;
 #include <iostream>
 #endif
 
+#include "TMath.h"
 #include <cmath>
 
 namespace ROOT {
@@ -278,7 +279,7 @@ public:
    Scalar Et() const { return E() / math_cosh(fEta); }
 
 private:
-   inline static Scalar pi() { return M_PI; }
+   inline static Scalar pi() { return TMath::Pi(); }
    inline void RestrictPhi()
    {
       if (fPhi <= -pi() || fPhi > pi())

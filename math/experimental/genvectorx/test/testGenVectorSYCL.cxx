@@ -510,9 +510,9 @@ int testRotations3D()
             // at.Rotate(angle, axist);
             // at.Print();
             // (17.856456,8.106555,-21.199782)
-            iret |= compare(rotated.X(), 17.856456, "x diff", 1e10);
-            iret |= compare(rotated.Y(), 8.106555, "y diff", 1e10);
-            iret |= compare(rotated.Z(), -21.199782, "z diff", 1e10);
+            iret |= compare(rotated.X(), 17.856456, 1e10);
+            iret |= compare(rotated.Y(), 8.106555, 1e10);
+            iret |= compare(rotated.Z(), -21.199782, 1e10);
          });
       });
    }

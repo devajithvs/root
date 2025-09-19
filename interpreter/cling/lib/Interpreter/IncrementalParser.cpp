@@ -562,22 +562,11 @@ namespace cling {
                                            getCI()->getCodeGenOpts());
   }
 
-  void IncrementalParser::cleanupTU(clang::TranslationUnitDecl* MostRecentTU) {
-    for (Decl* D : MostRecentTU->noload_decls())
-      // Remove any TopLevelStmtDecl created for statements that failed to
-      // parse.
-      if (auto* TLSD = dyn_cast<TopLevelStmtDecl>(D))
-        if (!TLSD->getStmt())
-          MostRecentTU->removeDecl(TLSD);
-  }
-
   void IncrementalParser::commitTransaction(ParseResultTransaction& PRT,
                                             bool ClearDiagClient) {
     Transaction* T = PRT.getPointer();
     if (!T) {
       if (PRT.getInt() != kSuccess) {
-        // Make AST dumpable after a failed transaction.
-        cleanupTU(getCI()->getSema().getASTContext().getTranslationUnitDecl());
         // Nothing has been emitted to Codegen, reset the Diags.
         DiagnosticsEngine& Diags = getCI()->getSema().getDiagnostics();
         Diags.Reset(/*soft=*/true);

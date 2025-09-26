@@ -31,6 +31,10 @@ The `$ROOTSYS/tutorials` directory includes several sub-directories:
 \ingroup Tutorials
 \brief Examples showing the "histograms' classes" usage.
 
+\defgroup tutorial_heterogenous Heterogenous tutorials
+\ingroup Tutorials
+\brief Examples showing how to use ROOT with heterogeneous hardware (CPUs, GPUs, and other accelerators)
+
 \defgroup tutorial_http HTTP tutorials
 \ingroup Tutorials
 \brief Examples showing the HTTP interface.

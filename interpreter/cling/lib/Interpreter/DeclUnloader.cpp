@@ -209,7 +209,7 @@ namespace {
           if ((*I)->getName() == "_Unwind_Resume")
             continue;
 
-          m_CodeGen->forgetGlobal(*I);
+          // m_CodeGen->forgetGlobal(*I);
           (*I)->eraseFromParent();
         }
         Changed = true;

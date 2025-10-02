@@ -174,10 +174,10 @@ namespace cling {
 
   bool
   TransactionUnloader::unloadModule(llvm::Module* M) {
-    for (auto& Func: M->functions())
-      m_CodeGen->forgetGlobal(&Func);
-    for (auto& Glob: M->globals())
-      m_CodeGen->forgetGlobal(&Glob);
-    return true;
+    // for (auto& Func: M->functions())
+    //   m_CodeGen->forgetGlobal(&Func);
+    // for (auto& Glob: M->globals())
+    //   m_CodeGen->forgetGlobal(&Glob);
+    // return true;
   }
 } // end namespace cling

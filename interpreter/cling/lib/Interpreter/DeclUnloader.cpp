@@ -971,8 +971,8 @@ namespace cling {
           GVEraser.EraseGlobalValue(GV);
         }
       }
-      // DeferredDecls exist even without Module.
-      m_CodeGen->forgetDecl(mangledName);
+      // // DeferredDecls exist even without Module.
+      // m_CodeGen->forgetDecl(mangledName);
     }
   }
 

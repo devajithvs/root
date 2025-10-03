@@ -292,7 +292,7 @@ namespace cling {
 
   void Transaction::MacroDirectiveInfo::print(llvm::raw_ostream& Out,
                                               const clang::Preprocessor& PP) const {
-    PP.printMacro(this->m_II, this->m_MD, Out);
+    // PP.printMacro(this->m_II, this->m_MD, Out);
   }
 
   void Transaction::dump() const {

@@ -1008,7 +1008,7 @@ namespace cling {
       return false;
 
     // Remove the pair from the macros
-    PP.removeMacro(MacroD.m_II, const_cast<MacroDirective*>(MacroD.m_MD));
+    // PP.removeMacro(MacroD.m_II, const_cast<MacroDirective*>(MacroD.m_MD));
 
     return true;
   }

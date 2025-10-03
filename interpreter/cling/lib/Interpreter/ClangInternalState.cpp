@@ -333,7 +333,7 @@ namespace cling {
   void ClangInternalState::printMacroDefinitions(llvm::raw_ostream& Out,
                                                 const clang::Preprocessor& PP) {
     stdstrstream contentsOS;
-    PP.printMacros(contentsOS);
+    // PP.printMacros(contentsOS);
     Out << "Ordered Alphabetically:\n";
     std::vector<std::string> elems;
     {

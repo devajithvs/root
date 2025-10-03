@@ -1,0 +1,5 @@
+<!-- redecl_selection.xml -->
+<lcgdict>
+  <class name="edm::Wrapper<portabletest::TestHostMultiCollection2>"/>
+  <class name="edm::Wrapper<portabletest::TestHostMultiCollection3>"/>
+</lcgdict>

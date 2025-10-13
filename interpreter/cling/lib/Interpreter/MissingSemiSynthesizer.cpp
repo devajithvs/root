@@ -19,27 +19,17 @@ namespace cling {
     if (auto* VD = llvm::dyn_cast<VarDecl>(D)) {
       ASTContext& Ctx = m_Sema->getASTContext();
 
-      // Suppress the "expected ';' after top level declarator" error
-        auto& Diags = Ctx.getDiagnostics();
-        if (Diags.hasErrorOccurred()) {
-        // Reset counts, but keep other state intact
-        Diags.Reset(false /*soft - only counts, not mappings*/);
-        }
-
       // Create a DeclRefExpr to reference the variable
-      Expr* DRE = DeclRefExpr::Create(Ctx,
-                                      NestedNameSpecifierLoc(),
-                                      SourceLocation(),
-                                      VD,
-                                      false,
-                                      VD->getLocation(),
-                                      VD->getType(),
-                                      VK_LValue);
+      Expr* DRE = VD->getInit();
+
+      DRE->dump();
 
         auto* TLSD = TopLevelStmtDecl::Create(Ctx, DRE);
+        llvm::errs() << "Dumpting TLSD\n";
+        TLSD->dump();
         // Pretend the user omitted the semicolon
         TLSD->setSemiMissing(true);
-        // VD->setIsUsed();
+        VD->setIsUsed();
       return Result(TLSD, true);
     }
     return Result(D, true);

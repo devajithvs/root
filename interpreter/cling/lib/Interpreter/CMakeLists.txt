@@ -75,6 +75,7 @@ endif()
 
 add_cling_library(clingInterpreter OBJECT
   AutoSynthesizer.cpp
+  MissingSemiSynthesizer.cpp
   AutoloadCallback.cpp
   ASTTransformer.cpp
   BackendPasses.cpp

@@ -11,6 +11,7 @@
 
 #include "ASTTransformer.h"
 #include "AutoSynthesizer.h"
+#include "MissingSemiSynthesizer.h"
 #include "CheckEmptyTransactionTransformer.h"
 #include "ClingPragmas.h"
 #include "DeclCollector.h"
@@ -1058,6 +1059,7 @@ namespace cling {
     typedef std::unique_ptr<ASTTransformer> ASTTPtr_t;
     std::vector<ASTTPtr_t> ASTTransformers;
     ASTTransformers.emplace_back(new AutoSynthesizer(TheSema));
+    ASTTransformers.emplace_back(new MissingSemiSynthesizer(TheSema));
     ASTTransformers.emplace_back(new EvaluateTSynthesizer(TheSema));
     if (hasCodeGenerator() && !m_Interpreter->getOptions().NoRuntime) {
       // Don't protect against crashes if we cannot run anything.

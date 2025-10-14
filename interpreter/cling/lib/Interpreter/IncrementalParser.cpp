@@ -9,7 +9,6 @@
 
 #include "IncrementalParser.h"
 
-#include "SemicolonInjector.h"
 #include "ASTTransformer.h"
 #include "AutoSynthesizer.h"
 #include "MissingSemiSynthesizer.h"
@@ -48,7 +47,6 @@
 #include "clang/Parse/Parser.h"
 #include "clang/Sema/Sema.h"
 #include "clang/Sema/SemaDiagnostic.h"
-#include "clang/Basic/DiagnosticParse.h"
 #include "clang/Serialization/ASTWriter.h"
 #include "clang/Serialization/ASTReader.h"
 #include "llvm/Support/Path.h"
@@ -127,9 +125,6 @@ namespace {
     std::stack<bool> m_IgnorePromptDiags;
     llvm::PointerIntPair<DiagnosticConsumer*, 1, bool /*Own*/> m_Target{};
 
-    bool m_SuppressMissingSemiOnce = false;
-    bool m_SuppressedMissingSemiHit = false;
-
     void SyncDiagCountWithTarget() {
       NumWarnings = m_PrevClient.getNumWarnings();
       NumErrors = m_PrevClient.getNumErrors();
@@ -171,27 +166,6 @@ namespace {
                           const Diagnostic &Info) override {
       if (Info.getID() == diag::warn_falloff_nonvoid_function) {
         DiagLevel = DiagnosticsEngine::Error;
-      }
-      if (m_SuppressMissingSemiOnce) {
-        const unsigned ID = Info.getID();
-        if (ID == diag::err_invalid_token_after_toplevel_declarator) {
-          m_SuppressMissingSemiOnce = false;
-          m_SuppressedMissingSemiHit = true;
-
-          // If this was counted as an error, clear the engine’s “an error happened”
-          // state (soft reset: only counters/mappings) like we do elsewhere.
-          if (DiagLevel == DiagnosticsEngine::Error) {
-            auto *Diags = const_cast<DiagnosticsEngine*>(Info.getDiags());
-            if (Diags && Diags->hasErrorOccurred()) {
-              // only clear counts if this is the first/only error; otherwise leave it
-              if (m_PrevClient.getNumErrors() == 0) {
-                Diags->Reset(/*soft=*/true);
-              }
-            }
-          }
-
-          return; // do not forward; we consumed it
-        }
       }
       if (Ignoring()) {
         if (Info.getID() == diag::warn_unused_expr
@@ -247,14 +221,6 @@ namespace {
       m_Target.setPointer(Consumer);
       m_Target.setInt(Own);
     }
-
-    void SuppressMissingSemiOnceArm(bool Arm) {
-      // arming multiple times is fine; we only consume once
-      m_SuppressMissingSemiOnce = Arm;
-      if (!Arm) m_SuppressedMissingSemiHit = false;
-    }
-    bool DidSuppressMissingSemi() const { return m_SuppressedMissingSemiHit; }
-    void ClearSuppressedMissingSemiHit() { m_SuppressedMissingSemiHit = false; }
 
     DiagnosticConsumer* getTargetConsumer() const
     { return m_Target.getPointer(); }
@@ -1006,7 +972,6 @@ namespace cling {
     const CompilationOptions& CO =
         m_Consumer->getTransaction()->getCompilationOpts();
     FilteringDiagConsumer::RAAI RAAITmp(*m_DiagConsumer, CO.IgnorePromptDiags);
-    auto* FDC = static_cast<FilteringDiagConsumer*>(m_DiagConsumer.get());
 
     llvm::CrashRecoveryContextCleanupRegistrar<Sema> CleanupSema(&S);
     Sema::GlobalEagerInstantiationScope GlobalInstantiations(S, /*Enabled=*/true);
@@ -1019,42 +984,8 @@ namespace cling {
 
     Parser::DeclGroupPtrTy ADecl;
     Sema::ModuleImportState ImportState;
-
-    {
-      auto& PP = getCI()->getPreprocessor();
-      auto& SM = getCI()->getSourceManager();
-      auto anchor = m_Parser->getCurToken().getLocation();
-      if (cling::LooksLikeDeclMissingSemiOnThisLine(PP, SM, anchor)) {
-        if (FDC) FDC->SuppressMissingSemiOnceArm(true);
-        llvm::errs() << "[cling] Will suppress missing ';' diagnostic (first decl)\n";
-      }
-    }
-
-    clang::DiagnosticErrorTrap trap(Diags);
-    bool suppressedMissingSemi = false;
-    
     for (bool AtEOF = m_Parser->ParseFirstTopLevelDecl(ADecl, ImportState);
          !AtEOF; AtEOF = m_Parser->ParseTopLevelDecl(ADecl, ImportState)) {
-      auto& PP = getCI()->getPreprocessor();
-      auto& SM = getCI()->getSourceManager();
-      auto anchor = m_Parser->getCurToken().getLocation();
-      if (cling::LooksLikeDeclMissingSemiOnThisLine(PP, SM, anchor)) {
-        if (FDC) FDC->SuppressMissingSemiOnceArm(true);
-      }
-
-      // If we did suppress one during this iteration, remember and clear the mark
-      if (FDC && FDC->DidSuppressMissingSemi()) {
-        suppressedMissingSemi = true;
-        FDC->ClearSuppressedMissingSemiHit();
-      }
-
-      // after a parse step, if your DiagnosticErrorTrap saw an error,
-      // check whether we actually suppressed the missing-;:
-      if (trap.hasErrorOccurred() && suppressedMissingSemi) {
-        // we intentionally ate that error; treat the transaction as clean
-        Diags.Reset(/*soft=*/true);
-      }
-
       if (ADecl && !m_Consumer->HandleTopLevelDecl(ADecl.get())) {
         m_Consumer->getTransaction()->setIssuedDiags(Transaction::kErrors);
         return llvm::make_error<llvm::StringError>(

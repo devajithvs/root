@@ -112,11 +112,6 @@ namespace utils {
       const clang::StoredDiagnostic& operator[](int i) const {
         return m_Saved[i];
       }
-
-      // NEW virtual hooks (no-ops by default)
-      virtual void SuppressMissingSemiOnceArm(bool) {}
-      virtual bool DidSuppressMissingSemi() const { return false; }
-      virtual void ClearSuppressedMissingSemiHit() {}
     };
 
 } // namespace utils

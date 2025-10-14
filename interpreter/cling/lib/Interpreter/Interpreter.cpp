@@ -1127,15 +1127,26 @@ namespace cling {
                                             size_t& WrapPoint) const {
     // If wrapPoint is > length of input, nothing is wrapped!
     if (WrapPoint < Input.size()) {
-      const std::string Header = makeUniqueWrapper(m_UniqueCounter++);
+      // Extract identifier starting at WrapPoint: [a-zA-Z_][a-zA-Z0-9_]*
+      size_t i = WrapPoint;
+      auto isIdentStart = [](char c) {
+        return c == '_' || std::isalpha(static_cast<unsigned char>(c));
+      };
+      auto isIdentChar = [](char c) {
+        return c == '_' || std::isalnum(static_cast<unsigned char>(c));
+      };
 
-      // Suppport Input and Output begin the same string
-      std::string Wrapper = Input.substr(WrapPoint);
-      Wrapper.insert(0, Header);
-      Wrapper.append("\n;\n}");
-      Wrapper.insert(0, Input.substr(0, WrapPoint));
-      Wrapper.swap(Output);
-      WrapPoint += Header.size();
+      std::string ident;
+      if (isIdentStart(Input[i])) {
+        ident.push_back(Input[i++]);
+        while (i < Input.size() && isIdentChar(Input[i]))
+          ident.push_back(Input[i++]);
+      }
+
+      if (ident.empty())
+        return Input;
+
+      Output = Input + "; " + ident;
       return Output;
     }
     // in-case std::string::npos was passed
@@ -1374,8 +1385,8 @@ namespace cling {
     // non-default C++ at the prompt:
     CO.IgnorePromptDiags = 1;
 
-    IncrementalParser::ParseResultTransaction PRT
-      = m_IncrParser->Compile(input, CO);
+    IncrementalParser::ParseResultTransaction PRT =
+        m_IncrParser->Compile(Wrapper, CO);
     Transaction* lastT = PRT.getPointer();
     if (lastT && lastT->getState() != Transaction::kCommitted) {
       assert((lastT->getState() == Transaction::kCommitted

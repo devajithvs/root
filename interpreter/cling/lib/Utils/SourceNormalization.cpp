@@ -443,44 +443,40 @@ cling::utils::isUnnamedMacro(llvm::StringRef source,
   return std::string::npos;
 }
 
-// Return true if we saw "<...> <ident> = <expr>" with NO trailing ';'.
-// On success, fills outPos with the start offset of <ident> and outIdent with its text.
-// This is intentionally simple: it avoids proving it's a declaration; it’s a best-effort nicety.
+// Return true if we saw "<...> <ident> = <expr>" with no trailing ';'.
 bool cling::utils::getWrapPoint(std::string& source,
-                               const clang::LangOptions& LangOpts,
-                               size_t& outPos,
-                               std::string& outIdent) {
+                                const clang::LangOptions& LangOpts,
+                                std::string& outIdent) {
   MinimalPPLexer Lex(LangOpts, source);
-  Token Tok, PrevTok;
-
+  Token Tok, Prev;
+  Prev.startToken();
   bool haveIdent = false;
-  size_t identOffset = std::string::npos;
-  StringRef identSpelling;
-
-  auto off = [](const Token& Tk) -> size_t { return getFileOffset(Tk); };
+  StringRef identRef;
 
   while (true) {
     bool atEOF = Lex.Lex(Tok);
+
+    // Skip preprocessor lines and end-of-directive markers
     if (Lex.inPPDirective() || Tok.is(tok::eod)) {
       if (atEOF) break;
       continue;
     }
+
     if (Tok.is(tok::annot_repl_input_end)) break;
 
-    // Candidate declarator name
+    // Remember identifier candidates
     if (Tok.is(tok::raw_identifier) && !Tok.needsCleaning()) {
       haveIdent = true;
-      identOffset = off(Tok);
-      identSpelling = Tok.getRawIdentifier();
+      identRef = Tok.getRawIdentifier();
     }
 
-    // If immediately followed by '(' it's likely a call/func decl -> drop candidate.
-    if (Tok.is(tok::l_paren) && PrevTok.is(tok::raw_identifier)) {
+    // If followed by '(', it's a call/declaration, not an assignment
+    if (Tok.is(tok::l_paren) && Prev.is(tok::raw_identifier)) {
       haveIdent = false;
-      identSpelling = StringRef();
+      identRef = StringRef();
     }
 
-    // Saw "=", check if a ';' appears before EOF
+    // Check for assignment without trailing ';'
     if (Tok.is(tok::equal) && haveIdent) {
       Token look;
       bool foundSemi = false;
@@ -490,18 +486,16 @@ bool cling::utils::getWrapPoint(std::string& source,
         if (look.is(tok::annot_repl_input_end) || eof2) break;
       }
       if (!foundSemi) {
-        outPos = identOffset;
-        outIdent = identSpelling.str();
-        return true; // Missing semicolon, we’ll append "; <ident>"
+        outIdent = identRef.str();
+        return true; // Missing semicolon; caller can append "; <ident>"
       }
-      // already complete; keep scanning
       haveIdent = false;
-      identSpelling = StringRef();
+      identRef = StringRef();
     }
 
-    PrevTok = Tok;
+    Prev = Tok;
     if (atEOF) break;
   }
 
-  return false; // no TSLD to complete
+  return false;
 }

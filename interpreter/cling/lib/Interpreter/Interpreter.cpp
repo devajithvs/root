@@ -834,15 +834,14 @@ namespace cling {
       m_CUDACompiler->process(input);
 
     std::string wrapReadySource = input;
-    size_t wrapPoint = std::string::npos;
     std::string ident;
     if (!isRawInputEnabled())
-      utils::getWrapPoint(wrapReadySource, getCI()->getLangOpts(), wrapPoint, ident);
+      utils::getWrapPoint(wrapReadySource, getCI()->getLangOpts(), ident);
 
     CompilationOptions CO = makeDefaultCompilationOpts();
     CO.EnableShadowing = m_RuntimeOptions.AllowRedefinition && !isRawInputEnabled();
 
-    if (isRawInputEnabled() || wrapPoint == std::string::npos) {
+    if (isRawInputEnabled()) {
       CO.DeclarationExtraction = 0;
       CO.ValuePrinting = 0;
       CO.ResultEvaluation = 0;
@@ -985,11 +984,10 @@ namespace cling {
 
     std::string wrapped = input;
     std::string ident;
-    size_t wrapPos;
-    utils::getWrapPoint(wrapped, getCI()->getLangOpts(), wrapPos, ident);
+    utils::getWrapPoint(wrapped, getCI()->getLangOpts(), ident);
     const std::string& Src = WrapInput(wrapped, wrapped, ident);
 
-    CO.CodeCompletionOffset = offset + wrapPos;
+    CO.CodeCompletionOffset = offset;
 
     StateDebuggerRAII stateDebugger(this);
 
@@ -1360,10 +1358,17 @@ namespace cling {
                                 const std::string& ident /* = 0*/) {
     StateDebuggerRAII stateDebugger(this);
 
+    // FIXME: Move this to WrapInput later
+    bool WantValuePrinting = CO.ValuePrinting != CompilationOptions::VPDisabled;
+
+    std::string identifierName;
+    if (WantValuePrinting)
+      identifierName = ident;
+
     // Wrap the expression
     std::string WrapperBuffer;
-    const std::string& Wrapper = WrapInput(input, WrapperBuffer, ident);
-
+    const std::string& Wrapper =
+        WrapInput(input, WrapperBuffer, identifierName);
     // We have wrapped and need to disable warnings that are caused by
     // non-default C++ at the prompt:
     CO.IgnorePromptDiags = 1;
@@ -1398,9 +1403,7 @@ namespace cling {
     Value resultV;
     if (!V)
       V = &LastValue;
-    bool WantValuePrinting = lastT->getCompilationOpts().ValuePrinting
-      != CompilationOptions::VPDisabled;
-    
+
     // Force-flush as we might be printing on screen with printf.
     std::cout.flush();
     fflush(stdout);

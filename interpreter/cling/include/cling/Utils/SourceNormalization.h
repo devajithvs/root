@@ -45,10 +45,11 @@ namespace utils {
   /// \param source - The source code to analyze; out: the source with
   ///        re-arranged includes.
   /// \param LangOpts - LangOptions to use for lexing.
-  /// \return The position where the function signature and '{' should be
-  ///     inserted; std::string::npos if this source should not be wrapped.
-  bool getWrapPoint(std::string& source, const clang::LangOptions& LangOpts, size_t& outPos,
-                               std::string& outIdent);
+  /// \param outIdent On success, set to the identifier text (`<ident>`).
+  /// \return true if we have "<...> <ident> = <expr>" with no trailing ';',
+  /// false otherwise.
+  bool getWrapPoint(std::string& source, const clang::LangOptions& LangOpts,
+                    std::string& outIdent);
 } // namespace utils
 } // namespace cling
 

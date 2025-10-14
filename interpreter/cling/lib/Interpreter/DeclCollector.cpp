@@ -206,25 +206,11 @@ namespace cling {
     if (getTransaction()->getIssuedDiags() == Transaction::kErrors)
       return true;
     
-    for (Decl *D : DGR) {
-      llvm::errs() << "Checking Decl: " << D->getDeclKindName() << "\n";
-
-      if (auto *TSD = llvm::dyn_cast<TopLevelStmtDecl>(D)) {
-        llvm::errs() << "  -> TopLevelStmtDecl found\n";
-        if (auto *S = TSD->getStmt())
-          S->dump(); // dumps AST node to stderr
-
-        if (TSD->isSemiMissing()) {
-          llvm::errs() << "    !! Semi missing detected\n";
-          if (auto *synthesizer = m_IncrParser->GetSynthesizer()) {
-            llvm::errs() << "    >> Synthesizing SVR init\n";
-            TSD->setStmt(synthesizer->SynthesizeSVRInit(
-                llvm::cast<Expr>(TSD->getStmt())));
-          }
-        }
-      }
-    }
-
+    for (Decl *D : DGR)
+      if (auto *TSD = llvm::dyn_cast<TopLevelStmtDecl>(D);
+          TSD && TSD->isSemiMissing())
+            if (auto *synthesizer = m_IncrParser->GetSynthesizer())
+        TSD->setStmt(synthesizer->SynthesizeSVRInit(cast<Expr>(TSD->getStmt())));
 
     if (comesFromASTReader(DGR)) {
       for (DeclGroupRef::iterator DI = DGR.begin(), DE = DGR.end();

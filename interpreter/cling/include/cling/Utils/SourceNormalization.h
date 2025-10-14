@@ -47,7 +47,8 @@ namespace utils {
   /// \param LangOpts - LangOptions to use for lexing.
   /// \return The position where the function signature and '{' should be
   ///     inserted; std::string::npos if this source should not be wrapped.
-  size_t getWrapPoint(std::string& source, const clang::LangOptions& LangOpts);
+  bool getWrapPoint(std::string& source, const clang::LangOptions& LangOpts, size_t& outPos,
+                               std::string& outIdent);
 } // namespace utils
 } // namespace cling
 

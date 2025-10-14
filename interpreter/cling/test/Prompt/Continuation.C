@@ -28,7 +28,7 @@ unsigned u1 = 45, u2
 // CHECK-NEXT: (unsigned int) {{[[:digit:]]+}}
 u1
 // CHECK-NEXT: (unsigned int) 45
-int i1 \ i2 // expected-error {{expected ';' at end of declaration}}
+int i1 \ i2 // expected-error {{expected ';' after top level declarator}}
 
 static void InvokeTest(int A,
                        int B) { printf("Invoke: %d, %d\n", A, B); }

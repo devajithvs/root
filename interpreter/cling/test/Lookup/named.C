@@ -49,9 +49,9 @@ namespace B {
 // ROOT-6095: names introduced in a scopeless enum should be available in the
 // parent context.
 typedef enum { k0, k1 } E;
-E foo = k1
+E foo = k1; foo
 //CHECK: (E) (k1) : (unsigned int) 1
-struct X { enum { k0, k1 = 2 }; } bar
+struct X { enum { k0, k1 = 2 }; } bar; bar
 X::k1
 //CHECK: (X::(unnamed enum {{.*}})) (X::k1) : (unsigned int) 2
 

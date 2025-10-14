@@ -43,6 +43,6 @@ printf("Unloaded alot\n");
 
 .compareState "A"
 
-printf("FAIL\n"); // expected-error@2 {{use of undeclared identifier 'printf'}}
+printf("FAIL\n"); // expected-error@1 {{use of undeclared identifier 'printf'}}
 
 .q

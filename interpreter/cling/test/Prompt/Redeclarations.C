@@ -9,7 +9,7 @@
 // RUN: cat %s | %cling -Xclang -verify
 
 class MyClass{}; // expected-note {{previous definition is here}}
-struct MyClass{} // expected-error {{redefinition of 'MyClass'}}
+struct MyClass{}; // expected-error {{redefinition of 'MyClass'}}
 MyClass * s; // expected-note {{previous definition is here}}
 MyClass s; // expected-error {{redefinition of 's'}}
 

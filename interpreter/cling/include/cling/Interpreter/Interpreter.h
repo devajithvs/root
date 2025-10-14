@@ -284,7 +284,7 @@ namespace cling {
                                        CompilationOptions CO,
                                        Value* V = nullptr,
                                        Transaction** T = nullptr,
-                                       size_t wrapPoint = 0);
+                                       const std::string& ident = "");
 
     ///\brief Worker function to code complete after all the mechanism
     /// has been set up.
@@ -310,7 +310,7 @@ namespace cling {
     ///\returns A reference to Buffer when wrapped, otherwise a ref to Input
     ///
     const std::string& WrapInput(const std::string& Input, std::string& Buffer,
-                                 size_t& WrapPoint) const;
+                                 const std::string& Ident) const;
 
     ///\brief Runs given wrapper function.
     ///

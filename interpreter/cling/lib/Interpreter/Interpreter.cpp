@@ -834,14 +834,14 @@ namespace cling {
       m_CUDACompiler->process(input);
 
     std::string wrapReadySource = input;
-    size_t wrapPoint = std::string::npos;
+    std::string ident;
     if (!isRawInputEnabled())
-      wrapPoint = utils::getWrapPoint(wrapReadySource, getCI()->getLangOpts());
+      utils::getWrapPoint(wrapReadySource, getCI()->getLangOpts(), ident);
 
     CompilationOptions CO = makeDefaultCompilationOpts();
     CO.EnableShadowing = m_RuntimeOptions.AllowRedefinition && !isRawInputEnabled();
 
-    if (isRawInputEnabled() || wrapPoint == std::string::npos) {
+    if (isRawInputEnabled()) {
       CO.DeclarationExtraction = 0;
       CO.ValuePrinting = 0;
       CO.ResultEvaluation = 0;
@@ -854,7 +854,7 @@ namespace cling {
     CO.ResultEvaluation = (bool)V;
     // CO.IgnorePromptDiags = 1; done by EvaluateInternal().
     CO.CheckPointerValidity = 1;
-    if (EvaluateInternal(wrapReadySource, CO, V, T, wrapPoint)
+    if (EvaluateInternal(wrapReadySource, CO, V, T, ident)
                                                      == Interpreter::kFailure) {
       return Interpreter::kFailure;
     }
@@ -983,10 +983,11 @@ namespace cling {
     CO.CheckPointerValidity = 0;
 
     std::string wrapped = input;
-    size_t wrapPos = utils::getWrapPoint(wrapped, getCI()->getLangOpts());
-    const std::string& Src = WrapInput(wrapped, wrapped, wrapPos);
+    std::string ident;
+    utils::getWrapPoint(wrapped, getCI()->getLangOpts(), ident);
+    const std::string& Src = WrapInput(wrapped, wrapped, ident);
 
-    CO.CodeCompletionOffset = offset + wrapPos;
+    CO.CodeCompletionOffset = offset;
 
     StateDebuggerRAII stateDebugger(this);
 
@@ -1123,24 +1124,15 @@ namespace cling {
   }
 
   const std::string& Interpreter::WrapInput(const std::string& Input,
-                                            std::string& Output,
-                                            size_t& WrapPoint) const {
-    // If wrapPoint is > length of input, nothing is wrapped!
-    if (WrapPoint < Input.size()) {
-      const std::string Header = makeUniqueWrapper(m_UniqueCounter++);
+                                             std::string& Output,
+                                             const std::string& Ident) const {
+    if (Ident.empty())
+      return Input;
 
-      // Suppport Input and Output begin the same string
-      std::string Wrapper = Input.substr(WrapPoint);
-      Wrapper.insert(0, Header);
-      Wrapper.append("\n;\n}");
-      Wrapper.insert(0, Input.substr(0, WrapPoint));
-      Wrapper.swap(Output);
-      WrapPoint += Header.size();
-      return Output;
-    }
-    // in-case std::string::npos was passed
-    WrapPoint = 0;
-    return Input;
+    Output = Input;
+    Output += "; ";
+    Output += Ident;
+    return Output;
   }
 
   Interpreter::ExecutionResult
@@ -1363,19 +1355,26 @@ namespace cling {
                                 CompilationOptions CO,
                                 Value* V, /* = 0 */
                                 Transaction** /* T = 0 */,
-                                size_t wrapPoint /* = 0*/) {
+                                const std::string& ident /* = 0*/) {
     StateDebuggerRAII stateDebugger(this);
+
+    // FIXME: Move this to WrapInput later
+    bool WantValuePrinting = CO.ValuePrinting != CompilationOptions::VPDisabled;
+
+    std::string identifierName;
+    if (WantValuePrinting)
+      identifierName = ident;
 
     // Wrap the expression
     std::string WrapperBuffer;
-    const std::string& Wrapper = WrapInput(input, WrapperBuffer, wrapPoint);
-
+    const std::string& Wrapper =
+        WrapInput(input, WrapperBuffer, identifierName);
     // We have wrapped and need to disable warnings that are caused by
     // non-default C++ at the prompt:
     CO.IgnorePromptDiags = 1;
 
-    IncrementalParser::ParseResultTransaction PRT
-      = m_IncrParser->Compile(input, CO);
+    IncrementalParser::ParseResultTransaction PRT =
+        m_IncrParser->Compile(Wrapper, CO);
     Transaction* lastT = PRT.getPointer();
     if (lastT && lastT->getState() != Transaction::kCommitted) {
       assert((lastT->getState() == Transaction::kCommitted
@@ -1404,9 +1403,7 @@ namespace cling {
     Value resultV;
     if (!V)
       V = &LastValue;
-    bool WantValuePrinting = lastT->getCompilationOpts().ValuePrinting
-      != CompilationOptions::VPDisabled;
-    
+
     // Force-flush as we might be printing on screen with printf.
     std::cout.flush();
     fflush(stdout);

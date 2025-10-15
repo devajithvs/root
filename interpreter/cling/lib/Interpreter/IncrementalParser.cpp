@@ -898,6 +898,8 @@ namespace cling {
                                               0 /* mod time*/);
     SM.overrideFileContents(FE, std::move(MB));
     FID = SM.createFileID(FE, NewLoc, SrcMgr::C_User);
+    if (CO.IsPromptInput)
+      m_Interpreter->RegisterPromptFileID(FID);
     if (CO.CodeCompletionOffset != -1) {
       // The completion point is set one a 1-based line/column numbering.
       // It relies on the implementation to account for the wrapper extra line.

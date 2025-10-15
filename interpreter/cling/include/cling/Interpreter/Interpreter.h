@@ -42,6 +42,7 @@ namespace llvm {
 }
 
 namespace clang {
+  class FileID;
   class ASTContext;
   class ASTDeserializationListener;
   class CompilerInstance;
@@ -178,7 +179,12 @@ namespace cling {
     using ModuleFileExtensions =
         std::vector<std::shared_ptr<clang::ModuleFileExtension>>;
 
+    bool IsPromptLoc(clang::SourceLocation Loc) const;
+    void RegisterPromptFileID(clang::FileID FID);
+
   private:
+
+    llvm::DenseSet<unsigned> PromptFileIDs;
 
     ///\brief Interpreter invocation options.
     ///

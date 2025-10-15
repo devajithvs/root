@@ -17,6 +17,10 @@ namespace cling {
   ///
   class CompilationOptions {
   public:
+
+    // True when this chunk comes from the interactive prompt (REPL).
+    bool IsPromptInput = false;
+
     ///\brief Whether or not to extract the declarations out from the processed
     /// input.
     ///

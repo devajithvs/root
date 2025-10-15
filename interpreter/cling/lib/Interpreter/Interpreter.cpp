@@ -99,6 +99,20 @@ namespace {
 
 namespace cling {
 
+  void Interpreter::RegisterPromptFileID(clang::FileID FID) {
+    if (!FID.isValid()) return;
+    PromptFileIDs.insert(FID.getHashValue());
+  }
+
+  bool Interpreter::IsPromptLoc(clang::SourceLocation Loc) const {
+    if (!Loc.isValid()) return false;
+    const auto &SM = m_IncrParser->getCI()->getSourceManager();
+    // Peel macro expansions
+    clang::SourceLocation Spelling = SM.getSpellingLoc(Loc);
+    clang::FileID FID = SM.getFileID(Spelling);
+    return FID.isValid() && PromptFileIDs.contains(FID.getHashValue());
+  }
+
   Interpreter::PushTransactionRAII::PushTransactionRAII(const Interpreter* i)
     : m_Interpreter(i) {
     CompilationOptions CO = m_Interpreter->makeDefaultCompilationOpts();
@@ -854,6 +868,7 @@ namespace cling {
     CO.ResultEvaluation = (bool)V;
     // CO.IgnorePromptDiags = 1; done by EvaluateInternal().
     CO.CheckPointerValidity = 1;
+    CO.IsPromptInput = true;
     if (EvaluateInternal(wrapReadySource, CO, V, T, ident)
                                                      == Interpreter::kFailure) {
       return Interpreter::kFailure;

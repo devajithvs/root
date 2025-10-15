@@ -501,11 +501,13 @@ namespace test {
       // TODO: check for . or -> in the cached token stream
       return false;
 
+    const bool inPrompt = m_Interpreter && m_Interpreter->IsPromptLoc(R.getNameLoc());
+
     for (Scope* DepScope = S; DepScope; DepScope = DepScope->getParent()) {
       if (DeclContext* Ctx = static_cast<DeclContext*>(DepScope->getEntity())) {
         if (!Ctx->isDependentContext())
           // For now we support only the prompt.
-          if (isa<FunctionDecl>(Ctx))
+          if (inPrompt)
             return true;
       }
     }

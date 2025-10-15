@@ -579,10 +579,10 @@ add_dependencies(hsimple onepcm)
 if(WIN32)
   set(hsimple_cmd COMMAND ${CMAKE_COMMAND} -E env PATH="${CMAKE_RUNTIME_OUTPUT_DIRECTORY}\\\;%PATH%"
                           ROOT_INCLUDE_PATH=${DEFAULT_ROOT_INCLUDE_PATH}
-                          ROOTIGNOREPREFIX=1 ROOT_HIST=0 $<TARGET_FILE:root.exe> -l -q -b -n -x ${CMAKE_SOURCE_DIR}/tutorials/hsimple.C -e return)
+                          ROOTIGNOREPREFIX=1 ROOT_HIST=0 $<TARGET_FILE:root.exe> -l -q -b -n -x ${CMAKE_SOURCE_DIR}/tutorials/hsimple.C)
 else()
   set(hsimple_cmd COMMAND ROOT_INCLUDE_PATH=${DEFAULT_ROOT_INCLUDE_PATH}
-                          ROOTIGNOREPREFIX=1 ROOT_HIST=0 $<TARGET_FILE:root.exe> -l -q -b -n -x ${CMAKE_SOURCE_DIR}/tutorials/hsimple.C -e return)
+                          ROOTIGNOREPREFIX=1 ROOT_HIST=0 $<TARGET_FILE:root.exe> -l -q -b -n -x ${CMAKE_SOURCE_DIR}/tutorials/hsimple.C)
 endif()
 add_custom_command(OUTPUT tutorials/hsimple.root
                    ${hsimple_cmd}

@@ -18,6 +18,7 @@
 #include "cling/Interpreter/Transaction.h"
 #include "cling/Utils/AST.h"
 #include "cling/Utils/Output.h"
+#include "cling/Interpreter/DynLookupArm.h"
 
 #include "clang/AST/ASTContext.h"
 #include "clang/AST/RecursiveASTVisitor.h"
@@ -242,13 +243,81 @@ namespace cling {
     m_NoELoc = m_NoRange.getEnd();
   }
 
+  // Pretty-print any Stmt/Expr using the TU's printing policy.
+  static std::string prettyStmt(const clang::ASTContext& Ctx, const clang::Stmt* S) {
+    if (!S) return "<null>";
+    clang::PrintingPolicy PP(Ctx.getPrintingPolicy());
+    PP.SuppressUnwrittenScope = true;
+    PP.ConstantsAsWritten = true;
+    PP.IncludeNewlines = false;
+
+    std::string Out;
+    llvm::raw_string_ostream OS(Out);
+    S->printPretty(OS, /*Helper*/nullptr, PP);
+    OS.flush();
+    if (Out.empty())
+      Out = std::string("<") + S->getStmtClassName() + ">";
+    return Out;
+  }
+
+  static bool isEvaluateTCall(const Expr* E) {
+    auto *CE = llvm::dyn_cast<CallExpr>(E);
+    if (!CE) return false;
+    const Expr *Callee = CE->getCallee()->IgnoreParenImpCasts();
+    if (auto *DRE = llvm::dyn_cast<DeclRefExpr>(Callee)) {
+      if (const auto *FD = llvm::dyn_cast<FunctionDecl>(DRE->getDecl())) {
+        if (FD->getIdentifier() && FD->getName() == "EvaluateT")
+          return true;
+      }
+    }
+    return false;
+  }
+
+  #include "clang/AST/Expr.h"
+  #include "clang/AST/Attr.h"
+
+  static bool hasAnnotResolveAtRuntime(const clang::Decl* D) {
+    for (auto *A : D->specific_attrs<clang::AnnotateAttr>())
+      if (A->getAnnotation() == "__ResolveAtRuntime")
+        return true;
+    return false;
+  }
+
+  // Return the first VarDecl referenced by `S` that carries __ResolveAtRuntime.
+  static clang::VarDecl* findAnnotatedVarInStmt(clang::Stmt* S) {
+    if (!S) return nullptr;
+    if (auto *DRE = llvm::dyn_cast<clang::DeclRefExpr>(S)) {
+      if (auto *VD = llvm::dyn_cast<clang::VarDecl>(DRE->getDecl()))
+        if (VD->hasAttr<clang::AnnotateAttr>())
+          for (auto *A : VD->specific_attrs<clang::AnnotateAttr>())
+            if (A->getAnnotation() == "__ResolveAtRuntime")
+              return VD; // non-const
+    }
+    for (auto *Child : S->children())
+      if (auto *Hit = findAnnotatedVarInStmt(Child))
+        return Hit;
+    return nullptr;
+  }
+
+
+  static inline void stripResolveRuntimeAnnots(clang::Decl *D) {
+    for (auto *A : llvm::make_early_inc_range(D->specific_attrs<clang::AnnotateAttr>())) {
+      llvm::StringRef ann = A->getAnnotation();
+      if (ann == "__ResolveAtRuntime" || ann == "__ResolvedAtRuntime")
+        D->dropAttr<clang::AnnotateAttr>();
+    }
+  }
+
   ASTTransformer::Result EvaluateTSynthesizer::Transform(Decl* D) {
     if (!getCompilationOpts().DynamicScoping)
       return Result(D, true);
 
-    if (FunctionDecl* FD = dyn_cast<FunctionDecl>(D)) {
-      if (FD->hasBody() && ShouldVisit(FD)) {
-        // Find DynamicLookup specific builtins
+    // Only run when the current compile is armed.
+    if (!ShouldVisitDC(D->getDeclContext()))
+      return Result(D, true);
+
+    if (auto *FD = dyn_cast<FunctionDecl>(D)) {
+      if (FD->hasBody()) {
         if (!m_EvalDecl)
           Initialize();
 
@@ -262,11 +331,128 @@ namespace cling {
       }
       assert ((!isa<BlockDecl>(D) || !isa<ObjCMethodDecl>(D))
               && "Not implemented yet!");
+    } else if (auto *VD = dyn_cast<VarDecl>(D)) {
+      // Rewrite unknowns inside variable initializers at any level.
+      if (VD->hasInit()) {
+        if (!m_EvalDecl)
+          Initialize();
+        m_CurDeclContext = VD->getDeclContext();
+        ASTNodeInfo NI = Visit(VD->getInit());
+        if (NI.hasErrorOccurred())
+          return Result(nullptr, false);
+        if (NI.isForReplacement())
+          if (auto *E = NI.getAs<Expr>())
+            VD->setInit(E);
+      }
+    } else if (auto *RD = dyn_cast<CXXRecordDecl>(D)) {
+      // Methods within classes (arrive as separate decls too, but safe to handle).
+      if (!m_EvalDecl)
+        Initialize();
+      for (auto *M : RD->methods()) {
+        if (!M->hasBody()) continue;
+        m_CurDeclContext = M;
+        ASTNodeInfo NB = Visit(M->getBody());
+        if (NB.hasErrorOccurred())
+          return Result(nullptr, false);
+        if (NB.isForReplacement())
+          M->setBody(NB.getAsSingleNode());
+      }
+    } else if (auto *TL = dyn_cast<TopLevelStmtDecl>(D)) {
+        if (auto *A = D->getAttr<clang::AnnotateAttr>()){
+          cling::errs() << "Has annotation : " << A->getAnnotation() << "\n";
+          if (A->getAnnotation() == "__ResolveAtRuntime")
+            return Result(D, true);;
+        }
+        if (!m_EvalDecl) Initialize();
+        m_CurDeclContext = TL->getDeclContext();
+
+        clang::Stmt *S = TL->getStmt();
+
+        if (auto *E = llvm::dyn_cast<Expr>(TL->getStmt()))
+          if (isEvaluateTCall(E))
+            return Result(D, true); // already wrapped, do nothing
+
+        // NEW: only act if this TLSD actually references a VarDecl annotated
+        // by the callback (i.e. our dummy dependent symbol).
+        if (auto *AnnVD = findAnnotatedVarInStmt(S)) {
+          cling::errs() << "[EvalTSynth] Current TL: "
+                        << TL << ":" << D << "\n";
+          cling::errs() << "[EvalTSynth] TL has __ResolveAtRuntime var: "
+                        << AnnVD->getName() << ":" << AnnVD << "\n";
+          // Do the usual rewrite (your top-level path; recommended: compound path):
+          ASTNodeInfo NS = VisitTopLevelStmt(S);
+          stripResolveRuntimeAnnots(AnnVD);
+          if (NS.hasErrorOccurred())
+            return Result(nullptr, false);
+          if (NS.isForReplacement()) {
+            TL->setStmt(NS.getAsSingleNode());
+            cling::errs() << "[EvalTSynth] expr(after) : "
+                          << prettyStmt(*m_Context, NS.getAsSingleNode()) << "\n";
+            // Optionally mark as resolved to avoid re-entry in other passes
+            TL->addAttr(clang::AnnotateAttr::CreateImplicit(
+                m_Sema->getASTContext(), "__ResolveAtRuntime", nullptr, 0));
+          }
+        }
+
+
+        // ASTNodeInfo NS = VisitTopLevelStmt(TL->getStmt());
+        // if (NS.hasErrorOccurred())
+        //   return Result(nullptr, false);
+        // if (NS.isForReplacement()) {
+        //   TL->setStmt(NS.getAsSingleNode());
+        //   TL->addAttr(AnnotateAttr::CreateImplicit(m_Sema->getASTContext(), "__ResolvedAtRuntime", nullptr, 0));
+        // }
+        // cling::errs() << "[EvalTSynth] expr(after) : "
+        //           << prettyStmt(*m_Context, NS.getAsSingleNode()) << "\n";
+          return Result(D, true);
     }
+
 
     //TODO: Check for error before returning.
     return Result(D, true);
   }
+
+
+// Shorthand for Expr plus its type.
+static std::string prettyExprWithType(const clang::ASTContext& Ctx, const clang::Expr* E) {
+  if (!E) return "<null-expr>";
+  std::string S = prettyStmt(Ctx, E);
+  S += " : ";
+  S += E->getType().getAsString(Ctx.getPrintingPolicy());
+  return S;
+}
+
+  // In EvaluateTSynthesizer (implementation)
+  // In EvaluateTSynthesizer (implementation)
+  ASTNodeInfo EvaluateTSynthesizer::VisitTopLevelStmt(Stmt* Node) {
+    // If this top-level is a pure expression (often it is), wrap the *whole* thing.
+    Expr* E = nullptr;
+
+    // Common top-level carriers:
+    if (auto *EW = llvm::dyn_cast<ExprWithCleanups>(Node))
+      E = EW->getSubExpr();
+    else if (auto *FS = llvm::dyn_cast<FullExpr>(Node))
+      E = FS->getSubExpr();
+    else
+      E = llvm::dyn_cast<Expr>(Node);
+
+    if (!E) {
+      // Not an expression at top level (rare). Reuse existing logic.
+      if (auto *CS = llvm::dyn_cast<CompoundStmt>(Node))
+        return VisitCompoundStmt(CS);
+      return ASTNodeInfo(Node, /*needs eval*/false);
+    }
+
+    // We’re in immediate context: enable value printing for last stmt.
+    const bool valuePrinterReq = true;
+
+    // IMPORTANT: do *not* call Visit(E) first; we want to wrap the original expr.
+    Expr* Wrapped = SubstituteUnknownSymbolTopLevel(m_Context->VoidTy, E, valuePrinterReq);
+    cling::errs() << "[EvalTSynth] expr(after - blah) : "
+                << prettyStmt(*m_Context, Wrapped) << "\n";
+    return ASTNodeInfo(Wrapped, /*isForReplacement*/true);
+  }
+
 
   // StmtVisitor
 
@@ -668,6 +854,110 @@ namespace cling {
 
   // end StmtVisitor
 
+  Expr* EvaluateTSynthesizer::BuildDynamicExprInfoTopLevel(Expr* SubTree,
+                                                         bool ValuePrinterReq) {
+    Sema::ContextRAII pushedDC(*m_Sema, m_CurDeclContext);
+
+    llvm::SmallVector<DeclRefExpr*, 4> Addresses;
+    ostrstream OS;
+    const PrintingPolicy& Policy = m_Context->getPrintingPolicy();
+
+    StmtPrinterHelper helper(Policy, Addresses, m_Sema);
+
+    // // NOTE: unlike BuildDynamicExprInfo(), we intentionally do NOT add
+    // // an extra surrounding pair of parentheses for non-ParenListExpr here.
+    // SubTree->printPretty(OS, &helper, Policy);
+
+    if (!isa<ParenListExpr>(SubTree))
+      OS << '(';
+    SubTree->printPretty(OS, &helper, Policy);
+    if (!isa<ParenListExpr>(SubTree))
+      OS << ')';
+
+    // 2. Build the template
+    Expr* ExprTemplate = ConstructConstCharPtrExpr(OS.str());
+
+    // 3. Build the array of addresses (identical to original)
+    QualType VarAddrTy =
+        m_Sema->BuildArrayType(m_Context->VoidPtrTy, ArraySizeModifier::Normal,
+                              /*ArraySize*/ nullptr, /*IndexTypeQuals*/ 0,
+                              m_NoRange, DeclarationName());
+    llvm::SmallVector<Expr*, 2> Inits;
+    Scope* S = m_Sema->getScopeForContext(m_Sema->CurContext);
+    for (unsigned i = 0; i < Addresses.size(); ++i) {
+      Expr *E = Addresses[i];
+      if (!E->isLValue()) {
+        cling::errs() << "[EvaluateTSynthesizer] skip & of non-lvalue: "
+                      << E->getStmtClassName() << "\n";
+        continue;
+      }
+      Expr* UnOp = m_Sema->BuildUnaryOp(S, E->getBeginLoc(), UO_AddrOf, E).get();
+      if (!UnOp) return SubTree;
+      m_Sema->ImpCastExprToType(
+          UnOp, m_Context->getPointerType(m_Context->VoidPtrTy), CK_BitCast);
+      Inits.push_back(UnOp);
+    }
+
+    InitListExpr* ILE = m_Sema->ActOnInitList(m_NoSLoc, Inits, m_NoELoc)
+                            .getAs<InitListExpr>();
+    TypeSourceInfo* TSI =
+        m_Context->getTrivialTypeSourceInfo(VarAddrTy, m_NoSLoc);
+    Expr* ExprAddresses =
+        m_Sema->BuildCompoundLiteralExpr(m_NoSLoc, TSI, m_NoELoc, ILE).get();
+    if (!ExprAddresses) return SubTree;
+
+    m_Sema->ImpCastExprToType(
+        ExprAddresses,
+        m_Context->getPointerType(m_Context->VoidPtrTy),
+        CK_ArrayToPointerDecay);
+
+    Expr* VPReq = ValuePrinterReq
+                      ? m_Sema->ActOnCXXBoolLiteral(m_NoSLoc, tok::kw_true).get()
+                      : m_Sema->ActOnCXXBoolLiteral(m_NoSLoc, tok::kw_false).get();
+
+    llvm::SmallVector<Expr*, 4> CtorArgs;
+    CtorArgs.push_back(ExprTemplate);
+    CtorArgs.push_back(ExprAddresses);
+    CtorArgs.push_back(VPReq);
+
+    QualType ExprInfoTy = m_Context->getTypeDeclType(m_DynamicExprInfoDecl);
+    ExprResult Initializer =
+        m_Sema->ActOnParenListExpr(m_NoSLoc, m_NoELoc, CtorArgs);
+    TypeSourceInfo* TrivialTSI =
+        m_Context->getTrivialTypeSourceInfo(ExprInfoTy, SourceLocation());
+
+    Expr* Result =
+        m_Sema->BuildCXXNew(m_NoSLoc, /*UseGlobal=*/false, m_NoSLoc,
+                            /*PlacementArgs=*/MultiExprArg(), m_NoELoc, m_NoRange,
+                            ExprInfoTy, TrivialTSI, /*ArraySize=*/{},
+                            m_NoRange, Initializer.get())
+            .get();
+    return Result;
+  }
+
+
+  // same signature pattern as the existing one; "TopLevel" calls the TL builder
+  Expr* EvaluateTSynthesizer::SubstituteUnknownSymbolTopLevel(const QualType InstTy,
+                                                              Expr* SubTree,
+                                                              bool ValuePrinterReq) {
+    assert(SubTree && "No subtree specified!");
+    llvm::SmallVector<Expr*, 2> CallArgs;
+
+    // Arg0: DynamicExprInfo but *without* the extra outer parentheses
+    Expr* Arg0 = BuildDynamicExprInfoTopLevel(SubTree, ValuePrinterReq);
+    // Arg1: DeclContext*
+    QualType DCTy = m_Context->getTypeDeclType(m_DeclContextDecl);
+    Expr* Arg1 = utils::Synthesize::CStyleCastPtrExpr(m_Sema, DCTy,
+                                                      (uintptr_t)m_CurDeclContext);
+    CallArgs.push_back(Arg0);
+    CallArgs.push_back(Arg1);
+
+    CallExpr* EvalCall = BuildEvalCallExpr(InstTy, SubTree, CallArgs);
+    getSubstSymbolMap()[EvalCall] = SubTree;
+    return EvalCall;
+  }
+
+
   // EvalBuilder
 
   Expr* EvaluateTSynthesizer::SubstituteUnknownSymbol(const QualType InstTy,
@@ -909,12 +1199,18 @@ namespace cling {
 
   // end EvalBuilder
 
-  bool EvaluateTSynthesizer::ShouldVisit(FunctionDecl* D) {
+  bool EvaluateTSynthesizer::ShouldVisitDC(const DeclContext* DC) {
+    // FIXME: Here we should have our custom attribute.
+    if (!getCompilationOpts().DynamicScoping) return false;
+    // O(1): no TU scan, no Transaction dependency.
+    return cling::DynLookupArm::isArmed(*m_Context);
+  }
+
+  bool EvaluateTSynthesizer::ShouldVisitTLSD(TopLevelStmtDecl* D) {
     // FIXME: Here we should have our custom attribute.
     if (AnnotateAttr* A = D->getAttr<AnnotateAttr>())
-      if (A->getAnnotation() == "__ResolveAtRuntime")
-        return true;
-    return false;
+      return false;
+    return true;
   }
 
   bool EvaluateTSynthesizer::IsArtificiallyDependent(Expr* Node) {

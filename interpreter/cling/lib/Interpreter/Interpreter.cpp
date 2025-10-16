@@ -1373,6 +1373,8 @@ namespace cling {
                                 const std::string& ident /* = 0*/) {
     StateDebuggerRAII stateDebugger(this);
 
+    llvm::errs() << "Input: " << input << "\n";
+
     // FIXME: Move this to WrapInput later
     bool WantValuePrinting = CO.ValuePrinting != CompilationOptions::VPDisabled;
 

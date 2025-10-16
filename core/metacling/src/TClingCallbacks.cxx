@@ -18,6 +18,7 @@
 #include "cling/Interpreter/Interpreter.h"
 #include "cling/Interpreter/InterpreterCallbacks.h"
 #include "cling/Interpreter/Transaction.h"
+#include "cling/Interpreter/DynLookupArm.h"
 #include "cling/Utils/AST.h"
 
 #include "clang/AST/ASTConsumer.h"
@@ -765,33 +766,33 @@ bool TClingCallbacks::tryResolveAtRuntimeInternal(LookupResult &R, Scope *S) {
    assert(TU && "Must not be null.");
 
    // DynamicLookup only happens inside wrapper functions:
-   clang::FunctionDecl* Wrapper = nullptr;
-   Scope* Cursor = S;
-   do {
-      DeclContext* DCCursor = Cursor->getEntity();
-      if (DCCursor == TU)
-         return false;
-      Wrapper = dyn_cast_or_null<FunctionDecl>(DCCursor);
-      if (Wrapper) {
-         if (utils::Analyze::IsWrapper(Wrapper)) {
-            break;
-         } else {
-            // Can't have a function inside the wrapper:
-            return false;
-         }
-      }
-   } while ((Cursor = Cursor->getParent()));
+   // clang::FunctionDecl* Wrapper = nullptr;
+   // Scope* Cursor = S;
+   // do {
+   //    DeclContext* DCCursor = Cursor->getEntity();
+   //    if (DCCursor == TU)
+   //       return false;
+   //    Wrapper = dyn_cast_or_null<FunctionDecl>(DCCursor);
+   //    if (Wrapper) {
+   //       if (utils::Analyze::IsWrapper(Wrapper)) {
+   //          break;
+   //       } else {
+   //          // Can't have a function inside the wrapper:
+   //          return false;
+   //       }
+   //    }
+   // } while ((Cursor = Cursor->getParent()));
 
-   if (!Wrapper) {
-      // The parent of S wasn't the TU?!
-      return false;
-   }
+   // if (!Wrapper) {
+   //    // The parent of S wasn't the TU?!
+   //    return false;
+   // }
 
-   // Prevent redundant declarations for control statements (e.g., for, if, while)
-   // that have already been annotated.
-   if (auto annot = Wrapper->getAttr<AnnotateAttr>())
-      if (annot->getAnnotation() == "__ResolveAtRuntime" && S->isControlScope())
-         return false;
+   // // Prevent redundant declarations for control statements (e.g., for, if, while)
+   // // that have already been annotated.
+   // if (auto annot = Wrapper->getAttr<AnnotateAttr>())
+   //    if (annot->getAnnotation() == "__ResolveAtRuntime" && S->isControlScope())
+   //       return false;
 
    VarDecl* Result = VarDecl::Create(C, TU, Loc, Loc, II, C.DependentTy,
                                      /*TypeSourceInfo*/nullptr, SC_None);
@@ -805,7 +806,10 @@ bool TClingCallbacks::tryResolveAtRuntimeInternal(LookupResult &R, Scope *S) {
    // is a gross hack, because TClingCallbacks shouldn't know about
    // EvaluateTSynthesizer at all!
 
-   Wrapper->addAttr(AnnotateAttr::CreateImplicit(C, "__ResolveAtRuntime", nullptr, 0));
+   Result->addAttr(AnnotateAttr::CreateImplicit(C, "__ResolveAtRuntime", nullptr, 0));
+
+   // Arm dynamic lookup for this compilation unit in O(1).
+   cling::DynLookupArm::arm(C, Result);
 
    // Here we have the scope but we cannot do Sema::PushDeclContext, because
    // on pop it will try to go one level up, which we don't want.

@@ -21,6 +21,7 @@
 namespace clang {
   class Decl;
   class Sema;
+  class DeclContext;
 }
 
 namespace cling {
@@ -184,6 +185,7 @@ namespace cling {
     MapTy& getSubstSymbolMap() { return m_SubstSymbolMap; }
 
     ASTNodeInfo VisitStmt(clang::Stmt* Node);
+    ASTNodeInfo VisitTopLevelStmt(clang::Stmt* Node);
     ASTNodeInfo VisitCompoundStmt(clang::CompoundStmt* Node);
     ASTNodeInfo VisitIfStmt(clang::IfStmt* Node);
 
@@ -237,6 +239,10 @@ namespace cling {
     ///
     void Initialize();
 
+    /// In EvaluateTSynthesizer (header or private section)
+    clang::Expr* SubstituteUnknownSymbolTopLevel(const clang::QualType InstTy,
+                                         clang::Expr* SubTree,
+                                         bool ValuePrinterReq = false);
     /// @{
     /// @name Helpers, which simplify node replacement
 
@@ -270,13 +276,16 @@ namespace cling {
     ///\brief Creates const char* expression from given value.
     clang::Expr* ConstructConstCharPtrExpr(llvm::StringRef Val);
 
+    clang::Expr* BuildDynamicExprInfoTopLevel(clang::Expr* SubTree, bool ValuePrinterReq = false);
+
     ///\brief Checks if the given node is marked as dependent by us.
     ///
     bool IsArtificiallyDependent(clang::Expr* Node);
 
     ///\brief Checks if the function might contain dynamically scoped Decls.
     ///
-    bool ShouldVisit(clang::FunctionDecl* D);
+    bool ShouldVisitDC(const clang::DeclContext* DC);
+    bool ShouldVisitTLSD(clang::TopLevelStmtDecl* D);
 
     /// \brief Gets all children of a given node.
     ///

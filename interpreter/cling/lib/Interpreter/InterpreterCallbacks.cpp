@@ -10,6 +10,7 @@
 #include "cling/Interpreter/InterpreterCallbacks.h"
 
 #include "cling/Interpreter/Interpreter.h"
+#include "cling/Interpreter/DynLookupArm.h"
 
 #include "clang/AST/ASTContext.h"
 #include "clang/Basic/ASTSourceDescriptor.h"
@@ -449,13 +450,13 @@ namespace test {
     }
 
     // DynamicLookup only happens inside topmost functions:
-    clang::DeclContext* TopmostDC = DC;
-    while (!isa<TranslationUnitDecl>(TopmostDC->getParent())) {
-      TopmostDC = TopmostDC->getParent();
-    }
-    FunctionDecl* TopmostFunc = dyn_cast<FunctionDecl>(TopmostDC);
-    if (!TopmostFunc)
-       return false;
+    // clang::DeclContext* TopmostDC = DC;
+    // while (!isa<TranslationUnitDecl>(TopmostDC->getParent())) {
+    //   TopmostDC = TopmostDC->getParent();
+    // }
+    // FunctionDecl* TopmostFunc = dyn_cast<FunctionDecl>(TopmostDC);
+    // if (!TopmostFunc)
+    //    return false;
 
     DeclarationName Name = R.getLookupName();
     IdentifierInfo* II = Name.getAsIdentifierInfo();
@@ -466,8 +467,12 @@ namespace test {
     // Annotate the decl to give a hint in cling. FIXME: Current implementation
     // is a gross hack, because TClingCallbacks shouldn't know about
     // EvaluateTSynthesizer at all!
-    TopmostFunc->addAttr(
+    Res->addAttr(
         AnnotateAttr::CreateImplicit(C, "__ResolveAtRuntime", nullptr, 0));
+
+    // Arm dynamic lookup for this compilation unit in O(1).
+    cling::DynLookupArm::arm(C, Res);
+
     R.addDecl(Res);
     DC->addDecl(Res);
     // Say that we can handle the situation. Clang should try to recover

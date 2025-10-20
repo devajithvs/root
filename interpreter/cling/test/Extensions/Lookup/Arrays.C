@@ -16,6 +16,7 @@
 std::unique_ptr<cling::test::SymbolResolverCallback> SRC;
 SRC.reset(new cling::test::SymbolResolverCallback(gCling))
 gCling->setCallbacks(std::move(SRC));
+blah->Draw()
 
 // Fixed size arrays
 int a[5] = {1,2,3,4,5};

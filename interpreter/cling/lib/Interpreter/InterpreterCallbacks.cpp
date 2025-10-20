@@ -419,9 +419,6 @@ namespace test {
   SymbolResolverCallback::~SymbolResolverCallback() { }
 
   bool SymbolResolverCallback::LookupObject(LookupResult& R, Scope* S) {
-    if (!ShouldResolveAtRuntime(R, S))
-      return false;
-
     if (m_IsRuntime) {
       // We are currently parsing an EvaluateT() expression
       if (!m_Resolve)
@@ -440,10 +437,15 @@ namespace test {
         m_TesterDecl = utils::Lookup::Named(&SemaR, "Tester", NSD);
       }
       assert (m_TesterDecl && "Tester not found!");
+      R.clear();
       R.addDecl(m_TesterDecl);
+      R.resolveKind();  
       return true; // Tell clang to continue.
     }
 
+    if (!ShouldResolveAtRuntime(R, S))
+      return false;
+    
     // We are currently NOT parsing an EvaluateT() expression.
     // Escape the expression into an EvaluateT() expression.
     ASTContext& C = R.getSema().getASTContext();

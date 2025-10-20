@@ -832,9 +832,20 @@ namespace cling {
       cling::errs() << "VirtualFileID could not be created.\n";
   }
 
+  static void dummyblah() {
+    llvm::errs() << "This will print something\n";
+  }
+
   IncrementalParser::ParseResultTransaction
   IncrementalParser::Compile(llvm::StringRef input,
                              const CompilationOptions& Opts) {
+    llvm::errs() << "Compile Input: " << input << "\n";
+
+    if (input.find("RuntimePrintValue.h") != std::string::npos) {
+      dummyblah();
+      int i = 10;
+    }
+    
     Transaction* CurT = beginTransaction(Opts);
     EParseResult ParseRes = ParseInternal(input);
 

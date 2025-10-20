@@ -1364,7 +1364,10 @@ namespace cling {
       *T = PRT.getPointer();
     return Interpreter::kSuccess;
   }
-
+  static void dummyblah() {
+    llvm::errs() << "This will print something\n";
+  }
+    
   Interpreter::CompilationResult
   Interpreter::EvaluateInternal(const std::string& input,
                                 CompilationOptions CO,
@@ -1374,6 +1377,11 @@ namespace cling {
     StateDebuggerRAII stateDebugger(this);
 
     llvm::errs() << "Input: " << input << "\n";
+
+    if (input == "blah->Draw()") {
+      dummyblah();
+      int i = 10;
+    }
 
     // FIXME: Move this to WrapInput later
     bool WantValuePrinting = CO.ValuePrinting != CompilationOptions::VPDisabled;

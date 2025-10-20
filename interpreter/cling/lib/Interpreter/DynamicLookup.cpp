@@ -317,18 +317,18 @@ namespace cling {
       return Result(D, true);
 
     if (auto *FD = dyn_cast<FunctionDecl>(D)) {
-      if (FD->hasBody()) {
-        if (!m_EvalDecl)
-          Initialize();
+      // if (FD->hasBody()) {
+      //   if (!m_EvalDecl)
+      //     Initialize();
 
-        // Set the decl context, which is needed by Evaluate.
-        m_CurDeclContext = FD;
-        ASTNodeInfo NewBody = Visit(D->getBody());
-        if (NewBody.hasErrorOccurred()) {
-          return Result(nullptr, false); // Signal a fatal error.
-        }
-        FD->setBody(NewBody.getAsSingleNode());
-      }
+      //   // Set the decl context, which is needed by Evaluate.
+      //   m_CurDeclContext = FD;
+      //   ASTNodeInfo NewBody = Visit(D->getBody());
+      //   if (NewBody.hasErrorOccurred()) {
+      //     return Result(nullptr, false); // Signal a fatal error.
+      //   }
+      //   FD->setBody(NewBody.getAsSingleNode());
+      // }
       assert ((!isa<BlockDecl>(D) || !isa<ObjCMethodDecl>(D))
               && "Not implemented yet!");
     } else if (auto *VD = dyn_cast<VarDecl>(D)) {
@@ -384,15 +384,17 @@ namespace cling {
           stripResolveRuntimeAnnots(AnnVD);
           if (NS.hasErrorOccurred())
             return Result(nullptr, false);
-          if (NS.isForReplacement()) {
+          // if (NS.isForReplacement()) {
             TL->setStmt(NS.getAsSingleNode());
             cling::errs() << "[EvalTSynth] expr(after) : "
                           << prettyStmt(*m_Context, NS.getAsSingleNode()) << "\n";
             // Optionally mark as resolved to avoid re-entry in other passes
             TL->addAttr(clang::AnnotateAttr::CreateImplicit(
                 m_Sema->getASTContext(), "__ResolveAtRuntime", nullptr, 0));
-          }
+          // }
         }
+
+        TL->dump();
 
 
         // ASTNodeInfo NS = VisitTopLevelStmt(TL->getStmt());
@@ -422,39 +424,96 @@ static std::string prettyExprWithType(const clang::ASTContext& Ctx, const clang:
   return S;
 }
 
-  // In EvaluateTSynthesizer (implementation)
-  // In EvaluateTSynthesizer (implementation)
-  ASTNodeInfo EvaluateTSynthesizer::VisitTopLevelStmt(Stmt* Node) {
-    // If this top-level is a pure expression (often it is), wrap the *whole* thing.
-    Expr* E = nullptr;
 
-    // Common top-level carriers:
-    if (auto *EW = llvm::dyn_cast<ExprWithCleanups>(Node))
-      E = EW->getSubExpr();
-    else if (auto *FS = llvm::dyn_cast<FullExpr>(Node))
-      E = FS->getSubExpr();
-    else
-      E = llvm::dyn_cast<Expr>(Node);
-
-    if (!E) {
-      // Not an expression at top level (rare). Reuse existing logic.
-      if (auto *CS = llvm::dyn_cast<CompoundStmt>(Node))
-        return VisitCompoundStmt(CS);
-      return ASTNodeInfo(Node, /*needs eval*/false);
+  // Return the first VarDecl referenced by `S` that carries __ResolveAtRuntime.
+  static clang::VarDecl* findAnnotatedVarInStmt2(clang::Stmt* S) {
+    if (!S) return nullptr;
+    if (auto *DRE = llvm::dyn_cast<clang::DeclRefExpr>(S)) {
+      if (auto *VD = llvm::dyn_cast<clang::VarDecl>(DRE->getDecl()))
+        if (VD->hasAttr<clang::AnnotateAttr>())
+          for (auto *A : VD->specific_attrs<clang::AnnotateAttr>())
+            if (A->getAnnotation() == "__ResolveAtRuntime")
+              return VD; // non-const
     }
-
-    // We’re in immediate context: enable value printing for last stmt.
-    const bool valuePrinterReq = true;
-
-    // IMPORTANT: do *not* call Visit(E) first; we want to wrap the original expr.
-    Expr* Wrapped = SubstituteUnknownSymbolTopLevel(m_Context->VoidTy, E, valuePrinterReq);
-    cling::errs() << "[EvalTSynth] expr(after - blah) : "
-                << prettyStmt(*m_Context, Wrapped) << "\n";
-    return ASTNodeInfo(Wrapped, /*isForReplacement*/true);
+    for (auto *Child : S->children())
+      if (auto *Hit = findAnnotatedVarInStmt2(Child))
+        return Hit;
+    return nullptr;
   }
+
+  // // In EvaluateTSynthesizer (implementation)
+  // ASTNodeInfo EvaluateTSynthesizer::VisitTopLevelStmt(Stmt* Node) {
+  //   // If this top-level is a pure expression (often it is), wrap the *whole* thing.
+  //   Expr* E = nullptr;
+
+  //   // Common top-level carriers:
+  //   if (auto *EW = llvm::dyn_cast<ExprWithCleanups>(Node))
+  //     E = EW->getSubExpr();
+  //   else if (auto *FS = llvm::dyn_cast<FullExpr>(Node))
+  //     E = FS->getSubExpr();
+  //   else
+  //     E = llvm::dyn_cast<Expr>(Node);
+
+  //   if (!E) {
+  //     // Not an expression at top level (rare). Reuse existing logic.
+  //     if (auto *CS = llvm::dyn_cast<CompoundStmt>(Node))
+  //       return VisitCompoundStmt(CS);
+  //     return ASTNodeInfo(Node, /*needs eval*/false);
+  //   }
+
+  //   // We’re in immediate context: enable value printing for last stmt.
+  //   const bool valuePrinterReq = true;
+
+  //   // IMPORTANT: do *not* call Visit(E) first; we want to wrap the original expr.
+  //   Expr* Wrapped = SubstituteUnknownSymbol(m_Context->VoidTy, E, valuePrinterReq);
+  //   cling::errs() << "[EvalTSynth] expr(after - blah) : "
+  //               << prettyStmt(*m_Context, Wrapped) << "\n";
+  //   return ASTNodeInfo(Wrapped, /*isForReplacement*/true);
+  // }
 
 
   // StmtVisitor
+
+  ASTNodeInfo EvaluateTSynthesizer::VisitTopLevelStmt(Stmt* Node) {
+  // 1) If the top-level "statement" is actually a variable declaration,
+  //    reuse the existing machinery (LifetimeHandler injection, etc.).
+  if (auto *DS = llvm::dyn_cast<DeclStmt>(Node)) {
+    return VisitDeclStmt(DS);
+  }
+
+  // 2) Otherwise, treat it like the wrapper-body last statement did:
+  //    wrap the *whole* expression in a one-element CompoundStmt and
+  //    run through VisitCompoundStmt(), which (a) recurses, (b) decides
+  //    value-printer correctly, and (c) calls SubstituteUnknownSymbol(...)
+  //    at the right spot.
+  if (auto *E = llvm::dyn_cast<Expr>(Node)) {
+    // Guard: if already an EvaluateT(...) call, leave it alone.
+    if (isEvaluateTCall(E))
+      return ASTNodeInfo(Node, /*needs eval*/false);
+
+    llvm::SmallVector<Stmt*, 1> One{E};
+    FPOptionsOverride FP;
+    auto *CS = CompoundStmt::Create(*m_Context, One, FP,
+                                    E->getBeginLoc(), E->getEndLoc());
+
+    ASTNodeInfo NI = VisitCompoundStmt(CS);
+    if (NI.hasErrorOccurred())
+      return NI;
+
+    // Extract the single transformed statement from the new compound.
+    if (NI.isForReplacement()) {
+      if (auto *NewCS = llvm::dyn_cast<CompoundStmt>(NI.getAsSingleNode()))
+        if (NewCS->size() == 1)
+          return ASTNodeInfo(*NewCS->body_begin(), /*for replacement*/true);
+      // Fallback: pass through whatever we got.
+      return NI;
+    }
+    return ASTNodeInfo(Node, /*needs eval*/false);
+  }
+
+  // 3) Any other Stmt: recurse generically, letting VisitStmt handle children.
+  return VisitStmt(Node);
+}
 
   ASTNodeInfo EvaluateTSynthesizer::VisitStmt(Stmt* Node) {
     for (Stmt::child_iterator
@@ -524,58 +583,148 @@ static std::string prettyExprWithType(const clang::ASTContext& Ctx, const clang:
     return ASTNodeInfo(Node, false);
   }
 
-  ASTNodeInfo EvaluateTSynthesizer::VisitCompoundStmt(CompoundStmt* Node) {
-    ++m_NestedCompoundStmts;
-    ASTNodes Children;
-    ASTNodes NewChildren;
-    if (GetChildren(Children, Node)) {
-      ASTNodes::iterator it;
-      for (it = Children.begin(); it != Children.end(); ++it) {
-        ASTNodeInfo NewNode = Visit(*it);
-        if (NewNode.hasErrorOccurred())
-          return NewNode; // abort.
-        if (!NewNode.hasSingleNode()) {
+#undef NDEBUG
+#ifndef NDEBUG
 
-          ASTNodes& NewStmts(NewNode.getNodes());
-          for(unsigned i = 0; i < NewStmts.size(); ++i)
-            NewChildren.push_back(NewStmts[i]);
-        }
-        else {
-          if (NewNode.isForReplacement()) {
-            if (Expr* E = NewNode.getAs<Expr>()) {
-              // Check whether value printer has been requested
-              bool valuePrinterReq = false;
-              // If this was the last or the last is not null stmt, means that
-              // we need to value print.
-              // If this is in a wrapper function's body then look for VP.
-              if (FunctionDecl* FD = dyn_cast<FunctionDecl>(m_CurDeclContext))
-                valuePrinterReq
-                  = m_NestedCompoundStmts < 2  && utils::Analyze::IsWrapper(FD)
-                  && ((it+1) == Children.end() || ((it+2) == Children.end()
-                                                   && !isa<NullStmt>(*(it+1))));
+static std::string callCalleeName(const clang::Expr* E) {
+  using namespace clang;
+  if (!E) return "<null>";
+  auto *CE = llvm::dyn_cast<CallExpr>(E->IgnoreParenImpCasts());
+  if (!CE) return "<not-a-call>";
+  const Expr *Callee = CE->getCallee()->IgnoreParenImpCasts();
+  if (auto *DRE = llvm::dyn_cast<DeclRefExpr>(Callee)) {
+    if (auto *FD = llvm::dyn_cast<FunctionDecl>(DRE->getDecl()))
+      if (auto *II = FD->getIdentifier()) return II->getName().str();
+  }
+  return std::string("<") + Callee->getStmtClassName() + ">";
+}
 
-              // Assume void if still not escaped
-              NewChildren.push_back(SubstituteUnknownSymbol(m_Context->VoidTy,E,
-                                                            valuePrinterReq));
+static void collectDeclRefNames(const clang::Stmt* S,
+                                llvm::SmallVectorImpl<std::string>& Out) {
+  using namespace clang;
+  if (!S) return;
+  if (auto *DRE = llvm::dyn_cast<DeclRefExpr>(S))
+    if (auto *VD = llvm::dyn_cast<ValueDecl>(DRE->getDecl()))
+      if (auto *II = VD->getIdentifier())
+        Out.push_back(II->getName().str());
+  for (auto *C : S->children()) collectDeclRefNames(C, Out);
+}
+#endif // NDEBUG
+
+ASTNodeInfo EvaluateTSynthesizer::VisitCompoundStmt(CompoundStmt* Node) {
+#ifndef NDEBUG
+  llvm::errs() << "[EvalTSynth][CS] enter nest=" << (m_NestedCompoundStmts+1);
+  if (auto *FD = llvm::dyn_cast_or_null<FunctionDecl>(m_CurDeclContext)) {
+    llvm::errs() << " ctx=FunctionDecl(" 
+                 << (FD->getIdentifier()? FD->getName() : "<anon>") << ")";
+    llvm::errs() << " isWrapper=" << (utils::Analyze::IsWrapper(FD) ? "yes":"no");
+  } else {
+    llvm::errs() << " ctx=" << (m_CurDeclContext ? m_CurDeclContext->getDeclKindName() : "<null>");
+  }
+  llvm::errs() << "\n";
+#endif
+
+  ++m_NestedCompoundStmts;
+  ASTNodes Children;
+  ASTNodes NewChildren;
+
+  if (GetChildren(Children, Node)) {
+    for (size_t idx = 0; idx < Children.size(); ++idx) {
+      Stmt* Child = Children[idx];
+
+#ifndef NDEBUG
+      llvm::errs() << "  [CS][" << idx << "] class=" 
+                   << (Child ? Child->getStmtClassName() : "<null>")
+                   << " before='" << prettyStmt(*m_Context, Child) << "'\n";
+#endif
+
+      ASTNodeInfo NewNode = Visit(Child);
+      if (NewNode.hasErrorOccurred())
+        return NewNode; // abort.
+
+      if (!NewNode.hasSingleNode()) {
+#ifndef NDEBUG
+        llvm::errs() << "  [CS][" << idx << "] multi-node replacement ("
+                     << NewNode.getNodes().size() << " stmts)\n";
+#endif
+        ASTNodes& NewStmts(NewNode.getNodes());
+        for (unsigned i = 0; i < NewStmts.size(); ++i)
+          NewChildren.push_back(NewStmts[i]);
+        continue;
+      }
+
+      if (NewNode.isForReplacement()) {
+        if (Expr* E = NewNode.getAs<Expr>()) {
+#ifndef NDEBUG
+          llvm::errs() << "  [CS][" << idx << "] replacement requested for Expr\n";
+          if (auto *CE = llvm::dyn_cast<CallExpr>(E->IgnoreParenImpCasts())) {
+            llvm::SmallVector<std::string, 8> Names;
+            collectDeclRefNames(CE, Names);
+            llvm::errs() << "    call callee=" << callCalleeName(CE)
+                         << " argc=" << CE->getNumArgs();
+            if (!Names.empty()) {
+              llvm::errs() << " refs=[";
+              for (size_t i=0;i<Names.size();++i) {
+                if (i) llvm::errs() << ",";
+                llvm::errs() << Names[i];
+              }
+              llvm::errs() << "]";
             }
+            llvm::errs() << "\n";
           }
-          else
-            NewChildren.push_back(*it);
+#endif
+          // compute valuePrinterReq the same way as before
+          bool valuePrinterReq = false;
+          if (FunctionDecl* FD = dyn_cast<FunctionDecl>(m_CurDeclContext))
+            valuePrinterReq = m_NestedCompoundStmts < 2 &&
+                              utils::Analyze::IsWrapper(FD) &&
+                              ((idx + 1) == Children.size() ||
+                               ((idx + 2) == Children.size() &&
+                                !isa<NullStmt>(Children[idx + 1])));
+
+#ifndef NDEBUG
+          llvm::errs() << "    valuePrinterReq=" << (valuePrinterReq ? "true":"false") << "\n";
+          llvm::errs() << "    substituting as void-target\n";
+#endif
+          Stmt* Subst = SubstituteUnknownSymbol(m_Context->VoidTy, E, valuePrinterReq);
+
+#ifndef NDEBUG
+          llvm::errs() << "  [CS][" << idx << "] after='" 
+                       << prettyStmt(*m_Context, Subst) << "'\n";
+#endif
+          NewChildren.push_back(Subst);
+        } else {
+#ifndef NDEBUG
+          llvm::errs() << "  [CS][" << idx << "] non-Expr replacement\n";
+#endif
+          NewChildren.push_back(NewNode.getAsSingleNode());
         }
+      } else {
+#ifndef NDEBUG
+        llvm::errs() << "  [CS][" << idx << "] no replacement\n";
+#endif
+        NewChildren.push_back(Child);
       }
     }
-
-    FPOptionsOverride FPFeatures;
-    if (Node->hasStoredFPFeatures()) {
-      FPFeatures = Node->getStoredFPFeatures();
-    }
-    auto* NewCS = CompoundStmt::Create(*m_Context, NewChildren, FPFeatures,
-                                       Node->getLBracLoc(),
-                                       Node->getRBracLoc());
-
-    --m_NestedCompoundStmts;
-    return ASTNodeInfo(NewCS, true);
   }
+
+  FPOptionsOverride FPFeatures;
+  if (Node->hasStoredFPFeatures())
+    FPFeatures = Node->getStoredFPFeatures();
+
+  auto* NewCS = CompoundStmt::Create(*m_Context, NewChildren, FPFeatures,
+                                     Node->getLBracLoc(),
+                                     Node->getRBracLoc());
+
+#ifndef NDEBUG
+  llvm::errs() << "[EvalTSynth][CS] exit  nest=" << m_NestedCompoundStmts
+               << " size=" << NewChildren.size()
+               << " result='" << prettyStmt(*m_Context, NewCS) << "'\n";
+#endif
+
+  --m_NestedCompoundStmts;
+  return ASTNodeInfo(NewCS, true);
+}
 
   ASTNodeInfo EvaluateTSynthesizer::VisitDeclStmt(DeclStmt* Node) {
     // Visit all the children, which are the contents of the DeclGroupRef
@@ -854,110 +1003,6 @@ static std::string prettyExprWithType(const clang::ASTContext& Ctx, const clang:
 
   // end StmtVisitor
 
-  Expr* EvaluateTSynthesizer::BuildDynamicExprInfoTopLevel(Expr* SubTree,
-                                                         bool ValuePrinterReq) {
-    Sema::ContextRAII pushedDC(*m_Sema, m_CurDeclContext);
-
-    llvm::SmallVector<DeclRefExpr*, 4> Addresses;
-    ostrstream OS;
-    const PrintingPolicy& Policy = m_Context->getPrintingPolicy();
-
-    StmtPrinterHelper helper(Policy, Addresses, m_Sema);
-
-    // // NOTE: unlike BuildDynamicExprInfo(), we intentionally do NOT add
-    // // an extra surrounding pair of parentheses for non-ParenListExpr here.
-    // SubTree->printPretty(OS, &helper, Policy);
-
-    if (!isa<ParenListExpr>(SubTree))
-      OS << '(';
-    SubTree->printPretty(OS, &helper, Policy);
-    if (!isa<ParenListExpr>(SubTree))
-      OS << ')';
-
-    // 2. Build the template
-    Expr* ExprTemplate = ConstructConstCharPtrExpr(OS.str());
-
-    // 3. Build the array of addresses (identical to original)
-    QualType VarAddrTy =
-        m_Sema->BuildArrayType(m_Context->VoidPtrTy, ArraySizeModifier::Normal,
-                              /*ArraySize*/ nullptr, /*IndexTypeQuals*/ 0,
-                              m_NoRange, DeclarationName());
-    llvm::SmallVector<Expr*, 2> Inits;
-    Scope* S = m_Sema->getScopeForContext(m_Sema->CurContext);
-    for (unsigned i = 0; i < Addresses.size(); ++i) {
-      Expr *E = Addresses[i];
-      if (!E->isLValue()) {
-        cling::errs() << "[EvaluateTSynthesizer] skip & of non-lvalue: "
-                      << E->getStmtClassName() << "\n";
-        continue;
-      }
-      Expr* UnOp = m_Sema->BuildUnaryOp(S, E->getBeginLoc(), UO_AddrOf, E).get();
-      if (!UnOp) return SubTree;
-      m_Sema->ImpCastExprToType(
-          UnOp, m_Context->getPointerType(m_Context->VoidPtrTy), CK_BitCast);
-      Inits.push_back(UnOp);
-    }
-
-    InitListExpr* ILE = m_Sema->ActOnInitList(m_NoSLoc, Inits, m_NoELoc)
-                            .getAs<InitListExpr>();
-    TypeSourceInfo* TSI =
-        m_Context->getTrivialTypeSourceInfo(VarAddrTy, m_NoSLoc);
-    Expr* ExprAddresses =
-        m_Sema->BuildCompoundLiteralExpr(m_NoSLoc, TSI, m_NoELoc, ILE).get();
-    if (!ExprAddresses) return SubTree;
-
-    m_Sema->ImpCastExprToType(
-        ExprAddresses,
-        m_Context->getPointerType(m_Context->VoidPtrTy),
-        CK_ArrayToPointerDecay);
-
-    Expr* VPReq = ValuePrinterReq
-                      ? m_Sema->ActOnCXXBoolLiteral(m_NoSLoc, tok::kw_true).get()
-                      : m_Sema->ActOnCXXBoolLiteral(m_NoSLoc, tok::kw_false).get();
-
-    llvm::SmallVector<Expr*, 4> CtorArgs;
-    CtorArgs.push_back(ExprTemplate);
-    CtorArgs.push_back(ExprAddresses);
-    CtorArgs.push_back(VPReq);
-
-    QualType ExprInfoTy = m_Context->getTypeDeclType(m_DynamicExprInfoDecl);
-    ExprResult Initializer =
-        m_Sema->ActOnParenListExpr(m_NoSLoc, m_NoELoc, CtorArgs);
-    TypeSourceInfo* TrivialTSI =
-        m_Context->getTrivialTypeSourceInfo(ExprInfoTy, SourceLocation());
-
-    Expr* Result =
-        m_Sema->BuildCXXNew(m_NoSLoc, /*UseGlobal=*/false, m_NoSLoc,
-                            /*PlacementArgs=*/MultiExprArg(), m_NoELoc, m_NoRange,
-                            ExprInfoTy, TrivialTSI, /*ArraySize=*/{},
-                            m_NoRange, Initializer.get())
-            .get();
-    return Result;
-  }
-
-
-  // same signature pattern as the existing one; "TopLevel" calls the TL builder
-  Expr* EvaluateTSynthesizer::SubstituteUnknownSymbolTopLevel(const QualType InstTy,
-                                                              Expr* SubTree,
-                                                              bool ValuePrinterReq) {
-    assert(SubTree && "No subtree specified!");
-    llvm::SmallVector<Expr*, 2> CallArgs;
-
-    // Arg0: DynamicExprInfo but *without* the extra outer parentheses
-    Expr* Arg0 = BuildDynamicExprInfoTopLevel(SubTree, ValuePrinterReq);
-    // Arg1: DeclContext*
-    QualType DCTy = m_Context->getTypeDeclType(m_DeclContextDecl);
-    Expr* Arg1 = utils::Synthesize::CStyleCastPtrExpr(m_Sema, DCTy,
-                                                      (uintptr_t)m_CurDeclContext);
-    CallArgs.push_back(Arg0);
-    CallArgs.push_back(Arg1);
-
-    CallExpr* EvalCall = BuildEvalCallExpr(InstTy, SubTree, CallArgs);
-    getSubstSymbolMap()[EvalCall] = SubTree;
-    return EvalCall;
-  }
-
-
   // EvalBuilder
 
   Expr* EvaluateTSynthesizer::SubstituteUnknownSymbol(const QualType InstTy,
@@ -1024,10 +1069,15 @@ static std::string prettyExprWithType(const clang::ASTContext& Ctx, const clang:
     llvm::SmallVector<Expr*, 2> Inits;
     Scope* S = m_Sema->getScopeForContext(m_Sema->CurContext);
     for (unsigned int i = 0; i < Addresses.size(); ++i) {
-
+      Expr *E = Addresses[i];
+      if (!E->isLValue()) {
+        cling::errs() << "[EvaluateTSynthesizer] skip & of non-lvalue: "
+                      << E->getStmtClassName() << "\n";
+        continue;
+      }
       Expr* UnOp
-        = m_Sema->BuildUnaryOp(S, Addresses[i]->getBeginLoc(), UO_AddrOf,
-                               Addresses[i]).get();
+        = m_Sema->BuildUnaryOp(S, E->getBeginLoc(), UO_AddrOf,
+                               E).get();
       if (!UnOp) {
         // Not good, return what we had.
         cling::errs() << "Error while creating dynamic expression for:\n  ";

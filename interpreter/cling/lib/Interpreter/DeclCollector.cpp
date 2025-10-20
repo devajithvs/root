@@ -24,6 +24,41 @@
 
 using namespace clang;
 
+#include "llvm/Support/raw_ostream.h"
+#include "clang/AST/PrettyPrinter.h"
+
+static std::string typeToString(const clang::ASTContext& Ctx, clang::QualType QT) {
+  clang::PrintingPolicy PP(Ctx.getPrintingPolicy());
+  PP.SuppressUnwrittenScope = true;
+  PP.ConstantsAsWritten = true;
+  std::string S; llvm::raw_string_ostream OS(S);
+  QT.print(OS, PP); OS.flush(); return S;
+}
+
+static std::string exprToString(const clang::Expr* E) {
+  if (!E) return "<null-expr>";
+  clang::PrintingPolicy PP = clang::LangOptions();
+  PP.SuppressUnwrittenScope = true;
+  PP.ConstantsAsWritten = true;
+  std::string S; llvm::raw_string_ostream OS(S);
+  E->printPretty(OS, /*Helper*/nullptr, PP); OS.flush();
+  if (S.empty()) S = std::string("<") + E->getStmtClassName() + ">";
+  return S;
+}
+
+static const char* valueKindStr(::clang::ExprValueKind VK) {
+  using VK_t = ::clang::ExprValueKind;
+  switch (VK) {
+    case VK_t::VK_PRValue: return "prvalue";
+    case VK_t::VK_LValue: return "lvalue";
+    case VK_t::VK_XValue: return "xvalue";
+  }
+  return "?";
+}
+
+static const char* boolStr(bool b){ return b ? "true" : "false"; }
+
+
 namespace {
   ///\brief Return true if this decl (which comes from an AST file) should
   /// not be sent to CodeGen. The module is assumed to describe the contents
@@ -209,8 +244,12 @@ namespace cling {
     for (Decl *D : DGR)
       if (auto *TSD = llvm::dyn_cast<TopLevelStmtDecl>(D);
           TSD && TSD->isSemiMissing())
-            if (auto *synthesizer = m_IncrParser->GetSynthesizer())
-        TSD->setStmt(synthesizer->SynthesizeSVRInit(cast<Expr>(TSD->getStmt())));
+        if (auto *synthesizer = m_IncrParser->GetSynthesizer()) {
+          TSD->dump();
+          Expr* lastExpr = cast<Expr>(TSD->getStmt());
+          llvm::errs() << "[HandleTopLevelDecl] E(before) : " << exprToString(lastExpr) << "\n";
+          TSD->setStmt(synthesizer->SynthesizeSVRInit(lastExpr));
+        }
 
     if (comesFromASTReader(DGR)) {
       for (DeclGroupRef::iterator DI = DGR.begin(), DE = DGR.end();

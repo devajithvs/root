@@ -179,9 +179,7 @@ namespace cling {
     ///
     const Transaction* m_Next;
 
-    ///\brief The Sema holding the ASTContext and the Preprocessor.
-    ///
-    clang::Sema& m_Sema;
+    
 
     // Intentionally use struct instead of pair because we don't need default
     // init.
@@ -204,6 +202,10 @@ namespace cling {
     void Initialize();
 
   public:
+  ///\brief The Sema holding the ASTContext and the Preprocessor.
+    ///
+    clang::Sema& m_Sema;
+
     enum State {
       kCollecting,
       kCompleted,

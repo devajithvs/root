@@ -2278,11 +2278,15 @@ bool Sema::LookupName(LookupResult &R, Scope *S, bool AllowBuiltinCreation,
   } else {
     // Perform C++ unqualified name lookup.
     if (CppLookupName(R, S)) {
-      if (R.isSingleResult())
+      if (R.isSingleResult()) {
         if (const TagDecl *TD = dyn_cast<TagDecl>(R.getFoundDecl())) {
           if (!TD->getDefinition() && ExternalSource)
             ExternalSource->LookupUnqualified(R, S);
+        } else if (const auto *VD = llvm::dyn_cast<VarDecl>(R.getFoundDecl())) {
+          if (ExternalSource && VD->getType()->isDependentType())
+            ExternalSource->LookupUnqualified(R, S);
         }
+      }
       return true;
     }
   }

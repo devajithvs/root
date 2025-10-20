@@ -24,6 +24,41 @@
 
 using namespace clang;
 
+#include "llvm/Support/raw_ostream.h"
+#include "clang/AST/PrettyPrinter.h"
+
+static std::string typeToString(const clang::ASTContext& Ctx, clang::QualType QT) {
+  clang::PrintingPolicy PP(Ctx.getPrintingPolicy());
+  PP.SuppressUnwrittenScope = true;
+  PP.ConstantsAsWritten = true;
+  std::string S; llvm::raw_string_ostream OS(S);
+  QT.print(OS, PP); OS.flush(); return S;
+}
+
+static std::string exprToString(const clang::ASTContext& Ctx, const clang::Expr* E) {
+  if (!E) return "<null-expr>";
+  clang::PrintingPolicy PP(Ctx.getPrintingPolicy());
+  PP.SuppressUnwrittenScope = true;
+  PP.ConstantsAsWritten = true;
+  std::string S; llvm::raw_string_ostream OS(S);
+  E->printPretty(OS, /*Helper*/nullptr, PP); OS.flush();
+  if (S.empty()) S = std::string("<") + E->getStmtClassName() + ">";
+  return S;
+}
+
+static const char* valueKindStr(::clang::ExprValueKind VK) {
+  using VK_t = ::clang::ExprValueKind;
+  switch (VK) {
+    case VK_t::VK_PRValue: return "prvalue";
+    case VK_t::VK_LValue: return "lvalue";
+    case VK_t::VK_XValue: return "xvalue";
+  }
+  return "?";
+}
+
+static const char* boolStr(bool b){ return b ? "true" : "false"; }
+
+
 namespace cling {
   ValueExtractionSynthesizer::ValueExtractionSynthesizer(clang::Sema* S, Interpreter* m_Interpreter,
                                                          bool isChildInterpreter)
@@ -203,220 +238,255 @@ namespace {
   }
 }
 
-  Expr* ValueExtractionSynthesizer::SynthesizeSVRInit(Expr* E) {
-    if (!m_gClingVD && !FindAndCacheRuntimeDecls(E))
-      return nullptr;
 
-    // We have the wrapper as Sema's CurContext
-    FunctionDecl* FD = cast<FunctionDecl>(m_Sema->CurContext);
+Expr* ValueExtractionSynthesizer::SynthesizeSVRInit(Expr* E) {
+  ::llvm::errs() << "[SVR] enter SynthesizeSVRInit E=" << (const void*)E << "\n";
+    llvm::errs() << "[SVR-fn] E(before) : " << exprToString(*m_Context, E) << "\n";
 
-    ExprWithCleanups* Cleanups = 0;
-    // In case of ExprWithCleanups we need to extend its 'scope' to the call.
-    if (E && isa<ExprWithCleanups>(E)) {
-      Cleanups = cast<ExprWithCleanups>(E);
-      E = Cleanups->getSubExpr();
-    }
-    // Build a reference to Value* in the wrapper, should be
-    // the only argument of the wrapper.
-    SourceLocation locStart = (E) ? E->getBeginLoc() : FD->getBeginLoc();
-    SourceLocation locEnd = (E) ? E->getEndLoc() : FD->getEndLoc();
-    QualType ETy = (E) ? E->getType() : m_Context->VoidTy;
-    QualType desugaredTy = ETy.getDesugaredType(*m_Context);
-
-    // The expr result is transported as reference, pointer, array, float etc
-    // based on the desugared type. We should still expose the typedef'ed
-    // (sugared) type to the cling::Value.
-    if (desugaredTy->isRecordType() && E->getValueKind() == VK_LValue) {
-      // returning a lvalue (not a temporary): the value should contain
-      // a reference to the lvalue instead of copying it.
-      desugaredTy = m_Context->getLValueReferenceType(desugaredTy);
-      ETy = m_Context->getLValueReferenceType(ETy);
-    }
-
-    // Create parameter `ThisInterp`.
-    auto *ThisInterp = utils::Synthesize::CStyleCastPtrExpr(m_Sema, m_Context->VoidPtrTy, (uintptr_t)m_Interpreter);
-    
-    // Create parameter `OutVal`.
-    auto *OutValue = utils::Synthesize::CStyleCastPtrExpr(m_Sema, m_Context->VoidPtrTy, (uintptr_t)&(m_Interpreter->LastValue));
-
-    Expr* ETyVP
-      = utils::Synthesize::CStyleCastPtrExpr(m_Sema, m_Context->VoidPtrTy,
-                                             (uintptr_t)ETy.getAsOpaquePtr());
-
-    // Pass whether to Value::dump() or not:
-    // Expr* EVPOn =
-    //     new (*m_Context) CharacterLiteral(getCompilationOpts().ValuePrinting,
-    //                                       CharacterLiteralKind::Ascii,
-    //                                       m_Context->CharTy, SourceLocation());
-
-
-    llvm::SmallVector<Expr*, 5> CallArgs;
-    CallArgs.push_back(ThisInterp);
-    CallArgs.push_back(OutValue);
-    CallArgs.push_back(ETyVP);
-    // CallArgs.push_back(EVPOn);
-
-    ExprResult Call;
-    SourceLocation noLoc = locStart;
-    if (desugaredTy->isVoidType()) {
-      // In cases where the cling::Value gets reused we need to reset the
-      // previous settings to void.
-      // We need to synthesize setValueNoAlloc(...), E, because we still need
-      // to run E.
-
-      // FIXME: Suboptimal: this discards the already created AST nodes.
-      QualType vpQT = m_Context->VoidPtrTy;
-      QualType vQT = m_Context->VoidTy;
-      Expr* vpQTVP
-        = utils::Synthesize::CStyleCastPtrExpr(m_Sema, vpQT,
-                                               (uintptr_t)vQT.getAsOpaquePtr());
-      CallArgs[2] = vpQTVP;
-
-
-      Call = m_Sema->ActOnCallExpr(/*Scope*/0, m_UnresolvedNoAlloc,
-                                   locStart, CallArgs, locEnd);
-
-      if (E)
-        Call = m_Sema->CreateBuiltinBinOp(locStart, BO_Comma, Call.get(), E);
-
-    }
-    else if (desugaredTy->isRecordType() || desugaredTy->isConstantArrayType()
-             || desugaredTy->isMemberPointerType()) {
-      // 2) object types :
-      // check existence of copy constructor before call
-      if (!desugaredTy->isMemberPointerType()
-          && !availableCopyConstructor(desugaredTy, m_Sema))
-        return E;
-      // call new (setValueWithAlloc(gCling, &SVR, ETy)) (E)
-      Call = m_Sema->ActOnCallExpr(/*Scope*/0, m_UnresolvedWithAlloc,
-                                   locStart, CallArgs, locEnd);
-      Expr* placement = Call.get();
-      if (const ConstantArrayType* constArray
-          = dyn_cast<ConstantArrayType>(desugaredTy.getTypePtr())) {
-        CallArgs.clear();
-        // Get a pointer to the base element type so the instantiated copyArray
-        // template can do placement new.
-        QualType baseElementType = m_Context->getBaseElementType(desugaredTy);
-        TypeSourceInfo* TSI = m_Context->getTrivialTypeSourceInfo(
-            m_Context->getPointerType(baseElementType), noLoc);
-        Expr* srcPointer =
-            m_Sema->BuildCStyleCastExpr(noLoc, TSI, noLoc, E).get();
-        CallArgs.push_back(srcPointer);
-        CallArgs.push_back(placement);
-        size_t arrSize
-          = m_Context->getConstantArrayElementCount(constArray);
-        Expr* arrSizeExpr
-          = utils::Synthesize::IntegerLiteralExpr(*m_Context, arrSize);
-
-        CallArgs.push_back(arrSizeExpr);
-        // 2.1) arrays:
-        // call copyArray(T* src, void* placement, size_t size)
-        Call = m_Sema->ActOnCallExpr(/*Scope*/0, m_UnresolvedCopyArray,
-                                     locStart, CallArgs, locEnd);
-
-      }
-      else {
-        if (!E->getSourceRange().isValid()) {
-          // We cannot do CXXNewExpr::CallInit (see Sema::BuildCXXNew) but
-          // that's what we want. Fail...
-          return E;
-        }
-        TypeSourceInfo* ETSI
-          = m_Context->getTrivialTypeSourceInfo(ETy, noLoc);
-
-        assert(!Call.isInvalid() && "Invalid Call before building new");
-
-        Call = m_Sema->BuildCXXNew(E->getSourceRange(),
-                                   /*useGlobal ::*/true,
-                                   /*placementLParen*/ noLoc,
-                                   MultiExprArg(placement),
-                                   /*placementRParen*/ noLoc,
-                                   /*TypeIdParens*/ SourceRange(),
-                                   /*allocType*/ ETSI->getType(),
-                                   /*allocTypeInfo*/ETSI,
-                                   /*arraySize*/{},
-                                   /*directInitRange*/E->getSourceRange(),
-                                   /*initializer*/E
-                                   );
-        if (Call.isInvalid()) {
-          m_Sema->Diag(E->getBeginLoc(), diag::err_undeclared_var_use)
-            << "operator new";
-          return Call.get();
-        }
-
-        // Handle possible cleanups:
-        Call = m_Sema->ActOnFinishFullExpr(Call.get(), /*DiscardedValue*/ false);
-      }
-    }
-    else {
-      // Mark the current number of arguemnts
-      const size_t nArgs = CallArgs.size();
-      if (desugaredTy->isIntegralOrEnumerationType()) {
-        // 1)  enum, integral, float, double, referece, pointer types :
-        //      call to cling::internal::setValueNoAlloc(...);
-
-        // force-cast it into uint64 in order to pick up the correct overload.
-        QualType UInt64Ty = m_Context->UnsignedLongLongTy;
-        TypeSourceInfo* TSI
-          = m_Context->getTrivialTypeSourceInfo(UInt64Ty, noLoc);
-        Expr* castedE
-          = m_Sema->BuildCStyleCastExpr(noLoc, TSI, noLoc, E).get();
-        CallArgs.push_back(castedE);
-      }
-      else if (desugaredTy->isReferenceType()) {
-        // we need to get the address of the references
-        Expr* AddrOfE  = m_Sema->CreateBuiltinUnaryOp(noLoc, UO_AddrOf, E).get();
-        CallArgs.push_back(AddrOfE);
-      }
-      else if (desugaredTy->isAnyPointerType()) {
-        // function pointers need explicit void* cast.
-        QualType VoidPtrTy = m_Context->VoidPtrTy;
-        TypeSourceInfo* TSI
-          = m_Context->getTrivialTypeSourceInfo(VoidPtrTy, noLoc);
-        Expr* castedE
-          = m_Sema->BuildCStyleCastExpr(noLoc, TSI, noLoc, E).get();
-        CallArgs.push_back(castedE);
-      }
-      else if (desugaredTy->isNullPtrType()) {
-        // nullptr should decay to void* just fine.
-        CallArgs.push_back(E);
-      }
-      else if (desugaredTy->isFloatingType()) {
-        // floats and double will fall naturally in the correct
-        // case, because of the overload resolution.
-        CallArgs.push_back(E);
-      }
-
-      // Test CallArgs.size to make sure an additional argument (the value)
-      // has been pushed on, if not than we didn't know how to handle the type
-      if (CallArgs.size() > nArgs) {
-        Call = m_Sema->ActOnCallExpr(/*Scope*/0, m_UnresolvedNoAlloc,
-                                   locStart, CallArgs, locEnd);
-      }
-      else {
-        m_Sema->Diag(locStart, diag::err_unsupported_unknown_any_decl) <<
-          utils::TypeName::GetFullyQualifiedName(desugaredTy, *m_Context) <<
-          SourceRange(locStart, locEnd);
-      }
-    }
-
-    assert(!Call.isInvalid() && "Invalid Call");
-
-    // Extend the scope of the temporary cleaner if applicable.
-    if (Cleanups && !Call.isInvalid()) {
-      Cleanups->setSubExpr(Call.get());
-      Cleanups->setValueKind(Call.get()->getValueKind());
-      Cleanups->setType(Call.get()->getType());
-      return Cleanups;
-    }
-    return Call.get();
+  if (!m_gClingVD && !FindAndCacheRuntimeDecls(E)) {
+    ::llvm::errs() << "[SVR] runtime decls missing => return nullptr\n";
+    return nullptr;
   }
 
-  static bool VSError(clang::Sema* Sema, clang::Expr* E, llvm::StringRef Err) {
+  // Current context
+  FunctionDecl* FD = cast<FunctionDecl>(m_Sema->CurContext);
+  ::llvm::errs() << "[SVR] CurContext FD=" << (const void*)FD
+               << " name=" << (FD->getIdentifier() ? FD->getName() : "<anon>") << "\n";
+
+  ExprWithCleanups* Cleanups = nullptr;
+  if (E && isa<ExprWithCleanups>(E)) {
+    Cleanups = cast<ExprWithCleanups>(E);
+    ::llvm::errs() << "[SVR] E is ExprWithCleanups: " << (const void*)Cleanups
+                 << " sub=" << (const void*)Cleanups->getSubExpr() << "\n";
+    E = Cleanups->getSubExpr();
+  }
+
+  SourceLocation locStart = (E) ? E->getBeginLoc() : FD->getBeginLoc();
+  SourceLocation locEnd   = (E) ? E->getEndLoc()   : FD->getEndLoc();
+  QualType ETy            = (E) ? E->getType()     : m_Context->VoidTy;
+  QualType desugaredTy    = ETy.getDesugaredType(*m_Context);
+
+  if (E) {
+    ::llvm::errs() << "[SVR] E(before) = " << exprToString(*m_Context, E) << "\n";
+    ::llvm::errs() << "[SVR] E VK=" << valueKindStr(E->getValueKind())
+                 << " ETy=" << typeToString(*m_Context, ETy)
+                 << " desugared=" << typeToString(*m_Context, desugaredTy) << "\n";
+  } else {
+    ::llvm::errs() << "[SVR] no E (void context)\n";
+  }
+
+  // If record lvalue, use reference type
+  if (E && desugaredTy->isRecordType() && E->getValueKind() == VK_LValue) {
+    desugaredTy = m_Context->getLValueReferenceType(desugaredTy);
+    ETy         = m_Context->getLValueReferenceType(ETy);
+    ::llvm::errs() << "[SVR] record lvalue -> make reference; "
+                 << "ETy=" << typeToString(*m_Context, ETy)
+                 << " desugared=" << typeToString(*m_Context, desugaredTy) << "\n";
+  }
+
+  // Params
+  auto *ThisInterp = utils::Synthesize::CStyleCastPtrExpr(
+      m_Sema, m_Context->VoidPtrTy, (uintptr_t)m_Interpreter);
+  auto *OutValue = utils::Synthesize::CStyleCastPtrExpr(
+      m_Sema, m_Context->VoidPtrTy, (uintptr_t)&(m_Interpreter->LastValue));
+  Expr* ETyVP = utils::Synthesize::CStyleCastPtrExpr(
+      m_Sema, m_Context->VoidPtrTy, (uintptr_t)ETy.getAsOpaquePtr());
+
+  ::llvm::errs() << "[SVR] Args: ThisInterp=" << (const void*)ThisInterp
+               << " OutValue=" << (const void*)OutValue
+               << " ETyVP=" << (const void*)ETyVP << "\n";
+
+  ::llvm::SmallVector<Expr*, 5> CallArgs;
+  CallArgs.push_back(ThisInterp);
+  CallArgs.push_back(OutValue);
+  CallArgs.push_back(ETyVP);
+
+  ExprResult Call;
+  SourceLocation noLoc = locStart;
+
+  // ---- Branch 1: void -------------------------------------------------------
+  if (desugaredTy->isVoidType()) {
+    ::llvm::errs() << "[SVR] branch: void result\n";
+    QualType vpQT = m_Context->VoidPtrTy;
+    QualType vQT  = m_Context->VoidTy;
+    Expr* vpQTVP  = utils::Synthesize::CStyleCastPtrExpr(m_Sema, vpQT,
+                        (uintptr_t)vQT.getAsOpaquePtr());
+    CallArgs[2]   = vpQTVP;
+
+    Call = m_Sema->ActOnCallExpr(/*Scope*/nullptr, m_UnresolvedNoAlloc,
+                                 locStart, CallArgs, locEnd);
+    if (Call.isInvalid())
+      ::llvm::errs() << "[SVR] m_UnresolvedNoAlloc(Call) invalid\n";
+
+    if (E) {
+      ::llvm::errs() << "[SVR] comma with original E: " << exprToString(*m_Context, E) << "\n";
+      Call = m_Sema->CreateBuiltinBinOp(locStart, BO_Comma, Call.get(), E);
+      if (Call.isInvalid())
+        ::llvm::errs() << "[SVR] comma operator creation invalid\n";
+    }
+  }
+  // ---- Branch 2: object / array / member-ptr -------------------------------
+  else if (desugaredTy->isRecordType() || desugaredTy->isConstantArrayType()
+           || desugaredTy->isMemberPointerType()) {
+
+    ::llvm::errs() << "[SVR] branch: object/array/memberptr "
+                 << typeToString(*m_Context, desugaredTy) << "\n";
+
+    if (!desugaredTy->isMemberPointerType()) {
+      bool hasCC = availableCopyConstructor(desugaredTy, m_Sema);
+      ::llvm::errs() << "[SVR] availableCopyConstructor=" << boolStr(hasCC) << "\n";
+      if (!hasCC) {
+        ::llvm::errs() << "[SVR] no copy ctor => return original E\n";
+        return E;
+      }
+    }
+
+    Call = m_Sema->ActOnCallExpr(/*Scope*/nullptr, m_UnresolvedWithAlloc,
+                                 locStart, CallArgs, locEnd);
+    if (Call.isInvalid())
+      ::llvm::errs() << "[SVR] m_UnresolvedWithAlloc(Call) invalid\n";
+
+    Expr* placement = Call.get();
+    ::llvm::errs() << "[SVR] placement expr: " << exprToString(*m_Context, placement) << "\n";
+
+    if (const ConstantArrayType* constArray
+          = dyn_cast<ConstantArrayType>(desugaredTy.getTypePtr())) {
+
+      ::llvm::errs() << "[SVR] sub-branch: constant array\n";
+      CallArgs.clear();
+
+      QualType baseElementType = m_Context->getBaseElementType(desugaredTy);
+      TypeSourceInfo* TSI
+        = m_Context->getTrivialTypeSourceInfo(m_Context->getPointerType(baseElementType), noLoc);
+      Expr* srcPointer = m_Sema->BuildCStyleCastExpr(noLoc, TSI, noLoc, E).get();
+      ::llvm::errs() << "[SVR] srcPointer: " << exprToString(*m_Context, srcPointer) << "\n";
+
+      CallArgs.push_back(srcPointer);
+      CallArgs.push_back(placement);
+
+      size_t arrSize = m_Context->getConstantArrayElementCount(constArray);
+      Expr* arrSizeExpr = utils::Synthesize::IntegerLiteralExpr(*m_Context, arrSize);
+      CallArgs.push_back(arrSizeExpr);
+      ::llvm::errs() << "[SVR] array size=" << arrSize << "\n";
+
+      Call = m_Sema->ActOnCallExpr(/*Scope*/nullptr, m_UnresolvedCopyArray,
+                                   locStart, CallArgs, locEnd);
+      if (Call.isInvalid())
+        ::llvm::errs() << "[SVR] m_UnresolvedCopyArray(Call) invalid\n";
+    } else {
+      if (!E || !E->getSourceRange().isValid()) {
+        ::llvm::errs() << "[SVR] invalid source range for E -> cannot BuildCXXNew; return E\n";
+        return E;
+      }
+
+      TypeSourceInfo* ETSI = m_Context->getTrivialTypeSourceInfo(ETy, noLoc);
+      ::llvm::errs() << "[SVR] BuildCXXNew: allocType=" << typeToString(*m_Context, ETy)
+                   << " init=" << exprToString(*m_Context, E) << "\n";
+
+      Call = m_Sema->BuildCXXNew(E->getSourceRange(),
+                                 /*useGlobal*/ true,
+                                 /*lParen*/ noLoc,
+                                 MultiExprArg(placement),
+                                 /*rParen*/ noLoc,
+                                 /*TypeIdParens*/ SourceRange(),
+                                 /*allocType*/ ETSI->getType(),
+                                 /*allocTypeInfo*/ ETSI,
+                                 /*arraySize*/ {},
+                                 /*directInitRange*/ E->getSourceRange(),
+                                 /*initializer*/ E);
+      if (Call.isInvalid()) {
+        ::llvm::errs() << "[SVR] BuildCXXNew invalid; diagnose and return expr\n";
+        m_Sema->Diag(E->getBeginLoc(), diag::err_undeclared_var_use) << "operator new";
+        return Call.get();
+      }
+
+      Call = m_Sema->ActOnFinishFullExpr(Call.get(), /*DiscardedValue*/ false);
+      if (Call.isInvalid())
+        ::llvm::errs() << "[SVR] ActOnFinishFullExpr invalid\n";
+    }
+  }
+  // ---- Branch 3: scalars / refs / ptrs / floats ----------------------------
+  else {
+    ::llvm::errs() << "[SVR] branch: scalar/ref/ptr/floating; "
+                 << "desugared=" << typeToString(*m_Context, desugaredTy) << "\n";
+
+    const size_t nArgs = CallArgs.size();
+
+    if (desugaredTy->isIntegralOrEnumerationType()) {
+      ::llvm::errs() << "[SVR] sub-branch: integral/enumeration\n";
+      QualType UInt64Ty = m_Context->UnsignedLongLongTy;
+      TypeSourceInfo* TSI = m_Context->getTrivialTypeSourceInfo(UInt64Ty, noLoc);
+      Expr* castedE = m_Sema->BuildCStyleCastExpr(noLoc, TSI, noLoc, E).get();
+      ::llvm::errs() << "[SVR] castedE: " << exprToString(*m_Context, castedE) << "\n";
+      CallArgs.push_back(castedE);
+    }
+    else if (desugaredTy->isReferenceType()) {
+      ::llvm::errs() << "[SVR] sub-branch: reference -> &E\n";
+      Expr* AddrOfE  = m_Sema->CreateBuiltinUnaryOp(noLoc, UO_AddrOf, E).get();
+      ::llvm::errs() << "[SVR] &E: " << exprToString(*m_Context, AddrOfE) << "\n";
+      CallArgs.push_back(AddrOfE);
+    }
+    else if (desugaredTy->isAnyPointerType()) {
+      ::llvm::errs() << "[SVR] sub-branch: pointer -> cast to void*\n";
+      QualType VoidPtrTy = m_Context->VoidPtrTy;
+      TypeSourceInfo* TSI
+        = m_Context->getTrivialTypeSourceInfo(VoidPtrTy, noLoc);
+      Expr* castedE
+        = m_Sema->BuildCStyleCastExpr(noLoc, TSI, noLoc, E).get();
+      ::llvm::errs() << "[SVR] castedE: " << exprToString(*m_Context, castedE) << "\n";
+      CallArgs.push_back(castedE);
+    }
+    else if (desugaredTy->isNullPtrType()) {
+      ::llvm::errs() << "[SVR] sub-branch: nullptr\n";
+      CallArgs.push_back(E);
+    }
+    else if (desugaredTy->isFloatingType()) {
+      ::llvm::errs() << "[SVR] sub-branch: floating\n";
+      CallArgs.push_back(E);
+    }
+
+    if (CallArgs.size() > nArgs) {
+      ::llvm::errs() << "[SVR] calling m_UnresolvedNoAlloc with "
+                   << (CallArgs.size() - nArgs) << " value arg(s)\n";
+      Call = m_Sema->ActOnCallExpr(/*Scope*/nullptr, m_UnresolvedNoAlloc,
+                                   locStart, CallArgs, locEnd);
+      if (Call.isInvalid())
+        ::llvm::errs() << "[SVR] m_UnresolvedNoAlloc(Call) invalid\n";
+    } else {
+      ::llvm::errs() << "[SVR] unsupported unknown-any: "
+                   << typeToString(*m_Context, desugaredTy) << "\n";
+      m_Sema->Diag(locStart, diag::err_unsupported_unknown_any_decl)
+        << utils::TypeName::GetFullyQualifiedName(desugaredTy, *m_Context)
+        << SourceRange(locStart, locEnd);
+    }
+  }
+
+  if (Call.isInvalid()) {
+    ::llvm::errs() << "[SVR] Call is invalid at exit; returning nullptr\n";
+    return nullptr;
+  }
+
+  // Extend cleanups if needed
+  if (Cleanups) {
+    ::llvm::errs() << "[SVR] wrap in ExprWithCleanups\n";
+    Cleanups->setSubExpr(Call.get());
+    Cleanups->setValueKind(Call.get()->getValueKind());
+    Cleanups->setType(Call.get()->getType());
+    ::llvm::errs() << "[SVR] result(with cleanups): "
+                 << exprToString(*m_Context, Cleanups) << "\n";
+    return Cleanups;
+  }
+
+  ::llvm::errs() << "[SVR] result: " << exprToString(*m_Context, Call.get())
+               << " : " << typeToString(*m_Context, Call.get()->getType()) << "\n";
+  return Call.get();
+}
+
+  static bool VSError(::clang::Sema* Sema, ::clang::Expr* E, ::llvm::StringRef Err) {
     DiagnosticsEngine& Diags = Sema->getDiagnostics();
     Diags.Report(E->getBeginLoc(),
                  Diags.getCustomDiagID(
-                     clang::DiagnosticsEngine::Level::Error,
+                     ::clang::DiagnosticsEngine::Level::Error,
                      "ValueExtractionSynthesizer could not find: '%0'."))
         << Err;
     return false;
@@ -505,12 +575,12 @@ namespace {
   /// for an expression evaluated at the prompt.
   ///
   ///\param [in] interp - The cling::Interpreter to allocate the SToredValueRef.
-  ///\param [in] vpQT - The opaque ptr for the clang::QualType of value stored.
+  ///\param [in] vpQT - The opaque ptr for the ::clang::QualType of value stored.
   ///\param [out] vpStoredValRef - The Value that is allocated.
   static cling::Value&
   allocateStoredRefValueAndGetGV(void* vpI, void* vpSVR, void* vpQT) {
     cling::Interpreter* i = (cling::Interpreter*)vpI;
-    clang::QualType QT = clang::QualType::getFromOpaquePtr(vpQT);
+    ::clang::QualType QT = ::clang::QualType::getFromOpaquePtr(vpQT);
     cling::Value& SVR = *(cling::Value*)vpSVR;
     // if (vpSVR) SVR.dump();
     // Here the copy keeps the refcounted value alive.

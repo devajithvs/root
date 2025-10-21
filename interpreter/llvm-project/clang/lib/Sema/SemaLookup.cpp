@@ -2278,11 +2278,18 @@ bool Sema::LookupName(LookupResult &R, Scope *S, bool AllowBuiltinCreation,
   } else {
     // Perform C++ unqualified name lookup.
     if (CppLookupName(R, S)) {
-      if (R.isSingleResult())
-        if (const TagDecl *TD = dyn_cast<TagDecl>(R.getFoundDecl())) {
-          if (!TD->getDefinition() && ExternalSource)
+      // *** CRITICAL: never interfere with operator lookup / ADL ***
+      if (R.getLookupKind() == Sema::LookupOperatorName) {
+        // Leave R exactly as produced; the caller will add ADL candidates.
+        return true;
+      }
+
+      if (R.isSingleResult() && R.getLookupKind() == Sema::LookupOrdinaryName) {
+        if (const auto *VD = llvm::dyn_cast<VarDecl>(R.getFoundDecl())) {
+          if (ExternalSource && VD->getType()->isDependentType())
             ExternalSource->LookupUnqualified(R, S);
         }
+      }
       return true;
     }
   }

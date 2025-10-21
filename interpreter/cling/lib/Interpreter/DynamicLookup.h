@@ -21,6 +21,7 @@
 namespace clang {
   class Decl;
   class Sema;
+  class DeclContext;
 }
 
 namespace cling {
@@ -184,6 +185,7 @@ namespace cling {
     MapTy& getSubstSymbolMap() { return m_SubstSymbolMap; }
 
     ASTNodeInfo VisitStmt(clang::Stmt* Node);
+    ASTNodeInfo VisitTopLevelStmt(clang::Stmt* Node);
     ASTNodeInfo VisitCompoundStmt(clang::CompoundStmt* Node);
     ASTNodeInfo VisitIfStmt(clang::IfStmt* Node);
 
@@ -276,7 +278,7 @@ namespace cling {
 
     ///\brief Checks if the function might contain dynamically scoped Decls.
     ///
-    bool ShouldVisit(clang::FunctionDecl* D);
+    bool ShouldVisitDC(const clang::DeclContext* DC);
 
     /// \brief Gets all children of a given node.
     ///

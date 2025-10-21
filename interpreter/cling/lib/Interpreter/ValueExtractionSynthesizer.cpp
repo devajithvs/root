@@ -531,28 +531,28 @@ namespace runtime {
     void setValueNoAlloc(void* vpI, void* vpSVR, void* vpQT,
                          float value) {
       allocateStoredRefValueAndGetGV(vpI, vpSVR, vpQT).setFloat(value);
-      dumpIfNoStorage(vpSVR);
+      // dumpIfNoStorage(vpSVR);
     }
 
     CLING_LIB_EXPORT
     void setValueNoAlloc(void* vpI, void* vpSVR, void* vpQT,
                          double value) {
       allocateStoredRefValueAndGetGV(vpI, vpSVR, vpQT).setDouble(value);
-      dumpIfNoStorage(vpSVR);
+      // dumpIfNoStorage(vpSVR);
     }
 
     CLING_LIB_EXPORT
     void setValueNoAlloc(void* vpI, void* vpSVR, void* vpQT,
                          long double value) {
       allocateStoredRefValueAndGetGV(vpI, vpSVR, vpQT).setLongDouble(value);
-      dumpIfNoStorage(vpSVR);
+      // dumpIfNoStorage(vpSVR);
     }
 
     CLING_LIB_EXPORT
     void setValueNoAlloc(void* vpI, void* vpSVR, void* vpQT,
                          unsigned long long value) {
       allocateStoredRefValueAndGetGV(vpI, vpSVR, vpQT).setULongLong(value);
-      dumpIfNoStorage(vpSVR);
+      // dumpIfNoStorage(vpSVR);
     }
 
     CLING_LIB_EXPORT
@@ -560,7 +560,7 @@ namespace runtime {
                          const void* value){
       allocateStoredRefValueAndGetGV(vpI, vpSVR, vpQT)
         .setPtr(const_cast<void*>(value));
-      dumpIfNoStorage(vpSVR);
+      // dumpIfNoStorage(vpSVR);
     }
 
     CLING_LIB_EXPORT

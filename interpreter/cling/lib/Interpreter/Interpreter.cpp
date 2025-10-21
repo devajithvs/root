@@ -872,8 +872,6 @@ namespace cling {
     if (EvaluateInternal(wrapReadySource, CO, V, T, ident)
                                                      == Interpreter::kFailure) {
       return Interpreter::kFailure;
-    } else {
-      V = &LastValue;
     }
 
     return Interpreter::kSuccess;
@@ -1042,7 +1040,6 @@ namespace cling {
     CO.CheckPointerValidity = 0;
 
     auto result = EvaluateInternal(input, CO, &V);
-    V = LastValue;
     return result;
   }
 
@@ -1419,12 +1416,13 @@ namespace cling {
       return kSuccess;
     }
 
-    Value resultV;
-    if (!V)
-      V = &LastValue;
-
-    if (!V->isValid())
-      V = &LastValue;
+    if (LastValue.isValid()) {
+      if (!V && WantValuePrinting) {
+        LastValue.dump();
+        LastValue.clear();
+      } else
+        *V = std::move(LastValue);
+    }
 
     // Force-flush as we might be printing on screen with printf.
     std::cout.flush();

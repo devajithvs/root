@@ -286,7 +286,7 @@ namespace cling {
             return Result(D, true);;
         }
         if (!m_EvalDecl) Initialize();
-        m_CurDeclContext = TL->getDeclContext();
+        m_CurDeclContext = TL->castToDeclContext(TL);
 
         clang::Stmt *S = TL->getStmt();
 

@@ -18,6 +18,7 @@
 #include "cling/Interpreter/Transaction.h"
 #include "cling/Utils/AST.h"
 #include "cling/Utils/Output.h"
+#include "cling/Interpreter/DynLookupArm.h"
 
 #include "clang/AST/ASTContext.h"
 #include "clang/AST/RecursiveASTVisitor.h"
@@ -242,26 +243,69 @@ namespace cling {
     m_NoELoc = m_NoRange.getEnd();
   }
 
+  #include "clang/AST/Expr.h"
+  #include "clang/AST/Attr.h"
+
+  // Return the first VarDecl referenced by `S` that carries __ResolveAtRuntime.
+  static clang::VarDecl* findAnnotatedVarInStmt(clang::Stmt* S) {
+    if (!S) return nullptr;
+    if (auto *DRE = llvm::dyn_cast<clang::DeclRefExpr>(S)) {
+      if (auto *VD = llvm::dyn_cast<clang::VarDecl>(DRE->getDecl()))
+        if (VD->hasAttr<clang::AnnotateAttr>())
+          for (auto *A : VD->specific_attrs<clang::AnnotateAttr>())
+            if (A->getAnnotation() == "__ResolveAtRuntime")
+              return VD; // non-const
+    }
+    for (auto *Child : S->children())
+      if (auto *Hit = findAnnotatedVarInStmt(Child))
+        return Hit;
+    return nullptr;
+  }
+
+
+  static inline void stripResolveRuntimeAnnots(clang::Decl *D) {
+    for (auto *A : llvm::make_early_inc_range(D->specific_attrs<clang::AnnotateAttr>())) {
+      llvm::StringRef ann = A->getAnnotation();
+      if (ann == "__ResolveAtRuntime" || ann == "__ResolvedAtRuntime")
+        D->dropAttr<clang::AnnotateAttr>();
+    }
+  }
+
   ASTTransformer::Result EvaluateTSynthesizer::Transform(Decl* D) {
     if (!getCompilationOpts().DynamicScoping)
       return Result(D, true);
 
-    if (FunctionDecl* FD = dyn_cast<FunctionDecl>(D)) {
-      if (FD->hasBody() && ShouldVisit(FD)) {
-        // Find DynamicLookup specific builtins
-        if (!m_EvalDecl)
-          Initialize();
+    // Only run when the current compile is armed.
+    if (!ShouldVisitDC(D->getDeclContext()))
+      return Result(D, true);
 
-        // Set the decl context, which is needed by Evaluate.
-        m_CurDeclContext = FD;
-        ASTNodeInfo NewBody = Visit(D->getBody());
-        if (NewBody.hasErrorOccurred()) {
-          return Result(nullptr, false); // Signal a fatal error.
+    if (auto *TL = dyn_cast<TopLevelStmtDecl>(D)) {
+        if (auto *A = D->getAttr<clang::AnnotateAttr>()){
+          cling::errs() << "Has annotation : " << A->getAnnotation() << "\n";
+          if (A->getAnnotation() == "__ResolveAtRuntime")
+            return Result(D, true);;
         }
-        FD->setBody(NewBody.getAsSingleNode());
-      }
-      assert ((!isa<BlockDecl>(D) || !isa<ObjCMethodDecl>(D))
-              && "Not implemented yet!");
+        if (!m_EvalDecl) Initialize();
+        m_CurDeclContext = TL->getDeclContext();
+
+        clang::Stmt *S = TL->getStmt();
+
+        if (auto *E = llvm::dyn_cast<Expr>(TL->getStmt()))
+        if (auto *AnnVD = findAnnotatedVarInStmt(S)) {
+          // cling::errs() << "[EvalTSynth] Current TL: "
+          //               << TL << ":" << D << "\n";
+          // cling::errs() << "[EvalTSynth] TL has __ResolveAtRuntime var: "
+          //               << AnnVD->getName() << ":" << AnnVD << "\n";
+          // Do the usual rewrite (your top-level path; recommended: compound path):
+          ASTNodeInfo NS = VisitTopLevelStmt(S);
+          stripResolveRuntimeAnnots(AnnVD);
+          if (NS.hasErrorOccurred())
+            return Result(nullptr, false);
+          TL->setStmt(NS.getAsSingleNode());
+        }
+
+        // TL->dump();
+        return Result(D, true);
     }
 
     //TODO: Check for error before returning.
@@ -269,6 +313,37 @@ namespace cling {
   }
 
   // StmtVisitor
+
+  ASTNodeInfo EvaluateTSynthesizer::VisitTopLevelStmt(Stmt* Node) {
+    // Treat it like the wrapper-body last statement did:
+    //    wrap the *whole* expression in a one-element CompoundStmt and
+    //    run through VisitCompoundStmt(), which (a) recurses, (b) decides
+    //    value-printer correctly, and (c) calls SubstituteUnknownSymbol(...)
+    //    at the right spot.
+    if (auto *E = llvm::dyn_cast<Expr>(Node)) {
+      llvm::SmallVector<Stmt*, 1> One{E};
+      FPOptionsOverride FP;
+      auto *CS = CompoundStmt::Create(*m_Context, One, FP,
+                                      E->getBeginLoc(), E->getEndLoc());
+
+      ASTNodeInfo NI = VisitCompoundStmt(CS);
+      if (NI.hasErrorOccurred())
+        return NI;
+
+      // Extract the single transformed statement from the new compound.
+      if (NI.isForReplacement()) {
+        if (auto *NewCS = llvm::dyn_cast<CompoundStmt>(NI.getAsSingleNode()))
+          if (NewCS->size() == 1)
+            return ASTNodeInfo(*NewCS->body_begin(), /*for replacement*/true);
+        // Fallback: pass through whatever we got.
+        return NI;
+      }
+      return ASTNodeInfo(Node, /*needs eval*/false);
+    }
+
+    // 3) Any other Stmt: recurse generically, letting VisitStmt handle children.
+    return VisitStmt(Node);
+  }
 
   ASTNodeInfo EvaluateTSynthesizer::VisitStmt(Stmt* Node) {
     for (Stmt::child_iterator
@@ -734,10 +809,15 @@ namespace cling {
     llvm::SmallVector<Expr*, 2> Inits;
     Scope* S = m_Sema->getScopeForContext(m_Sema->CurContext);
     for (unsigned int i = 0; i < Addresses.size(); ++i) {
-
+      Expr *E = Addresses[i];
+      if (!E->isLValue()) {
+        cling::errs() << "[EvaluateTSynthesizer] skip & of non-lvalue: "
+                      << E->getStmtClassName() << "\n";
+        continue;
+      }
       Expr* UnOp
-        = m_Sema->BuildUnaryOp(S, Addresses[i]->getBeginLoc(), UO_AddrOf,
-                               Addresses[i]).get();
+        = m_Sema->BuildUnaryOp(S, E->getBeginLoc(), UO_AddrOf,
+                               E).get();
       if (!UnOp) {
         // Not good, return what we had.
         cling::errs() << "Error while creating dynamic expression for:\n  ";
@@ -909,12 +989,11 @@ namespace cling {
 
   // end EvalBuilder
 
-  bool EvaluateTSynthesizer::ShouldVisit(FunctionDecl* D) {
+  bool EvaluateTSynthesizer::ShouldVisitDC(const DeclContext* DC) {
     // FIXME: Here we should have our custom attribute.
-    if (AnnotateAttr* A = D->getAttr<AnnotateAttr>())
-      if (A->getAnnotation() == "__ResolveAtRuntime")
-        return true;
-    return false;
+    if (!getCompilationOpts().DynamicScoping) return false;
+    // O(1): no TU scan, no Transaction dependency.
+    return cling::DynLookupArm::isArmed(*m_Context);
   }
 
   bool EvaluateTSynthesizer::IsArtificiallyDependent(Expr* Node) {

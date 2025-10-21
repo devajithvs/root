@@ -10,6 +10,7 @@
 #include "cling/Interpreter/InterpreterCallbacks.h"
 
 #include "cling/Interpreter/Interpreter.h"
+#include "cling/Interpreter/DynLookupArm.h"
 
 #include "clang/AST/ASTContext.h"
 #include "clang/Basic/ASTSourceDescriptor.h"
@@ -417,10 +418,27 @@ namespace test {
 
   SymbolResolverCallback::~SymbolResolverCallback() { }
 
-  bool SymbolResolverCallback::LookupObject(LookupResult& R, Scope* S) {
-    if (!ShouldResolveAtRuntime(R, S))
-      return false;
+  #include "llvm/Support/Path.h"
 
+  static bool isLocInFile(clang::SourceManager& SM,
+                          clang::SourceLocation Loc,
+                          llvm::StringRef WantedBasename) {
+    if (Loc.isInvalid()) return false;
+
+    // Peel off macro / expansion to the spelling file.
+    Loc = SM.getFileLoc(Loc);
+    clang::FileID FID = SM.getFileID(Loc);
+    if (FID.isInvalid()) return false;
+
+    auto FER = SM.getFileEntryRefForID(FID);
+    if (!FER) return false;
+    llvm::StringRef Path = FER->getName();
+
+    return llvm::sys::path::filename(Path) == WantedBasename;
+  }
+
+
+  bool SymbolResolverCallback::LookupObject(LookupResult& R, Scope* S) {
     if (m_IsRuntime) {
       // We are currently parsing an EvaluateT() expression
       if (!m_Resolve)
@@ -433,16 +451,50 @@ namespace test {
       clang::SourceManager& SM = SemaR.getSourceManager();
       if (SM.isInSystemHeader(R.getNameLoc()))
         return false;
+
+      if (isLocInFile(SM, R.getNameLoc(), "RuntimePrintValue.h"))
+        return false;
+
+
+      if (R.getLookupKind() != clang::Sema::LookupOrdinaryName)
+        return false;
+
+      if (!R.getLookupName().isIdentifier())
+        return false;
+
+      if (!SemaR.getLangOpts().IncrementalExtensions)
+        return false;
+
+      if (R.isForRedeclaration())
+        return false;
+
+      // f) Only fix up “dependent/placeholder” results — if Clang already found
+      //    a concrete non-dependent decl, leave it alone.
+      if (R.getResultKind() == clang::LookupResult::Found) {
+        if (const auto *VD = llvm::dyn_cast<clang::VarDecl>(R.getFoundDecl())) {
+          if (!VD->getType().isNull() && !VD->getType()->isDependentType())
+            return false; // real thing already found
+        } else {
+          // If it’s not a VarDecl, don’t replace it here.
+          return false;
+        }
+      }
+        
       if (!m_TesterDecl) {
         clang::NamespaceDecl* NSD = utils::Lookup::Namespace(&SemaR, "cling");
         NSD = utils::Lookup::Namespace(&SemaR, "test", NSD);
         m_TesterDecl = utils::Lookup::Named(&SemaR, "Tester", NSD);
       }
       assert (m_TesterDecl && "Tester not found!");
+      R.clear();
       R.addDecl(m_TesterDecl);
+      R.resolveKind();  
       return true; // Tell clang to continue.
     }
 
+    if (!ShouldResolveAtRuntime(R, S))
+      return false;
+    
     // We are currently NOT parsing an EvaluateT() expression.
     // Escape the expression into an EvaluateT() expression.
     ASTContext& C = R.getSema().getASTContext();
@@ -453,15 +505,6 @@ namespace test {
       S = S->getParent();
     }
 
-    // DynamicLookup only happens inside topmost functions:
-    clang::DeclContext* TopmostDC = DC;
-    while (!isa<TranslationUnitDecl>(TopmostDC->getParent())) {
-      TopmostDC = TopmostDC->getParent();
-    }
-    FunctionDecl* TopmostFunc = dyn_cast<FunctionDecl>(TopmostDC);
-    if (!TopmostFunc)
-       return false;
-
     DeclarationName Name = R.getLookupName();
     IdentifierInfo* II = Name.getAsIdentifierInfo();
     SourceLocation Loc = R.getNameLoc();
@@ -471,8 +514,12 @@ namespace test {
     // Annotate the decl to give a hint in cling. FIXME: Current implementation
     // is a gross hack, because TClingCallbacks shouldn't know about
     // EvaluateTSynthesizer at all!
-    TopmostFunc->addAttr(
+    Res->addAttr(
         AnnotateAttr::CreateImplicit(C, "__ResolveAtRuntime", nullptr, 0));
+
+    // Arm dynamic lookup for this compilation unit in O(1).
+    cling::DynLookupArm::arm(C, Res);
+
     R.addDecl(Res);
     DC->addDecl(Res);
     // Say that we can handle the situation. Clang should try to recover

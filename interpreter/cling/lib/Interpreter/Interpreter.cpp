@@ -872,6 +872,8 @@ namespace cling {
     if (EvaluateInternal(wrapReadySource, CO, V, T, ident)
                                                      == Interpreter::kFailure) {
       return Interpreter::kFailure;
+    } else {
+      V = &LastValue;
     }
 
     return Interpreter::kSuccess;
@@ -1039,7 +1041,9 @@ namespace cling {
     CO.ResultEvaluation = 1;
     CO.CheckPointerValidity = 0;
 
-    return EvaluateInternal(input, CO, &V);
+    auto result = EvaluateInternal(input, CO, &V);
+    V = LastValue;
+    return result;
   }
 
   Interpreter::CompilationResult
@@ -1417,6 +1421,9 @@ namespace cling {
 
     Value resultV;
     if (!V)
+      V = &LastValue;
+
+    if (!V->isValid())
       V = &LastValue;
 
     // Force-flush as we might be printing on screen with printf.

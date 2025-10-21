@@ -209,8 +209,11 @@ namespace cling {
     for (Decl *D : DGR)
       if (auto *TSD = llvm::dyn_cast<TopLevelStmtDecl>(D);
           TSD && TSD->isSemiMissing())
-            if (auto *synthesizer = m_IncrParser->GetSynthesizer())
-        TSD->setStmt(synthesizer->SynthesizeSVRInit(cast<Expr>(TSD->getStmt())));
+        if (auto *synthesizer = m_IncrParser->GetSynthesizer()) {
+          // TSD->dump();
+          Expr* lastExpr = cast<Expr>(TSD->getStmt());
+          TSD->setStmt(synthesizer->SynthesizeSVRInit(lastExpr));
+        }
 
     if (comesFromASTReader(DGR)) {
       for (DeclGroupRef::iterator DI = DGR.begin(), DE = DGR.end();

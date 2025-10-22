@@ -688,6 +688,10 @@ llvm::Error IncrementalJIT::removeModule(const Transaction& T) {
   if (iMod != m_CompiledModules.end())
     m_CompiledModules.erase(iMod);
 
+  if (llvm::Error Err = runCtors()) {
+    // FIXME: Make sure that initializing MainJITDylib now doesn't cause issues.
+    llvm::consumeError(std::move(Err));
+  }
   return llvm::Error::success();
 }
 

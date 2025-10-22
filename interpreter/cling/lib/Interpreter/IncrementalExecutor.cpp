@@ -165,15 +165,16 @@ IncrementalExecutor::runStaticInitializersOnce(Transaction& T) {
   // We don't care whether something was unresolved before.
   m_unresolvedSymbols.clear();
 
-  // check if there is any unresolved symbol in the list
-  if (diagnoseUnresolvedSymbols("static initializers"))
-    return kExeUnresolvedSymbols;
+  auto executionResult = kExeSuccess;
 
   if (llvm::Error Err = m_JIT->runCtors()) {
+    // check if there is any unresolved symbol in the list
+    if (diagnoseUnresolvedSymbols(m->getName().str()))
+      executionResult = kExeUnresolvedSymbols;
     llvm::logAllUnhandledErrors(std::move(Err), llvm::errs(),
                                 "[runStaticInitializersOnce]: ");
   }
-  return kExeSuccess;
+  return executionResult;
 }
 
 void IncrementalExecutor::runAndRemoveStaticDestructors(Transaction* T) {

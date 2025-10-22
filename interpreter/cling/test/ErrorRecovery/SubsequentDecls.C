@@ -25,7 +25,7 @@ namespace test { int y = 0; }
 // CHECK-NOT: Differences
 
 TemplatedF((int)2)
-// CHECK: IncrementalExecutor::executeFunction: symbol '{{.*}}' unresolved while linking [cling interface function]!
+// CHECK: IncrementalExecutor::executeFunction: symbol '{{.*}}' unresolved while linking
 // CHECK: You are probably missing the definition of int {{.*}}TemplatedF<int>(int)
 // CHECK: Maybe you need to load the corresponding shared library?
 
@@ -40,7 +40,7 @@ TemplatedF(__my_i)
 // CHECK: (int) 110
 
 TemplatedF((double)3.14)
-// CHECK: IncrementalExecutor::executeFunction: symbol '{{.*}}' unresolved while linking [cling interface function]!
+// CHECK: IncrementalExecutor::executeFunction: symbol '{{.*}}' unresolved while linking
 // CHECK: You are probably missing the definition of double {{.*}}TemplatedF<double>(double)
 // CHECK: Maybe you need to load the corresponding shared library?
 

@@ -4,6 +4,7 @@ on:
   pull_request:
     paths:
       - 'interpreter/cling/**'
+      - '.github/workflows/utilities/sync_cling.py'
 jobs:
   sync-cling-history:
     if: github.repository_owner == 'devajithvs'

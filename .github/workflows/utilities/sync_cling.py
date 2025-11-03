@@ -177,6 +177,10 @@ def principal():
 
     applyPatches(patches)
 
+    # Remove text-input directory, revert this after the run.
+    execCommand(f'git rm lib/UserInterface/textinput -r', CLING_REPO_DIR_NAME)
+    execCommand(f'git commit -m "Remove `textinput` directory"', CLING_REPO_DIR_NAME)
+
     syncTagAndPush(rootSyncTag, rootHashes[0])
 
 if __name__ == '__main__':

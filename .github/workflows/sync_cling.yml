@@ -1,16 +1,12 @@
 name: Sync Cling repo
 
 on:
-  push:
-    branches:
-      - 'master'
+  pull_request:
     paths:
       - 'interpreter/cling/**'
-  workflow_dispatch:
-
 jobs:
   sync-cling-history:
-    if: github.repository_owner == 'root-project'
+    if: github.repository_owner == 'devajithvs'
     runs-on: ubuntu-latest
     steps:
       - name: Checkout ROOT
@@ -22,8 +18,8 @@ jobs:
       - name: Checkout Cling
         uses: actions/checkout@v4
         with:
-          repository: root-project/cling
-          token: ${{ secrets.CLING_GIT_TOKEN }}
+          repository: devajithvs/cling
+          token: ${{ secrets.CLING_GIT_TOKEN_TESTING }}
           path: cling
           fetch-depth: 32768
 

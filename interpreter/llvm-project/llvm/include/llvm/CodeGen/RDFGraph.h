@@ -447,7 +447,7 @@ private:
   AllocatorTy MemPool;
 };
 
-using RegisterSet = std::set<RegisterRef, RegisterRefLess>;
+using RegisterSet = std::set<RegisterRef>;
 
 struct TargetOperandInfo {
   TargetOperandInfo(const TargetInstrInfo &tii) : TII(tii) {}

@@ -257,15 +257,6 @@ ABI Changes in This Version
 AST Dumping Potentially Breaking Changes
 ----------------------------------------
 
-- Pretty-printing of atomic builtins ``__atomic_test_and_set`` and ``__atomic_clear`` in ``-ast-print`` output.
-  These previously displayed an extra ``<null expr>`` argument, e.g.:
-
-    ``__atomic_test_and_set(p, <null expr>, 0)``
-
-  Now they are printed as:
-
-    ``__atomic_test_and_set(p, 0)``
-
 Clang Frontend Potentially Breaking Changes
 -------------------------------------------
 
@@ -460,9 +451,6 @@ C2y Feature Support
 
 C23 Feature Support
 ^^^^^^^^^^^^^^^^^^^
-- Added ``FLT_SNAN``, ``DBL_SNAN``, and ``LDBL_SNAN`` to Clang's ``<float.h>``
-  header in C23 and later modes. This implements
-  `WG14 N2710 <https://www.open-std.org/jtc1/sc22/wg14/www/docs/n2710.htm>`_.
 
 - Clang now supports `N3029 <https://www.open-std.org/jtc1/sc22/wg14/www/docs/n3029.htm>`_ Improved Normal Enumerations.
 - Clang now officially supports `N3030 <https://www.open-std.org/jtc1/sc22/wg14/www/docs/n3030.htm>`_ Enhancements to Enumerations. Clang already supported it as an extension, so there were no changes to compiler behavior.

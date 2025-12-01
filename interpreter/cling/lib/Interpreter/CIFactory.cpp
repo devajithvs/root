@@ -1508,6 +1508,8 @@ namespace {
     // to the output and are rather confusing.
     CI->getDiagnosticOpts().SnippetLineLimit = 1;
     CI->getDiagnosticOpts().ShowLineNumbers = 0;
+    // Promote -Wreturn-type to an error. A missing return in a non-void function is a warning by default, and cling cannot safely continue and crashes later.
+    CI->getDiagnosticOpts().Warnings.push_back("error=return-type");
 
     // Copied from CompilerInstance::createDiagnostics:
     // Chain in -verify checker, if requested.

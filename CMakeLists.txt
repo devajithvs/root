@@ -464,8 +464,8 @@ add_custom_target(move_headers ALL DEPENDS ${__allHeaders} ${__allBuiltins} giti
 get_property(__modulemap_extra_content GLOBAL PROPERTY ROOT_CXXMODULES_EXTRA_MODULEMAP_CONTENT)
 string(REPLACE ";" "" ROOT_GENERATED_MODULEMAP_CONTENT "${__modulemap_extra_content}")
 # Now append the generated content to the original modulemap
-configure_file(${CMAKE_SOURCE_DIR}/cmake/unix/module.modulemap ${CMAKE_BINARY_DIR}/include/ROOT.modulemap)
-install(FILES "${CMAKE_BINARY_DIR}/include/ROOT.modulemap" DESTINATION ${CMAKE_INSTALL_INCLUDEDIR} COMPONENT headers)
+configure_file(${CMAKE_SOURCE_DIR}/cmake/unix/module.modulemap ${CMAKE_BINARY_DIR}/include/module.modulemap)
+install(FILES "${CMAKE_BINARY_DIR}/include/module.modulemap" DESTINATION ${CMAKE_INSTALL_INCLUDEDIR} COMPONENT headers)
 
 # From now on we handled all exposed module and want to make all new modulemaps private to ROOT.
 set(ROOT_CXXMODULES_WRITE_TO_CURRENT_DIR ON)

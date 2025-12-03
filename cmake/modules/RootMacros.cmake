@@ -267,10 +267,10 @@ function(ROOT_REPLACE_BUILD_INTERFACE include_dir_var include_dir)
 endfunction(ROOT_REPLACE_BUILD_INTERFACE)
 
 #---------------------------------------------------------------------------------------------------
-#---ROOT_GENERATE_CXXMODULE( module_name MODULEMAP file.modulemap DEPENDENCIES module_name1 module_name2 )
+#---ROOT_GENERATE_CXXMODULE( module_name DEPENDENCIES module_name1 module_name2 )
 #
 function(ROOT_GENERATE_CXXMODULE module_name headers_location)
-  CMAKE_PARSE_ARGUMENTS(ARG "" "MODULEMAP" "DEPENDENCIES" ${ARGN})
+  CMAKE_PARSE_ARGUMENTS(ARG "" "" "DEPENDENCIES" ${ARGN})
 
   # rootcling bare-cling -I etc/ -x c++ -I /usr/include/c++/7/ -fmodules-cache-path=lib/
   #                      -fmodules -Xclang -emit-module -fmodule-name=std /usr/include/c++/7/module.modulemap
@@ -281,15 +281,7 @@ function(ROOT_GENERATE_CXXMODULE module_name headers_location)
   # Get all available modulemaps which ROOT will use.
   get_property(root_modulemaps GLOBAL PROPERTY ROOT_MODULEMAPS)
 
-  # Decide which modulemap filename to use:
-  if (ARG_MODULEMAP)
-    set(modulemap_name "${ARG_MODULEMAP}")
-  else()
-    # default behaviour, like before
-    set(modulemap_name "module.modulemap")
-  endif()
-
-  set(real_modulemap_file ${headers_location}/${modulemap_name})
+  set(real_modulemap_file ${headers_location}/module.modulemap)
 
   if (NOT ${real_modulemap_file} IN_LIST root_modulemaps)
     # The modulemap may be virtual (automatically mounted by rootcling)
@@ -299,13 +291,7 @@ function(ROOT_GENERATE_CXXMODULE module_name headers_location)
       # module.modulemap.build as a module.modulemap in etc/cling.
       set(virtual_modulemap_location "${virtual_modulemap_location}/module.modulemap")
     else()
-      # If the caller specified a MODULEMAP, respect that. Otherwise keep
-      # "${module_name}.modulemap" convention.
-      if (ARG_MODULEMAP)
-        set(virtual_modulemap_location "${virtual_modulemap_location}/${modulemap_name}")
-      else()
-        set(virtual_modulemap_location "${virtual_modulemap_location}/${module_name}.modulemap")
-      endif()
+      set(virtual_modulemap_location "${virtual_modulemap_location}/${module_name}.modulemap")
     endif()
 
     if (${virtual_modulemap_location} IN_LIST root_modulemaps)

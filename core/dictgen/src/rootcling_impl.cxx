@@ -4309,7 +4309,7 @@ int RootClingMain(int argc,
          clingArgsInterpreter.push_back("-fmodule-map-file=" + modulemap);
 
       if (includeDir) {
-         clingArgsInterpreter.push_back("-fmodule-map-file=" + std::string(includeDir) + "/module.modulemap");
+         clingArgsInterpreter.push_back("-fmodule-map-file=" + std::string(includeDir) + "/ROOT.modulemap");
       }
       std::string ModuleMapCWD = ROOT::FoundationUtils::GetCurrentDir() + "/module.modulemap";
       if (llvm::sys::fs::exists(ModuleMapCWD))

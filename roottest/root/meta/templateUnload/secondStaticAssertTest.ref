@@ -1,0 +1,2 @@
+secondStaticAssert.h:--:--: error: static assertion failed due to requirement '!std::is_integral_v<int>': scaling is not supported for integral bin content types
+secondStaticAssert.h:--:--: error: static assertion failed due to requirement '!std::is_integral_v<int>': scaling is not supported for integral bin content types

@@ -3847,12 +3847,12 @@ static bool CheckModuleValid(TModuleGenerator &modGen, const std::string &resour
       // if we passed rootcling ... -I/some/path somedir/some/header, the
       // modulemap should contain module M { header "somedir/some/header" }
       // This way we will make sure the module is properly activated.
-      if (!opts.GetSwitch("umbrellaHeader") && maybeUmbrella) {
-         ROOT::TMetaUtils::Info("CheckModuleValid, %s. You can silence this message by adding %s to the invocation.",
-                                warningMessage.c_str(),
-                                opts.GetSwitch("umbrellaHeader").ArgStr.data());
-         return true;
-      }
+      // if (!opts.GetSwitch("umbrellaHeader") && maybeUmbrella) {
+      //    ROOT::TMetaUtils::Info("CheckModuleValid, %s. You can silence this message by adding %s to the invocation.",
+      //                           warningMessage.c_str(),
+      //                           opts.GetSwitch("umbrellaHeader").ArgStr.data());
+      //    return true;
+      // }
 
       ROOT::TMetaUtils::Warning("CheckModuleValid", warningMessage.c_str());
       // We include the missing headers to fix the module for the user.
@@ -3913,7 +3913,9 @@ int RootClingMain(int argc,
 
    ROOT::RCmdLineOpts opts;
    DefineRootclingOptions(opts);
-   opts.Parse(argv, argc);
+
+   std::vector<const char*> cargv(argv, argv + argc);
+   opts.Parse(cargv.data(), argc);
 
    const char *etcDir = gDriverConfig->fTROOT__GetEtcDir();
    std::string llvmResourceDir = etcDir ? std::string(etcDir) + "/cling" : "";
@@ -3951,21 +3953,30 @@ int RootClingMain(int argc,
    }
 
    if (!opts.GetFlagValues("moduleMapFile").empty() && !opts.GetSwitch("cxxmodule")) {
-      ROOT::TMetaUtils::Error("", "Option %s can be used only when option %s is specified.\n",
-                              opts.GetFlagValues("moduleMapFile").ArgStr.str().c_str(),
-                              opts.GetSwitch("cxxmodule").ArgStr.str().c_str());
+      // ROOT::TMetaUtils::Error("", "Option %s can be used only when option %s is specified.\n",
+      //                         opts.GetFlagValues("moduleMapFile").ArgStr.str().c_str(),
+      //                         opts.GetSwitch("cxxmodule").ArgStr.str().c_str());
       std::cout << "\n";
       llvm::cl::PrintHelpMessage();
       return 1;
    }
 
+   enum VerboseLevel {
+      v = ROOT::TMetaUtils::kError,
+      v0 = ROOT::TMetaUtils::kFatal,
+      v1 = v,
+      v2 = ROOT::TMetaUtils::kWarning,
+      v3 = ROOT::TMetaUtils::kNote,
+      v4 = ROOT::TMetaUtils::kInfo
+   };
+
    // Set the default verbosity
-   auto gOptVerboseLevel = ROOT::TMetaUtils::kWarning;
-   if (opts.GetSwitch("v0")) gOptVerboseLevel = ROOT::TMetaUtils::kFatal;
-   if (opts.GetSwitch("v1") || opts.GetSwitch("v")) gOptVerboseLevel = ROOT::TMetaUtils::kError;
-   if (opts.GetSwitch("v2")) gOptVerboseLevel = ROOT::TMetaUtils::kWarning;
-   if (opts.GetSwitch("v3")) gOptVerboseLevel = ROOT::TMetaUtils::kNote;
-   if (opts.GetSwitch("v4")) gOptVerboseLevel = ROOT::TMetaUtils::kInfo;
+   auto gOptVerboseLevel = v2;
+   if (opts.GetSwitch("v0")) gOptVerboseLevel = v0;
+   if (opts.GetSwitch("v1") || opts.GetSwitch("v")) gOptVerboseLevel = v;
+   if (opts.GetSwitch("v2")) gOptVerboseLevel = v2;
+   if (opts.GetSwitch("v3")) gOptVerboseLevel = v3;
+   if (opts.GetSwitch("v4")) gOptVerboseLevel = v4;
 
    ROOT::TMetaUtils::GetErrorIgnoreLevel() = gOptVerboseLevel;
    if (gOptVerboseLevel == v4)
@@ -3975,7 +3986,7 @@ int RootClingMain(int argc,
       isGenreflex = true;
 
    if (!opts.GetFlagValue("lib-list-prefix").empty()) {
-      string filein = opts.GetFlagValue("lib-list-prefix") + ".in";
+      std::string filein = std::string(opts.GetFlagValue("lib-list-prefix")) + ".in";
       FILE *fp;
       if ((fp = fopen(filein.c_str(), "r")) == nullptr) {
          ROOT::TMetaUtils::Error(nullptr, "%s: The input list file %s does not exist\n", executableFileName, filein.c_str());
@@ -4034,8 +4045,8 @@ int RootClingMain(int argc,
         ROOT::TMetaUtils::Error("", "isysroot specified without a value.\n");
         return 1;
       }
-      clingArgs.push_back(opts.GetFlagValue("isysroot").ArgStr.str());
-      clingArgs.push_back(opts.GetFlagValue("isysroot").ValueStr.str());
+      clingArgs.push_back("-isysroot");
+      clingArgs.push_back(std::string(opts.GetFlagValue("isysroot")));
    }
 
    // Check if we have a multi dict request but no target library
@@ -4044,16 +4055,16 @@ int RootClingMain(int argc,
       return 1;
    }
 
-   for (const std::string &PPDefine : opts.GetFlagValues("D"))
+   for (const std::string &PPDefine : opts.GetFlagValuesAs<std::string>("D"))
       clingArgs.push_back(std::string("-D") + PPDefine);
 
-   for (const std::string &PPUndefine : opts.GetFlagValues("U"))
+   for (const std::string &PPUndefine : opts.GetFlagValuesAs<std::string>("U"))
       clingArgs.push_back(std::string("-U") + PPUndefine);
 
-   for (const std::string &IncludePath : opts.GetFlagValues("I"))
+   for (const std::string &IncludePath : opts.GetFlagValuesAs<std::string>("I"))
       clingArgs.push_back(std::string("-I") + llvm::sys::path::convert_to_slash(IncludePath));
 
-   for (const std::string &IncludePath : opts.GetFlagValues("isystem")) {
+   for (const std::string &IncludePath : opts.GetFlagValuesAs<std::string>("isystem")) {
       // Prevent mentioning compiler default include directories as -isystem
       // (https://gcc.gnu.org/bugzilla/show_bug.cgi?id=70129)
       if (std::find(opts.GetFlagValues("compilerI").begin(), opts.GetFlagValues("compilerI").end(), IncludePath)
@@ -4063,7 +4074,7 @@ int RootClingMain(int argc,
       }
    }
 
-   for (const std::string &WDiag : opts.GetFlagValues("W")) {
+   for (const std::string &WDiag : opts.GetFlagValuesAs<std::string>("W")) {
       const std::string FullWDiag = std::string("-W") + WDiag;
       // Suppress warning when compiling the dictionary, eg. gcc G__xxx.cxx
       CheckForMinusW(FullWDiag, diagnosticPragmas);
@@ -4154,7 +4165,7 @@ int RootClingMain(int argc,
       clingArgsInterpreter.push_back("-fmodules");
       clingArgsInterpreter.push_back("-fno-implicit-module-maps");
 
-      for (const std::string &modulemap : opts.GetFlagValues("moduleMapFile"))
+      for (const std::string &modulemap : opts.GetFlagValuesAs<std::string>("moduleMapFile"))
          clingArgsInterpreter.push_back("-fmodule-map-file=" + modulemap);
 
       if (includeDir) {
@@ -4406,9 +4417,9 @@ int RootClingMain(int argc,
    if (opts.GetSwitch("umbrellaHeader")) {
       bool hasSelectionFile = !linkdef.empty();
       unsigned expectedHeaderFilesSize = 1 + hasSelectionFile;
-      if (opts.GetArgs().size() > expectedHeaderFilesSize)
-         ROOT::TMetaUtils::Error(nullptr, "Option %s used but more than one header file specified.\n", 
-                                 opts.GetSwitch("umbrellaHeader").ArgStr.data());
+      // if (opts.GetArgs().size() > expectedHeaderFilesSize)
+         // ROOT::TMetaUtils::Error(nullptr, "Option %s used but more than one header file specified.\n", 
+         //                         opts.GetSwitch("umbrellaHeader").ArgStr.data());
    }
 
    // We have a multiDict request. This implies generating a pcm which is of the form
@@ -4474,7 +4485,7 @@ int RootClingMain(int argc,
 
    TModuleGenerator modGen(interp.getCI(),
                            opts.GetSwitch("inlineInputHeader"),
-                           opts.GetFlagValue("s"),
+                           opts.GetFlagValueAs<std::string>("s").value(),
                            opts.GetSwitch("writeEmptyRootPCM"));
 
    if (!gDriverConfig->fBuildingROOTStage1 && !filesIncludedByLinkdef.empty()) {
@@ -4713,7 +4724,7 @@ int RootClingMain(int argc,
 
    // If needed initialize the autoloading hook
    if (!opts.GetFlagValue("lib-list-prefix").empty()) {
-      LoadLibraryMap(opts.GetFlagValue("lib-list-prefix") + ".in", gAutoloads);
+      LoadLibraryMap(std::string(opts.GetFlagValue("lib-list-prefix")) + ".in", gAutoloads);
       scan.SetRecordDeclCallback(RecordDeclCallback);
    }
 

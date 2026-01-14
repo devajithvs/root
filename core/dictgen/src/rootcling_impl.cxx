@@ -1837,7 +1837,7 @@ void CallWriteStreamer(const ROOT::TMetaUtils::AnnotatedRecordDecl &cl,
 
 ////////////////////////////////////////////////////////////////////////////////
 
-void GenerateLinkdef(llvm::cl::list<std::string> &InputFiles,
+void GenerateLinkdef(const std::vector<std::string> &InputFiles,
                      std::string &code_for_parser)
 {
    code_for_parser += "#ifdef __CLING__\n\n";
@@ -1845,22 +1845,23 @@ void GenerateLinkdef(llvm::cl::list<std::string> &InputFiles,
    code_for_parser += "#pragma link off all classes;\n";
    code_for_parser += "#pragma link off all functions;\n\n";
 
-   for (std::string& arg : InputFiles) {
+   for (const std::string& arg : InputFiles) {
       char trail[3];
       int nostr = 0, noinp = 0, bcnt = 0, l = arg.length() - 1;
+      std::string newArg = arg;
       for (int j = 0; j < 3; j++) {
-         if (arg[l] == '-') {
-            arg[l] = '\0';
+         if (newArg[l] == '-') {
+            newArg[l] = '\0';
             nostr = 1;
             l--;
          }
-         if (arg[l] == '!') {
-            arg[l] = '\0';
+         if (newArg[l] == '!') {
+            newArg[l] = '\0';
             noinp = 1;
             l--;
          }
-         if (arg[l] == '+') {
-            arg[l] = '\0';
+         if (newArg[l] == '+') {
+            newArg[l] = '\0';
             bcnt = 1;
             l--;
          }
@@ -1875,7 +1876,7 @@ void GenerateLinkdef(llvm::cl::list<std::string> &InputFiles,
          if (nostr)
             ROOT::TMetaUtils::Error(nullptr, "option + mutual exclusive with -\n");
       }
-      llvm::SmallString<256> filestem = llvm::sys::path::filename(arg);
+      llvm::SmallString<256> filestem = llvm::sys::path::filename(newArg);
       llvm::sys::path::replace_extension(filestem, "");
 
       code_for_parser += "#pragma link C++ class ";
@@ -4055,27 +4056,27 @@ int RootClingMain(int argc,
       return 1;
    }
 
-   for (const std::string &PPDefine : opts.GetFlagValuesAs<std::string>("D"))
-      clingArgs.push_back(std::string("-D") + PPDefine);
+   for (const auto &PPDefine : opts.GetFlagValues("D"))
+      clingArgs.push_back(std::string("-D") + std::string(PPDefine));
 
-   for (const std::string &PPUndefine : opts.GetFlagValuesAs<std::string>("U"))
-      clingArgs.push_back(std::string("-U") + PPUndefine);
+   for (const auto &PPUndefine : opts.GetFlagValues("U"))
+      clingArgs.push_back(std::string("-U") + std::string(PPUndefine));
 
-   for (const std::string &IncludePath : opts.GetFlagValuesAs<std::string>("I"))
-      clingArgs.push_back(std::string("-I") + llvm::sys::path::convert_to_slash(IncludePath));
+   for (const auto &IncludePath : opts.GetFlagValues("I"))
+      clingArgs.push_back(std::string("-I") + llvm::sys::path::convert_to_slash(std::string(IncludePath)));
 
-   for (const std::string &IncludePath : opts.GetFlagValuesAs<std::string>("isystem")) {
+   for (const auto &IncludePath : opts.GetFlagValues("isystem")) {
       // Prevent mentioning compiler default include directories as -isystem
       // (https://gcc.gnu.org/bugzilla/show_bug.cgi?id=70129)
-      if (std::find(opts.GetFlagValues("compilerI").begin(), opts.GetFlagValues("compilerI").end(), IncludePath)
+      if (std::find(opts.GetFlagValues("compilerI").begin(), opts.GetFlagValues("compilerI").end(), std::string(IncludePath))
           == opts.GetFlagValues("compilerI").end()) {
          clingArgs.push_back("-isystem");
-         clingArgs.push_back(llvm::sys::path::convert_to_slash(IncludePath));
+         clingArgs.push_back(llvm::sys::path::convert_to_slash(std::string(IncludePath)));
       }
    }
 
-   for (const std::string &WDiag : opts.GetFlagValuesAs<std::string>("W")) {
-      const std::string FullWDiag = std::string("-W") + WDiag;
+   for (const auto &WDiag : opts.GetFlagValues("W")) {
+      const std::string FullWDiag = std::string("-W") + std::string(WDiag);
       // Suppress warning when compiling the dictionary, eg. gcc G__xxx.cxx
       CheckForMinusW(FullWDiag, diagnosticPragmas);
       // Suppress warning when compiling the input headers by cling.
@@ -4101,8 +4102,8 @@ int RootClingMain(int argc,
          auto excludePathsEnd = opts.GetFlagValues("excludePath").end();
          auto excludePathPos = std::find_if(opts.GetFlagValues("excludePath").begin(),
                                             excludePathsEnd,
-                                            [&](const std::string& path){
-                                               return ROOT::TMetaUtils::BeginsWith(&thisArg[offset], path);});
+                                            [&](std::string_view path){
+                                               return ROOT::TMetaUtils::BeginsWith(&thisArg[offset], std::string(path));});
          if (excludePathsEnd != excludePathPos) continue;
       }
       pcmArgs.push_back(thisArg);
@@ -4165,8 +4166,8 @@ int RootClingMain(int argc,
       clingArgsInterpreter.push_back("-fmodules");
       clingArgsInterpreter.push_back("-fno-implicit-module-maps");
 
-      for (const std::string &modulemap : opts.GetFlagValuesAs<std::string>("moduleMapFile"))
-         clingArgsInterpreter.push_back("-fmodule-map-file=" + modulemap);
+      for (const auto &modulemap : opts.GetFlagValues("moduleMapFile"))
+         clingArgsInterpreter.push_back("-fmodule-map-file=" + std::string(modulemap));
 
       if (includeDir) {
          clingArgsInterpreter.push_back("-fmodule-map-file=" + std::string(includeDir) + "/ROOT.modulemap");
@@ -4482,10 +4483,11 @@ int RootClingMain(int argc,
       return 1;
    }
 
+   std::string shLibFileName = std::string(opts.GetFlagValue("s"));
 
    TModuleGenerator modGen(interp.getCI(),
                            opts.GetSwitch("inlineInputHeader"),
-                           opts.GetFlagValueAs<std::string>("s").value(),
+                           shLibFileName,
                            opts.GetSwitch("writeEmptyRootPCM"));
 
    if (!gDriverConfig->fBuildingROOTStage1 && !filesIncludedByLinkdef.empty()) {
@@ -4886,7 +4888,7 @@ int RootClingMain(int argc,
    }
 
    if (!opts.GetFlagValue("lib-list-prefix").empty()) {
-      string liblist_filename = opts.GetFlagValue("lib-list-prefix") + ".out";
+      string liblist_filename = std::string(opts.GetFlagValue("lib-list-prefix")) + ".out";
 
       ofstream outputfile(liblist_filename.c_str(), ios::out);
       if (!outputfile) {
@@ -4913,11 +4915,11 @@ int RootClingMain(int argc,
    // Create the rootmap file
    std::string rootmapLibName = std::accumulate(opts.GetFlagValues("rml").begin(),
                                 opts.GetFlagValues("rml").end(),
-                                std::string(),
-   [](const std::string & a, const std::string & b) -> std::string {
-      if (a.empty()) return b;
-      else return a + " " + b;
-   });
+                                std::string{},
+   [](const std::string & a, std::string_view b) -> std::string {
+      if (a.empty()) return std::string(b); // convert string_view to string
+      else return a + " " + std::string(b); // convert string_view to string before concatenating
+    });
 
    bool rootMapNeeded = !opts.GetFlagValue("rmf").empty() || !rootmapLibName.empty();
 
@@ -4950,14 +4952,16 @@ int RootClingMain(int argc,
 
       ExtractSelectedNamespaces(scan, nsNames);
 
-      AdjustRootMapNames(opts.GetFlagValue("rmf"),
+      std::string rootmapFileName = std::string(opts.GetFlagValue("rmf"));
+
+      AdjustRootMapNames(rootmapFileName,
                          rootmapLibName);
 
       ROOT::TMetaUtils::Info(nullptr, "Rootmap file name %s and lib name(s) \"%s\"\n",
-                             opts.GetFlagValue("rmf").c_str(),
+                             rootmapFileName.c_str(),
                              rootmapLibName.c_str());
 
-      tmpCatalog.addFileName(opts.GetFlagValue("rmf"));
+      tmpCatalog.addFileName(rootmapFileName);
       std::unordered_set<std::string> headersToIgnore;
       if (opts.GetSwitch("inlineInputHeader"))
          for (const std::string& optHeaderFileName : opts.GetArgs())
@@ -4968,7 +4972,7 @@ int RootClingMain(int argc,
                                               scan.fSelectedTypedefs,
                                               interp);
 
-      rootclingRetCode += CreateNewRootMapFile(opts.GetFlagValue("rmf"),
+      rootclingRetCode += CreateNewRootMapFile(rootmapFileName,
                                           rootmapLibName,
                                           classesDefsList,
                                           classesNamesForRootmap,

@@ -686,7 +686,7 @@ function(ROOT_GENERATE_DICTIONARY dictionary)
 
   set(compIncPaths)
   foreach(implinc IN LISTS CMAKE_CXX_IMPLICIT_INCLUDE_DIRECTORIES CMAKE_C_IMPLICIT_INCLUDE_DIRECTORIES)
-    list(APPEND compIncPaths "-compilerI${implinc}")
+    list(APPEND compIncPaths "-compilerI ${implinc}")
   endforeach()
 
   if(cpp_module_file AND TARGET ${ARG_MODULE})

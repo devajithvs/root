@@ -145,10 +145,6 @@ namespace genreflex {
 
 ////////////////////////////////////////////////////////////////////////////////
 
-static llvm::cl::OptionCategory gRootclingOptions("rootcling common options");
-
-////////////////////////////////////////////////////////////////////////////////
-
 void SetRootSys();
 
 ROOT::Internal::RootCling::TROOTSYSSetter::TROOTSYSSetter() {
@@ -3527,20 +3523,6 @@ public:
    }
 };
 
-static llvm::cl::opt<bool> gOptSystemModuleByproducts("mSystemByproducts", llvm::cl::Hidden,
-                                                      llvm::cl::desc("Allow implicit build of system modules."),
-                                                      llvm::cl::cat(gRootclingOptions));
-static llvm::cl::list<std::string>
-gOptModuleByproducts("mByproduct", llvm::cl::ZeroOrMore,
-                     llvm::cl::Hidden,
-                     llvm::cl::desc("The list of the expected implicit modules build as part of building the current module."),
-                     llvm::cl::cat(gRootclingOptions));
-// Really llvm::cl::Required, will be changed in RootClingMain below.
-static llvm::cl::opt<std::string>
-gOptDictionaryFileName(llvm::cl::Positional,
-                      llvm::cl::desc("<output dictionary file>"),
-                      llvm::cl::cat(gRootclingOptions));
-
 ////////////////////////////////////////////////////////////////////////////////
 /// Custom diag client for clang that verifies that each implicitly build module
 /// is a system module. If not, it will let the current rootcling invocation
@@ -3606,26 +3588,26 @@ public:
       // an error unless -mSystemByproducts or -mByproduct were specified.
       bool isByproductModule = false;
       if (module) {
-         // -mSystemByproducts allows implicit building of any system module.
-         if (module->IsSystem && gOptSystemModuleByproducts) {
-            isByproductModule = true;
-         }
-         // -mByproduct lists concrete module names that are allowed.
-         if (std::find(gOptModuleByproducts.begin(), gOptModuleByproducts.end(), moduleName) !=
-             gOptModuleByproducts.end()) {
-            isByproductModule = true;
-         }
+         // // // -mSystemByproducts allows implicit building of any system module.
+         // // if (module->IsSystem && gOptSystemModuleByproducts) {
+         // //    isByproductModule = true;
+         // // }
+         // // -mByproduct lists concrete module names that are allowed.
+         // if (std::find(gOptModuleByproducts.begin(), gOptModuleByproducts.end(), moduleName) !=
+         //     gOptModuleByproducts.end()) {
+         //    isByproductModule = true;
+         // }
       }
       if (!isByproductModule)
          fChild->HandleDiagnostic(DiagLevel, Info);
 
       if (ID == remark_module_build && !isByproductModule) {
-         ROOT::TMetaUtils::Error(nullptr,
-                                 "Building module '%s' implicitly. If '%s' requires a \n"
-                                 "dictionary please specify build dependency: '%s' depends on '%s'.\n"
-                                 "Otherwise, specify '-mByproduct %s' to disable this diagnostic.\n",
-                                 moduleName.c_str(), moduleName.c_str(), gOptDictionaryFileName.c_str(),
-                                 moduleName.c_str(), moduleName.c_str());
+         // ROOT::TMetaUtils::Error(nullptr,
+         //                         "Building module '%s' implicitly. If '%s' requires a \n"
+         //                         "dictionary please specify build dependency: '%s' depends on '%s'.\n"
+         //                         "Otherwise, specify '-mByproduct %s' to disable this diagnostic.\n",
+         //                         moduleName.c_str(), moduleName.c_str(), gOptDictionaryFileName.c_str(),
+         //                         moduleName.c_str(), moduleName.c_str());
       }
    }
 
@@ -3675,14 +3657,67 @@ static void MaybeSuppressWin32CrashDialogs() {
 #endif
 }
 
+static const char *const kShortHelp = "USAGE: rootcling [subcommand] [options] <output dictionary file> <list of dictionary header files> <LinkDef file | selection xml file>\n";
+static const char *const kLongHelp = R"(
+SUBCOMMANDS:
+
+  bare-cling - Call directly cling and exit.
+
+  Type "rootcling <subcommand> --help" to get more help on a specific subcommand
+
+OPTIONS:
+
+Generic Options:
+
+  --help                   - Display available options (--help-hidden for more)
+
+rootcling common options:
+
+  -D <string>              - Specify defined macros.
+  -I <string>              - Specify an include path.
+  -U <string>              - Specify undefined macros.
+  -W <string>              - Specify compiler diagnostics options.
+  -c                       - Deprecated, legacy flag which is ignored.
+  --compilerI=<string>     - Specify a compiler default include path, to suppress unneeded `-isystem` arguments.
+  --cxxmodule              - Generate a C++ module.
+  --excludePath=<string>   - Do not store the <path> in the dictionary.
+  -f                       - Overwrite <file>s.
+  --failOnWarnings         - Fail if there are warnings.
+  --inlineInputHeader      - Does not generate #include <header> but expands the header content.
+  --interpreteronly        - Generate minimal dictionary for interactivity (without IO information).
+  --isystem=<string>       - Specify a system include path.
+  -m <string>              - The list of dependent modules of the dictionary.
+  --moduleMapFile=<string> - Specify a C++ modulemap file.
+  --multiDict              - If this library has multiple separate LinkDef files.
+  --noGlobalUsingStd       - Do not declare {using namespace std} in dictionary global scope.
+  --noIncludePaths         - Do not store include paths but rely on the env variable ROOT_INCLUDE_PATH.
+  -p                       - Deprecated, legacy flag which is ignored.
+  --reflex                 - Behave internally like genreflex.
+  --rmf=<string>           - Generate a rootmap file with the specified name.
+  --rml=<string>           - Generate rootmap file.
+  -s <string>              - The path to the library of the built dictionary.
+  --selSyntaxOnly          - Check the selection syntax only.
+  --split                  - Split the dictionary into two parts: one containing the IO (ClassDef)information and another the interactivity support.
+  --umbrellaHeader         - A single header including all headers instead of specifying them on the command line.
+  Choose verbosity level:
+      -v                     - Show errors.
+      --v0                    - Show only fatal errors.
+      --v1                    - Show errors (the same as -v).
+      --v2                    - Show warnings (default).
+      --v3                    - Show notes.
+      --v4                    - Show information.
+)";
+
 void DefineRootclingOptions(ROOT::RCmdLineOpts &opts)
 {
    using FT = ROOT::RCmdLineOpts::EFlagType;
    using FO = ROOT::RCmdLineOpts::EFlagOpt;
 
+   opts.AddFlag({"-h", "--help"});
+
    // boolean flags
    opts.AddFlag({"-f"}, FT::kSwitch, "Overwrite <file>s.");
-   opts.AddFlag({"--rootbuild"}, FT::kSwitch, "If we are building ROOT.");
+   opts.AddFlag({"-rootbuild"}, FT::kSwitch, "If we are building ROOT.");
    opts.AddFlag({"--cint"}, FT::kSwitch, "Deprecated, legacy flag which is ignored.");
    opts.AddFlag({"--reflex"}, FT::kSwitch, "Behave internally like genreflex.");
    opts.AddFlag({"--gccxml"}, FT::kSwitch, "Deprecated, legacy flag which is ignored.");
@@ -3701,6 +3736,7 @@ void DefineRootclingOptions(ROOT::RCmdLineOpts &opts)
    opts.AddFlag({"--selSyntaxOnly"}, FT::kSwitch, "Check the selection syntax only.");
    opts.AddFlag({"--failOnWarnings"}, FT::kSwitch, "Fail if there are warnings.");
    opts.AddFlag({"--noIncludePaths"}, FT::kSwitch, "Do not store include paths but rely on the env variable ROOT_INCLUDE_PATH.");
+   opts.AddFlag({"-mSystemByproducts"}, FT::kSwitch, "Allow implicit build of system modules.");
 
    // flags with arguments
    opts.AddFlag({"--lib-list-prefix"}, FT::kWithArg, "An ACLiC feature which exports the list of dependent libraries.");
@@ -3715,10 +3751,11 @@ void DefineRootclingOptions(ROOT::RCmdLineOpts &opts)
    opts.AddFlag({"--excludePath"}, FT::kWithArg, "Do not store the <path> in the dictionary.", FO::kFlagAllowMultiple);
    opts.AddFlag({"--isystem"}, FT::kWithArg, "Specify a system include path.", FO::kFlagAllowMultiple);
    opts.AddFlag({"-I"}, FT::kWithArg, "Specify an include path.", FO::kFlagAllowMultiple);
-   opts.AddFlag({"--compilerI"}, FT::kWithArg, "Specify a compiler default include path, to suppress unneeded `-isystem` arguments.", FO::kFlagAllowMultiple);
+   opts.AddFlag({"-compilerI"}, FT::kWithArg, "Specify a compiler default include path, to suppress unneeded `-isystem` arguments.", FO::kFlagAllowMultiple);
    opts.AddFlag({"-D"}, FT::kWithArg, "Specify defined macros.", FO::kFlagAllowMultiple);
    opts.AddFlag({"-U"}, FT::kWithArg, "Specify undefined macros.", FO::kFlagAllowMultiple);
    opts.AddFlag({"-W"}, FT::kWithArg, "Specify compiler diagnostics options.", FO::kFlagAllowMultiple);
+   opts.AddFlag({"-mByproduct"}, FT::kWithArg, "The list of the expected implicit modules build as part of building the current module.", FO::kFlagAllowMultiple);
 
    // verbosity (switch instead of enum)
    opts.AddFlag({"-v"}, FT::kSwitch, "Show errors.");
@@ -3785,10 +3822,10 @@ static bool ModuleContainsHeaders(TModuleGenerator &modGen, clang::HeaderSearch 
             else
                OtherModuleName = OtherModule->Name;
 
-            // Don't complain about headers that are actually in by-products:
-            if (std::find(gOptModuleByproducts.begin(), gOptModuleByproducts.end(), OtherModuleName)
-                != gOptModuleByproducts.end())
-               continue;
+            // // Don't complain about headers that are actually in by-products:
+            // if (std::find(gOptModuleByproducts.begin(), gOptModuleByproducts.end(), OtherModuleName)
+            //     != gOptModuleByproducts.end())
+            //    continue;
 
             missingHeaders.push_back({header, OtherModuleName});
          }
@@ -3918,6 +3955,17 @@ int RootClingMain(int argc,
    std::vector<const char*> cargv(argv, argv + argc);
    opts.Parse(cargv.data(), argc);
 
+   if (opts.ReportErrors()) {
+      std::cerr << kShortHelp;
+      return 1;
+   }
+
+   if (opts.GetSwitch("help")) {
+      std::cerr << kShortHelp;
+      std::cerr << kLongHelp;
+      return 0;
+   }
+
    const char *etcDir = gDriverConfig->fTROOT__GetEtcDir();
    std::string llvmResourceDir = etcDir ? std::string(etcDir) + "/cling" : "";
    
@@ -3957,8 +4005,8 @@ int RootClingMain(int argc,
       // ROOT::TMetaUtils::Error("", "Option %s can be used only when option %s is specified.\n",
       //                         opts.GetFlagValues("moduleMapFile").ArgStr.str().c_str(),
       //                         opts.GetSwitch("cxxmodule").ArgStr.str().c_str());
-      std::cout << "\n";
-      llvm::cl::PrintHelpMessage();
+      std::cerr << kShortHelp;
+      std::cerr << kLongHelp;
       return 1;
    }
 
@@ -3996,29 +4044,41 @@ int RootClingMain(int argc,
       fclose(fp);
    }
 
-   if (IsImplementationName(gOptDictionaryFileName)) {
+   // Get the dictionary filename from positional arguments
+   std::string dictionaryFileName;
+   auto positionalArgs = opts.GetArgs(); // vector<string> of all positional args
+
+   if (!positionalArgs.empty()) {
+      dictionaryFileName = positionalArgs[0];  // first positional argument
+   } else {
+      ROOT::TMetaUtils::Error(nullptr, "No dictionary file specified!\n");
+      return 1;
+   }
+
+   if (IsImplementationName(dictionaryFileName)) {
       FILE *fp;
-      if ((fp = fopen(gOptDictionaryFileName.c_str(), "r")) != nullptr) {
+      if ((fp = fopen(dictionaryFileName.c_str(), "r")) != nullptr) {
          fclose(fp);
          if (!opts.GetSwitch("f")) {
-            ROOT::TMetaUtils::Error(nullptr, "%s: output file %s already exists\n", executableFileName, gOptDictionaryFileName.c_str());
+            ROOT::TMetaUtils::Error(nullptr, "%s: output file %s already exists\n", executableFileName, dictionaryFileName.c_str());
             return 1;
          }
       }
 
       // remove possible pathname to get the dictionary name
-      if (gOptDictionaryFileName.size() > (PATH_MAX - 1)) {
+      if (dictionaryFileName.size() > (PATH_MAX - 1)) {
          ROOT::TMetaUtils::Error(nullptr, "rootcling: dictionary name too long (more than %d characters): %s\n",
-                                 (PATH_MAX - 1), gOptDictionaryFileName.c_str());
+                                 (PATH_MAX - 1), dictionaryFileName.c_str());
          return 1;
       }
 
-      dictname = llvm::sys::path::filename(gOptDictionaryFileName).str();
+      dictname = llvm::sys::path::filename(dictionaryFileName).str();
    }
 
    if (opts.GetSwitch("f") && dictname.empty()) {
       ROOT::TMetaUtils::Error(nullptr, "Inconsistent set of arguments detected: overwrite of dictionary file forced but no filename specified.\n");
-      llvm::cl::PrintHelpMessage();
+      std::cerr << kShortHelp;
+      std::cerr << kLongHelp;
       return 1;
    }
 
@@ -4041,11 +4101,7 @@ int RootClingMain(int argc,
       GetWarningsAreErrors() = true;
    }
 
-   if (opts.GetFlagValue("isysroot") != "-") {
-      if (opts.GetFlagValue("isysroot").empty()) {
-        ROOT::TMetaUtils::Error("", "isysroot specified without a value.\n");
-        return 1;
-      }
+   if (!opts.GetFlagValue("isysroot").empty()) {
       clingArgs.push_back("-isysroot");
       clingArgs.push_back(std::string(opts.GetFlagValue("isysroot")));
    }
@@ -4146,7 +4202,7 @@ int RootClingMain(int argc,
    // FIXME: This line is from TModuleGenerator, but we can't reuse this code
    // at this point because TModuleGenerator needs a CompilerInstance (and we
    // currently create the arguments for creating said CompilerInstance).
-   bool isPCH = (gOptDictionaryFileName.getValue() == "allDict.cxx");
+   bool isPCH = (dictionaryFileName == "allDict.cxx");
    std::string outputFile;
    // Data is in 'outputFile', therefore in the same scope.
    llvm::StringRef moduleName;
@@ -4157,7 +4213,7 @@ int RootClingMain(int argc,
    auto clingArgsInterpreter = clingArgs;
 
    if (opts.GetFlagValue("s").empty()) {
-      opts.GetFlagValue("s") = gOptDictionaryFileName.getValue();
+      opts.GetFlagValue("s") = dictionaryFileName;
    }
 
    if (!isPCH && opts.GetSwitch("cxxmodule")) {
@@ -4432,7 +4488,7 @@ int RootClingMain(int argc,
          newName += gPathSeparator;
       newName += llvm::sys::path::stem(opts.GetFlagValue("s"));
       newName += "_";
-      newName += llvm::sys::path::stem(gOptDictionaryFileName);
+      newName += llvm::sys::path::stem(dictionaryFileName);
       newName += llvm::sys::path::extension(opts.GetFlagValue("s"));
       opts.GetFlagValue("s") = newName;
    }
@@ -4524,27 +4580,27 @@ int RootClingMain(int argc,
 
    // Check if code goes to stdout or rootcling file
    std::ofstream fileout;
-   string main_dictname(gOptDictionaryFileName.getValue());
+   string main_dictname(dictionaryFileName);
    std::ostream *splitDictStream = nullptr;
    std::unique_ptr<std::ostream> splitDeleter(nullptr);
    // Store the temp files
    tempFileNamesCatalog tmpCatalog;
-   if (!gOptDictionaryFileName.empty()) {
-      tmpCatalog.addFileName(gOptDictionaryFileName.getValue());
-      fileout.open(gOptDictionaryFileName.c_str());
+   if (!dictionaryFileName.empty()) {
+      tmpCatalog.addFileName(dictionaryFileName);
+      fileout.open(dictionaryFileName.c_str());
       if (!fileout) {
          ROOT::TMetaUtils::Error(nullptr, "rootcling: failed to open %s in main\n",
-                                 gOptDictionaryFileName.c_str());
+                                 dictionaryFileName.c_str());
          return 1;
       }
    }
 
-   std::ostream &dictStream = (!gOptDictionaryFileName.empty()) ? fileout : std::cout;
-   bool isACLiC = gOptDictionaryFileName.getValue().find("_ACLiC_dict") != std::string::npos;
+   std::ostream &dictStream = (!dictionaryFileName.empty()) ? fileout : std::cout;
+   bool isACLiC = dictionaryFileName.find("_ACLiC_dict") != std::string::npos;
 
    // Now generate a second stream for the split dictionary if it is necessary
    if (opts.GetSwitch("split")) {
-      splitDictStream = CreateStreamPtrForSplitDict(gOptDictionaryFileName.getValue(), tmpCatalog);
+      splitDictStream = CreateStreamPtrForSplitDict(dictionaryFileName, tmpCatalog);
       splitDeleter.reset(splitDictStream);
    } else {
       splitDictStream = &dictStream;

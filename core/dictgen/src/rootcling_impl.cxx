@@ -3530,6 +3530,60 @@ struct RootclingConfig {
    std::string gOptDictionaryFileName;
 };
 
+enum VerboseLevel {
+   v = ROOT::TMetaUtils::kError,
+   v0 = ROOT::TMetaUtils::kFatal,
+   v1 = v,
+   v2 = ROOT::TMetaUtils::kWarning,
+   v3 = ROOT::TMetaUtils::kNote,
+   v4 = ROOT::TMetaUtils::kInfo
+};
+
+static VerboseLevel gOptVerboseLevel;
+
+static bool gOptForce;
+static bool gOptRootBuild;
+static bool gOptCint;
+static bool gOptReflex;
+static bool gOptGccXml;
+static bool gOptGeneratePCH;
+static bool gOptC;
+static bool gOptP;
+static bool gOptCxxModule;
+static bool gOptUmbrellaInput;
+static bool gOptMultiDict;
+static bool gOptNoGlobalUsingStd;
+static bool gOptInterpreterOnly;
+static bool gOptSplit;
+static bool gOptNoDictSelection;
+static bool gOptInlineInput;
+static bool gOptWriteEmptyRootPCM;
+static bool gOptCheckSelectionSyntax;
+static bool gOptFailOnWarnings;
+static bool gOptNoIncludePaths;
+static bool gOptSystemModuleByproducts;
+
+static std::string gOptLibListPrefix;
+static std::string gOptRootMapFileName;
+static std::string gOptSharedLibFileName;
+static std::string gOptISysRoot;
+
+static std::vector<std::string> gOptRootmapLibNames;
+static std::vector<std::string> gOptModuleMapFiles;
+static std::vector<std::string> gOptModuleDependencies;
+static std::vector<std::string> gOptExcludePaths;
+static std::vector<std::string> gOptSysIncludePaths;
+static std::vector<std::string> gOptIncludePaths;
+static std::vector<std::string> gOptCompDefaultIncludePaths;
+static std::vector<std::string> gOptPPDefines;
+static std::vector<std::string> gOptPPUndefines;
+static std::vector<std::string> gOptWDiags;
+static std::vector<std::string> gOptModuleByproducts;
+
+static std::string gOptDictionaryFileName;
+static std::vector<std::string> gOptDictionaryHeaderFiles;
+
+static bool gBareClingSubcommand;
 
 ////////////////////////////////////////////////////////////////////////////////
 /// Custom diag client for clang that verifies that each implicitly build module
@@ -3977,6 +4031,91 @@ int RootClingMain(int argc,
       return 0;
    }
 
+   gOptForce = opts.GetSwitch("f");
+   gOptRootBuild = opts.GetSwitch("rootbuild");
+   gOptCint = opts.GetSwitch("cint");
+   gOptReflex = opts.GetSwitch("reflex");
+   gOptGccXml = opts.GetSwitch("gccxml");
+   gOptGeneratePCH = opts.GetSwitch("generate-pch");
+   gOptC = opts.GetSwitch("c");
+   gOptP = opts.GetSwitch("p");
+   gOptCxxModule = opts.GetSwitch("cxxmodule");
+   gOptUmbrellaInput = opts.GetSwitch("umbrellaHeader");
+   gOptMultiDict = opts.GetSwitch("multiDict");
+   gOptNoGlobalUsingStd = opts.GetSwitch("noGlobalUsingStd");
+   gOptInterpreterOnly = opts.GetSwitch("interpreteronly");
+   gOptSplit = opts.GetSwitch("split");
+   gOptNoDictSelection = opts.GetSwitch("noDictSelection");
+   gOptInlineInput = opts.GetSwitch("inlineInputHeader");
+   gOptWriteEmptyRootPCM = opts.GetSwitch("writeEmptyRootPCM");
+   gOptCheckSelectionSyntax = opts.GetSwitch("selSyntaxOnly");
+   gOptFailOnWarnings = opts.GetSwitch("failOnWarnings");
+   gOptNoIncludePaths = opts.GetSwitch("noIncludePaths");
+   gOptSystemModuleByproducts = opts.GetSwitch("mSystemByproducts");
+
+   gOptLibListPrefix = std::string(opts.GetFlagValue("lib-list-prefix"));
+   gOptRootMapFileName = std::string(opts.GetFlagValue("rmf"));
+   gOptSharedLibFileName = std::string(opts.GetFlagValue("s"));
+   gOptISysRoot = std::string(opts.GetFlagValue("isysroot"));
+
+   gOptRootmapLibNames.reserve(opts.GetFlagValues("rml").size());
+   for (std::string_view v : opts.GetFlagValues("rml")) {
+      gOptRootmapLibNames.emplace_back(v);
+   }
+
+   gOptModuleMapFiles.reserve(opts.GetFlagValues("moduleMapFile").size());
+   for (std::string_view v : opts.GetFlagValues("moduleMapFile")) {
+      gOptModuleMapFiles.emplace_back(v);
+   }
+
+   gOptModuleDependencies.reserve(opts.GetFlagValues("m").size());
+   for (std::string_view v : opts.GetFlagValues("m")) {
+      gOptModuleDependencies.emplace_back(v);
+   }
+
+   gOptExcludePaths.reserve(opts.GetFlagValues("excludePath").size());
+   for (std::string_view v : opts.GetFlagValues("excludePath")) {
+      gOptExcludePaths.emplace_back(v);
+   }
+
+   gOptSysIncludePaths.reserve(opts.GetFlagValues("isystem").size());
+   for (std::string_view v : opts.GetFlagValues("isystem")) {
+      gOptSysIncludePaths.emplace_back(v);
+   }
+
+   gOptIncludePaths.reserve(opts.GetFlagValues("I").size());
+   for (std::string_view v : opts.GetFlagValues("I")) {
+      gOptIncludePaths.emplace_back(v);
+   }
+
+   gOptCompDefaultIncludePaths.reserve(opts.GetFlagValues("compilerI").size());
+   for (std::string_view v : opts.GetFlagValues("compilerI")) {
+      gOptCompDefaultIncludePaths.emplace_back(v);
+   }
+
+   gOptPPDefines.reserve(opts.GetFlagValues("D").size());
+   for (std::string_view v : opts.GetFlagValues("D")) {
+      gOptPPDefines.emplace_back(v);
+   }
+
+   gOptPPUndefines.reserve(opts.GetFlagValues("U").size());
+   for (std::string_view v : opts.GetFlagValues("U")) {
+      gOptPPUndefines.emplace_back(v);
+   }
+
+   gOptWDiags.reserve(opts.GetFlagValues("W").size());
+   for (std::string_view v : opts.GetFlagValues("W")) {
+      gOptWDiags.emplace_back(v);
+   }
+
+   gOptModuleByproducts.reserve(opts.GetFlagValues("mByproduct").size());
+   for (std::string_view v : opts.GetFlagValues("mByproduct")) {
+      gOptModuleByproducts.emplace_back(v);
+   }
+
+   gOptDictionaryFileName = opts.GetArgs()[1];
+   gOptDictionaryHeaderFiles = opts.GetArgs();
+
    const char *etcDir = gDriverConfig->fTROOT__GetEtcDir();
    std::string llvmResourceDir = etcDir ? std::string(etcDir) + "/cling" : "";
    
@@ -4025,7 +4164,7 @@ int RootClingMain(int argc,
    std::string dictname;
 
    if (!gDriverConfig->fBuildingROOTStage1) {
-      if (opts.GetSwitch("rootbuild")) {
+      if (gOptRootBuild) {
          // running rootcling as part of the ROOT build for ROOT libraries.
          gBuildingROOT = true;
       }
@@ -4078,7 +4217,7 @@ int RootClingMain(int argc,
       FILE *fp;
       if ((fp = fopen(dictionaryFileName.c_str(), "r")) != nullptr) {
          fclose(fp);
-         if (!opts.GetSwitch("f")) {
+         if (!gOptForce) {
             ROOT::TMetaUtils::Error(nullptr, "%s: output file %s already exists\n", executableFileName, dictionaryFileName.c_str());
             return 1;
          }
@@ -4094,7 +4233,7 @@ int RootClingMain(int argc,
       dictname = llvm::sys::path::filename(dictionaryFileName).str();
    }
 
-   if (opts.GetSwitch("f") && dictname.empty()) {
+   if (gOptForce && dictname.empty()) {
       ROOT::TMetaUtils::Error(nullptr, "Inconsistent set of arguments detected: overwrite of dictionary file forced but no filename specified.\n");
       std::cerr << kShortHelp;
       std::cerr << kLongHelp;

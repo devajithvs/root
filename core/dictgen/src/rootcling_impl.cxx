@@ -3522,6 +3522,13 @@ public:
    }
 };
 
+struct RootclingConfig {
+   bool gOptSystemModuleByproducts = false;
+   bool gOptUmbrellaInput = false;
+   std::vector<std::string> gOptModuleByproducts;
+   std::string gOptDictionaryFileName;
+};
+
 enum VerboseLevel {
    v = ROOT::TMetaUtils::kError,
    v0 = ROOT::TMetaUtils::kFatal,
@@ -3591,10 +3598,11 @@ class CheckModuleBuildClient : public clang::DiagnosticConsumer {
    clang::DiagnosticConsumer *fChild;
    bool fOwnsChild;
    clang::ModuleMap &fMap;
+   RootclingConfig &cfg;
 
 public:
-   CheckModuleBuildClient(clang::DiagnosticConsumer *Child, bool OwnsChild, clang::ModuleMap &Map)
-      : fChild(Child), fOwnsChild(OwnsChild), fMap(Map)
+   CheckModuleBuildClient(clang::DiagnosticConsumer *Child, bool OwnsChild, clang::ModuleMap &Map, RootclingConfig &cfg)
+      : fChild(Child), fOwnsChild(OwnsChild), fMap(Map), cfg(cfg)
    {
    }
 
@@ -3643,12 +3651,12 @@ public:
       bool isByproductModule = false;
       if (module) {
          // -mSystemByproducts allows implicit building of any system module.
-         if (module->IsSystem && gOptSystemModuleByproducts) {
+         if (module->IsSystem && cfg.gOptSystemModuleByproducts) {
             isByproductModule = true;
          }
          // -mByproduct lists concrete module names that are allowed.
-         if (std::find(gOptModuleByproducts.begin(), gOptModuleByproducts.end(), moduleName) !=
-             gOptModuleByproducts.end()) {
+         if (std::find(cfg.gOptModuleByproducts.begin(), cfg.gOptModuleByproducts.end(), moduleName) !=
+             cfg.gOptModuleByproducts.end()) {
             isByproductModule = true;
          }
       }
@@ -3660,7 +3668,7 @@ public:
                                  "Building module '%s' implicitly. If '%s' requires a \n"
                                  "dictionary please specify build dependency: '%s' depends on '%s'.\n"
                                  "Otherwise, specify '-mByproduct %s' to disable this diagnostic.\n",
-                                 moduleName.c_str(), moduleName.c_str(), gOptDictionaryFileName.c_str(),
+                                 moduleName.c_str(), moduleName.c_str(), cfg.gOptDictionaryFileName.c_str(),
                                  moduleName.c_str(), moduleName.c_str());
       }
    }
@@ -3829,7 +3837,7 @@ void DefineRootclingOptions(ROOT::RCmdLineOpts &opts)
 /// not in the given module will be inserted into the MissingHeader variable.
 /// Returns true iff the PCH was successfully generated.
 static bool ModuleContainsHeaders(TModuleGenerator &modGen, clang::HeaderSearch &headerSearch,
-                                  clang::Module *module, std::vector<std::array<std::string, 2>> &missingHeaders)
+                                  clang::Module *module, std::vector<std::array<std::string, 2>> &missingHeaders, RootclingConfig &cfg)
 {
    // Now we collect all header files from the previously collected modules.
    std::vector<clang::Module::Header> moduleHeaders;
@@ -3877,8 +3885,8 @@ static bool ModuleContainsHeaders(TModuleGenerator &modGen, clang::HeaderSearch 
                OtherModuleName = OtherModule->Name;
 
             // Don't complain about headers that are actually in by-products:
-            if (std::find(gOptModuleByproducts.begin(), gOptModuleByproducts.end(), OtherModuleName)
-                != gOptModuleByproducts.end())
+            if (std::find(cfg.gOptModuleByproducts.begin(), cfg.gOptModuleByproducts.end(), OtherModuleName)
+                != cfg.gOptModuleByproducts.end())
                continue;
 
             missingHeaders.push_back({header, OtherModuleName});
@@ -3894,7 +3902,7 @@ static bool ModuleContainsHeaders(TModuleGenerator &modGen, clang::HeaderSearch 
 ////////////////////////////////////////////////////////////////////////////////
 /// Check moduleName validity from modulemap. Check if this module is defined or not.
 static bool CheckModuleValid(TModuleGenerator &modGen, const std::string &resourceDir, cling::Interpreter &interpreter,
-                             llvm::StringRef LinkdefPath, const std::string &moduleName)
+                             llvm::StringRef LinkdefPath, const std::string &moduleName, RootclingConfig &cfg)
 {
    clang::CompilerInstance *CI = interpreter.getCI();
    clang::HeaderSearch &headerSearch = CI->getPreprocessor().getHeaderSearchInfo();
@@ -3914,7 +3922,7 @@ static bool CheckModuleValid(TModuleGenerator &modGen, const std::string &resour
    // by the user on the command line. This is an integrity check to
    // ensure that our used module map is not containing extraneous headers.
    std::vector<std::array<std::string, 2>> missingHdrMod;
-   if (!ModuleContainsHeaders(modGen, headerSearch, module, missingHdrMod)) {
+   if (!ModuleContainsHeaders(modGen, headerSearch, module, missingHdrMod, cfg)) {
       // FIXME: Upgrade this to an error once modules are stable.
       std::stringstream msgStream;
       msgStream << "after creating module \"" << module->Name << "\" ";
@@ -3939,7 +3947,7 @@ static bool CheckModuleValid(TModuleGenerator &modGen, const std::string &resour
       // if we passed rootcling ... -I/some/path somedir/some/header, the
       // modulemap should contain module M { header "somedir/some/header" }
       // This way we will make sure the module is properly activated.
-      if (!gOptUmbrellaInput && maybeUmbrella) {
+      if (!cfg.gOptUmbrellaInput && maybeUmbrella) {
          ROOT::TMetaUtils::Info("CheckModuleValid, %s. You can silence this message by adding %s to the invocation.",
                                 warningMessage.c_str(),
                                 "umbrellaHeader");
@@ -4003,6 +4011,7 @@ int RootClingMain(int argc,
    }
 #endif
 
+   RootclingConfig cfg;
    ROOT::RCmdLineOpts opts;
    DefineRootclingOptions(opts);
 
@@ -4149,6 +4158,10 @@ int RootClingMain(int argc,
    for (size_t i = 2, e = positionalArgs.size(); i < e; ++i) {
       gOptDictionaryHeaderFiles.push_back(positionalArgs[i]);
    }
+
+   cfg.gOptSystemModuleByproducts = gOptSystemModuleByproducts;
+   cfg.gOptModuleByproducts = gOptModuleByproducts;
+   cfg.gOptDictionaryFileName = gOptDictionaryFileName;
 
    std::string dictname;
 
@@ -4477,7 +4490,7 @@ int RootClingMain(int argc,
 
    // Attach our own diag client that listens to the module_build remarks from
    // clang to check that we don't build dictionary C++ modules implicitly.
-   auto recordingClient = new CheckModuleBuildClient(diags.getClient(), diags.ownsClient(), moduleMap);
+   auto recordingClient = new CheckModuleBuildClient(diags.getClient(), diags.ownsClient(), moduleMap, cfg);
    diags.setClient(recordingClient, true);
 
    if (ROOT::TMetaUtils::GetErrorIgnoreLevel() == ROOT::TMetaUtils::kInfo) {
@@ -5066,7 +5079,7 @@ int RootClingMain(int argc,
       if (modGen.IsPCH()) {
          if (!GenerateAllDict(modGen, CI, currentDirectory)) return 1;
       } else if (gOptCxxModule) {
-         if (!CheckModuleValid(modGen, llvmResourceDir, interp, linkdefFilename, moduleName.str()))
+         if (!CheckModuleValid(modGen, llvmResourceDir, interp, linkdefFilename, moduleName.str(), cfg))
             return 1;
       }
    }

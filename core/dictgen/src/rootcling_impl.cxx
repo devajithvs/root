@@ -4329,8 +4329,6 @@ int RootClingMain(int argc,
       clingArgsInterpreter.push_back("-fmodule-name=" + moduleName.str());
 
       std::string moduleCachePath = llvm::sys::path::parent_path(gOptSharedLibFileName).str();
-      clingArgsInterpreter.push_back("-fmodule-name");
-      clingArgsInterpreter.push_back(moduleName.str());
 
       // Set the C++ modules output directory to the directory where we generate
       // the shared library.

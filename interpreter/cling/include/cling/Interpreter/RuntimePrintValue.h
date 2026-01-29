@@ -210,6 +210,13 @@ namespace cling {
       const void* M = TypeTest::isMap(obj);
 
       std::string str("{ ");
+
+      // Check for recursion: if &(*iter) == obj, we have a self-referencing iterator
+      if (static_cast<const void*>(&(*iter)) == static_cast<const void*>(obj)) {
+        // Self-referential: the iterator dereferences to the container itself
+        return "{ <recursion detected> }";
+      }
+
       str += printValue(&(*iter), M);
       while (++iter != iterEnd) {
         str += ", ";

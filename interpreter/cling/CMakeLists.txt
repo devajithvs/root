@@ -422,6 +422,10 @@ if (NOT LLVM_INSTALL_TOOLCHAIN_ONLY)
     )
 endif()
 
+if(upstream_clang)
+  add_definitions(-DUPSTREAM_CLANG)
+endif()
+
 add_definitions( -D_GNU_SOURCE -DCLING_VERSION=${CLING_VERSION})
 
 option(CLING_INCLUDE_TESTS

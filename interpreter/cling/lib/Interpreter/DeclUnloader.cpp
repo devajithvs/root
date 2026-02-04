@@ -989,6 +989,7 @@ namespace cling {
     assert(MacroD.m_II && "The IdentifierInfo is null");
     CollectFilesToUncache(MacroD.m_MD->getLocation());
 
+    Preprocessor& PP = m_Sema->getPreprocessor();
 #ifndef NDEBUG
     bool ExistsInPP = false;
     // Make sure the macro is in the Preprocessor. Not sure if not redundant
@@ -1016,7 +1017,6 @@ namespace cling {
 
 #ifndef UPSTREAM_CLANG
     // Remove the pair from the macros
-    Preprocessor& PP = m_Sema->getPreprocessor();
     PP.removeMacro(MacroD.m_II, const_cast<MacroDirective*>(MacroD.m_MD));
 #endif
 

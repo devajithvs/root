@@ -891,14 +891,8 @@ namespace cling {
     SourceLocation NewLoc = getNextAvailableUniqueSourceLoc();
 
     // Create FileID for the current buffer.
-    FileID FID;
-    // Create FileEntry and FileID for the current buffer.
-    // Enabling the completion point only works on FileEntries.
-    FileEntryRef FE =
-        SM.getFileManager().getVirtualFileRef(source_name.str(), InputSize,
-                                              0 /* mod time*/);
-    SM.overrideFileContents(FE, std::move(MB));
-    FID = SM.createFileID(FE, NewLoc, SrcMgr::C_User);
+    FileID FID = SM.createFileID(std::move(MB), SrcMgr::C_User, /*LoadedID=*/0,
+                                 /*LoadedOffset=*/0, NewLoc);
 
     // NewLoc only used for diags.
     PP.EnterSourceFile(FID, /*DirLookup*/nullptr, NewLoc);

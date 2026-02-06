@@ -1180,9 +1180,10 @@ static GlobalModuleIndex *loadGlobalModuleIndex(cling::Interpreter &interp)
 #ifndef NDEBUG
                   SourceManager &SM = ND->getASTContext().getSourceManager();
                   SourceLocation Loc = ND->getLocation();
-                  OptionalFileEntryRef FE = SM.getFileEntryRefForID(SM.getFileID(Loc));
-                  (void)FE;
-                  assert(FE->getName().contains("input_line_"));
+
+                  // Don't ask for a FileEntryRef, which might not exist.
+                  StringRef BufferName = SM.getBufferName(Loc);
+                  assert(BufferName.contains("input_line_"));
 #endif
                   return;
                }

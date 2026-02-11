@@ -233,6 +233,29 @@ namespace cling {
       return str + " }";
     }
 
+    // std::array specialization
+    // Same as above but do not check for infinite recursion, as std::array
+    // begins at the position of the object itself
+    template <typename T, std::size_t N>
+    inline auto printValue_impl(const std::array<T, N>* obj)
+        -> decltype(std::end(*obj), std::string()) {
+      auto iter = obj->begin();
+      auto iterEnd = obj->end();
+      if (iter == iterEnd)
+        return valuePrinterInternal::kEmptyCollection;
+
+      const void* M = TypeTest::isMap(obj);
+
+      std::string str("{ ");
+      str += printValue(&(*iter), M);
+
+      while (++iter != iterEnd) {
+        str += ", ";
+        str += printValue(&(*iter), M);
+      }
+      return str + " }";
+    }
+
     // As above, but without ability to take address of elements.
     template <typename CollectionType>
     inline auto printValue_impl(

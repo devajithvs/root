@@ -28,9 +28,9 @@ std::unique_ptr<cling::test::SymbolResolverCallback> SRC;
 SRC.reset(new cling::test::SymbolResolverCallback(gCling, false))
 gCling->setCallbacks(std::move(SRC));
 p.q
-// expected-error@input_line_28:2 {{use of undeclared identifier 'p'}}
+// expected-error {{use of undeclared identifier 'p'}}
 
 // `auto` is not supported
 auto x = unknownexpression()
-// expected-error@input_line_31:2 {{cannot deduce 'auto' from unknown expression}}
+// expected-error {{cannot deduce 'auto' from unknown expression}}
 .q

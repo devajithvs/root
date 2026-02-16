@@ -27,8 +27,8 @@ LD() == LR() && LD() == LC()
 // CHECK-NEXT: (bool) true
 
 auto LL = [=,&Var] { return Var; };
-// expected-error@input_line_24:2 {{'Var' cannot be captured because it does not have automatic storage duration}}
-// expected-note@input_line_13:2 {{'Var' declared here}}
-// expected-warning@input_line_24:2 {{captures will be by reference, not copy}}
+// expected-error {{'Var' cannot be captured because it does not have automatic storage duration}}
+// expected-note {{'Var' declared here}}
+// expected-warning {{captures will be by reference, not copy}}
 
 .q

@@ -57,9 +57,9 @@ true // CHECK: (bool) true
 false // CHECK: (bool) false
 
 unordered_multiset<float> {1} // ROOT-7310
-// expected-error@input_line_42:2 {{expected ';' after expression}}
-// expected-error@input_line_42:2 {{use of undeclared identifier 'unordered_multiset'}}
-// expected-error@input_line_42:2 {{expected ';' after expression}}
+// expected-error {{expected ';' after expression}}
+// expected-error {{use of undeclared identifier 'unordered_multiset'}}
+// expected-error {{expected ';' after expression}}
 
 #include <unordered_set>
 std::unordered_multiset<float> {1}
@@ -100,7 +100,7 @@ auto fn_moo = std::bind (bla, _1,_2,10) // CHECK: ({{.*\(lambda\).*}} &) @0x{{[0
 void f(std::string) {}
 .rawInput 0
 f // CHECK: (void (*)(std::string)) Function @0x{{[0-9a-f]+}}
-// CHECK: at input_line_{{[0-9].*}}:1:
+// CHECK: at :1:
 // CHECK: void f(std::string) {}
 
 class notapointer {};

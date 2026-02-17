@@ -172,6 +172,25 @@ namespace {
             || Info.getID() == diag::warn_unused_call
             || Info.getID() == diag::warn_unused_comparison)
           return; // ignore!
+
+        // Suppress meaningless "note: '' included multiple times, additional
+        // include site here" from virtual Cling buffers.
+        // Also happens with clang-repl.
+        if (Info.getID() == diag::note_redefinition_include_same_file) {
+          if (!Info.hasSourceManager() || !Info.getLocation().isValid())
+            return;
+
+          const PresumedLoc PLoc =
+              Info.getSourceManager().getPresumedLoc(Info.getLocation());
+          if (!PLoc.isValid())
+            return;
+
+          StringRef Filename = PLoc.getFilename();
+          if (Filename.empty() ||
+              Filename.contains("cling interactive line includer"))
+            return;
+        }
+
         if (Info.getID() == diag::ext_return_has_expr) {
           // An error that we need to suppress.
           auto Diags = const_cast<DiagnosticsEngine*>(Info.getDiags());
@@ -888,7 +907,7 @@ namespace cling {
 
     // Create SourceLocation, which will allow clang to order the overload
     // candidates for example
-    SourceLocation NewLoc = getNextAvailableUniqueSourceLoc();
+    SourceLocation NewLoc = SM.getLocForStartOfFile(SM.getMainFileID());
 
     // Create FileID for the current buffer.
     FileID FID = SM.createFileID(std::move(MB), SrcMgr::C_User, /*LoadedID=*/0,

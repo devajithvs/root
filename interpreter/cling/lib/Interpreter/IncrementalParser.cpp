@@ -183,6 +183,25 @@ namespace {
         }
       }
 
+      // FIXME:
+      // Suppress meaningless "note: '' included multiple times, additional
+      // include site here" from virtual Cling buffers.
+      // Also happens with clang-repl.
+      if (Info.getID() == diag::note_redefinition_include_same_file) {
+        if (!Info.hasSourceManager() || !Info.getLocation().isValid())
+          return;
+
+        const PresumedLoc PLoc =
+            Info.getSourceManager().getPresumedLoc(Info.getLocation());
+        if (!PLoc.isValid())
+          return;
+
+        StringRef Filename = PLoc.getFilename();
+        if (Filename.empty() ||
+            Filename.contains("cling interactive line includer"))
+          return;
+      }
+
       // In principle, for simplicity, we preserve the old behavior of
       // delivering diagnostics to just one consumer (that is why we don't emit
       // to both), but we allow the "sink" to be changed.
@@ -888,7 +907,7 @@ namespace cling {
 
     // Create SourceLocation, which will allow clang to order the overload
     // candidates for example
-    SourceLocation NewLoc = getNextAvailableUniqueSourceLoc();
+    SourceLocation NewLoc = SM.getLocForStartOfFile(SM.getMainFileID());
 
     // Create FileID for the current buffer.
     FileID FID = SM.createFileID(std::move(MB), SrcMgr::C_User, /*LoadedID=*/0,

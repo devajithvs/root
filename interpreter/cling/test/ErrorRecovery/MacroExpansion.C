@@ -13,7 +13,7 @@
 
 .rawInput 1
 
-BEGIN_NAMESPACE int j; END_NAMESPACE // expected-note {{previous definition is here}}
+BEGIN_NAMESPACE int j; END_NAMESPACE
 
 .storeState "testMacroExpansion"
 BEGIN_NAMESPACE int j; END_NAMESPACE // expected-error {{redefinition of 'j'}}

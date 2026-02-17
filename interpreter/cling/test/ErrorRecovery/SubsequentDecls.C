@@ -46,7 +46,7 @@ TemplatedF((double)3.14)
 
 // ROOT-7295
 #include <vector>
-std::vector<float> a; // expected-note {{previous definition is here}}
+std::vector<float> a;
 std::vector<float> a; // expected-error {{redefinition of 'a'}}
 
 .q

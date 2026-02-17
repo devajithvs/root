@@ -61,20 +61,20 @@
 .rawInput 1
 */
 .rawInput 0
-// expected-error@input_line_23:1 {{expected expression}}
+// expected-error@1 {{expected expression}}
 // expected-error@<<< cling interactive line includer >>>:1 {{expected expression}}
 
 
 // This is a side effect of wrapping, expression is compiled as */; so 2 errors
-*/ // expected-error@2 {{expected expression}} expected-error@3 {{expected expression}}
+*/ // expected-error@3 {{expected expression}} expected-error@3 {{expected expression}}
 
 /* // /* */// expected-warning {{within block comment}}
 
 /* // /* *// */
-// expected-warning@input_line_29:2 {{within block comment}}
-// expected-error@input_line_29:2 {{expected expression}}
-// expected-error@input_line_29:2 {{expected expression}}
-// expected-error@input_line_29:3 {{expected expression}}
+// expected-warning {{within block comment}}
+// expected-error {{expected expression}}
+// expected-error {{expected expression}}
+// expected-error {{expected expression}}
 
 /* //  *  // */
 

@@ -548,16 +548,40 @@ static bool ParseDirective(StringRef S, ExpectedData *ED, SourceManager &SM,
           OptionalFileEntryRef File =
               PP->LookupFile(Pos, Filename, false, nullptr, nullptr, nullptr,
                              nullptr, nullptr, nullptr, nullptr, nullptr);
-          if (!File) {
+
+          FileID FID;
+          if (File) {
+            FID = SM.translateFile(*File);
+            if (FID.isInvalid()) {
+              FID = SM.createFileID(*File, Pos, SrcMgr::C_User);
+            }
+          } else if (Filename.starts_with("input_line_")) {
+            // clang-repl buffers (e.g., input_line_1) are virtual and not
+            // tracked by the FileManager. We need to manually scan the
+            // SourceManager's local SLocEntry table to find the buffer matching
+            // this name.
+            for (unsigned i = 0; i < SM.local_sloc_entry_size(); ++i) {
+              const SrcMgr::SLocEntry &Entry = SM.getLocalSLocEntry(i);
+              if (!Entry.isFile())
+                continue;
+              if (auto Buffer =
+                      Entry.getFile().getContentCache().getBufferIfLoaded()) {
+                if (Buffer->getBufferIdentifier() == Filename) {
+                  SourceLocation EntryLoc =
+                      SourceLocation::getFromRawEncoding(Entry.getOffset());
+                  FID = SM.getFileID(EntryLoc);
+                  break;
+                }
+              }
+            }
+          }
+
+          if (FID.isInvalid()) {
             Diags.Report(Pos.getLocWithOffset(PH.C - PH.Begin),
                          diag::err_verify_missing_file)
                 << Filename << KindStr;
             continue;
           }
-
-          FileID FID = SM.translateFile(*File);
-          if (FID.isInvalid())
-            FID = SM.createFileID(*File, Pos, SrcMgr::C_User);
 
           if (PH.Next(Line) && Line > 0)
             ExpectedLoc = SM.translateLineCol(FID, Line, 1);
@@ -936,11 +960,19 @@ static bool IsFromSameFile(SourceManager &SM, SourceLocation DirectiveLoc,
   if (SM.isWrittenInSameFile(DirectiveLoc, DiagnosticLoc))
     return true;
 
-  const FileEntry *DiagFile = SM.getFileEntryForID(SM.getFileID(DiagnosticLoc));
+  FileID DiagFID = SM.getFileID(DiagnosticLoc);
+  FileID DirFID = SM.getFileID(DirectiveLoc);
+
+  // If they are the exact same buffer, we're done.
+  if (DiagFID == DirFID)
+    return true;
+
+  const FileEntry *DiagFile = SM.getFileEntryForID(DiagFID);
+
   if (!DiagFile && SM.isWrittenInMainFile(DirectiveLoc))
     return true;
 
-  return (DiagFile == SM.getFileEntryForID(SM.getFileID(DirectiveLoc)));
+  return DiagFile == SM.getFileEntryForID(DirFID);
 }
 
 /// CheckLists - Compare expected to seen diagnostic lists and return the

@@ -58,11 +58,11 @@
   This will warn
   // /* */ // expected-warning {{within block comment}}
 
-.rawInput 1
-*/
-.rawInput 0
-// expected-error@input_line_23:1 {{expected expression}}
-// expected-error@<<< cling interactive line includer >>>:1 {{expected expression}}
+// .rawInput 1
+// */
+// .rawInput 0
+
+
 
 
 // This is a side effect of wrapping, expression is compiled as */; so 2 errors

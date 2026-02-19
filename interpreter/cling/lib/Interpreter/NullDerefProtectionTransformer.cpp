@@ -284,13 +284,6 @@ namespace cling {
     if (FID.isInvalid())
       return false;
 
-    // Check if this is an incremental input buffer. Since these lack a physical
-    // FileEntry/Directory, we should still ensure interactive user code is
-    // still transformed
-    StringRef BufferName = SM.getBufferName(Loc);
-    if (BufferName.contains("input_line_"))
-      return true;
-
     auto FE = SM.getFileEntryRefForID(FID);
     if (!FE)
       return false;

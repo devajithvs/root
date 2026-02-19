@@ -25,13 +25,14 @@ using namespace clang;
 
 namespace cling {
   /// \brief Returns whether the given source location is a Cling input line. If
-  /// it came from the prompt, it can be identified by the "input_line_" buffer
-  /// name
+  /// it came from the prompt, the file is a virtual file with overriden contents.
   static bool typedInClingPrompt(FullSourceLoc L) {
     if (L.isInvalid())
       return false;
     const SourceManager &SM = L.getManager();
-    return SM.getBufferName(L).contains("input_line_");
+    const FileID FID = SM.getFileID(L);
+    return SM.isFileOverridden(SM.getFileEntryForID(FID))
+           && (SM.getFileID(SM.getIncludeLoc(FID)) == SM.getMainFileID());
   }
 
   /// \brief Returns whether a declaration is a definition.  A `TemplateDecl` is

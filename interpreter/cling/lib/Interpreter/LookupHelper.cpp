@@ -246,8 +246,8 @@ namespace cling {
             // is not relevant for ROOT itself ....
             ASTContext &Context = S.getASTContext();
             QualType T = Context.getTypedefType(typedefDecl);
-            const TagType *TagTy = T->getAs<TagType>();
-            if (TagTy) next = TagTy->getDecl();
+            if (const auto *TD = T->getAsTagDecl())
+              next = TD;
           }
 
           // To use Lookup::Named we need to fit the assertion:
@@ -560,8 +560,8 @@ namespace cling {
           const TypedefNameDecl *typedefDecl = dyn_cast<TypedefNameDecl>(quickResult);
           if (typedefDecl) {
             QualType T = Context.getTypedefType(typedefDecl);
-            const TagType *TagTy = T->getAs<TagType>();
-            if (TagTy) tagdecl = TagTy->getDecl();
+            if (const auto *TD = T->getAsTagDecl())
+              tagdecl = TD;
             // NOTE: Should we instantiate here? ... maybe ...
             if (tagdecl && resultType) *resultType = T.getTypePtr();
 
@@ -693,11 +693,8 @@ namespace cling {
                 } else {
                    *setResultType = NNS->getAsType();
                 }
-                const TagType* TagTy = (*setResultType)->getAs<TagType>();
-                if (TagTy) {
+                if (const TagDecl *TD = (*setResultType)->getAsTagDecl()) {
                   // It is a class, struct, or union.
-                  TagDecl* TD = TagTy->getDecl();
-                  if (TD) {
                     TheDecl = TD->getDefinition();
                     if (!TheDecl && instantiateTemplate) {
 
@@ -731,7 +728,6 @@ namespace cling {
                         return 0;
                       }
                     }
-                  }
                 }
               }
               break;
@@ -784,8 +780,8 @@ namespace cling {
           TypeSourceInfo *TSI = 0;
           clang::QualType QT =
             clang::Sema::GetTypeFromParser(T.get(), &TSI);
-          if (const TagType* TT = QT->getAs<TagType>()) {
-            TheDecl = TT->getDecl()->getDefinition();
+          if (const auto *TD = QT->getAsTagDecl()) {
+            TheDecl = TD->getDefinition();
             *setResultType = QT.getTypePtr();
           }
         }
@@ -964,7 +960,7 @@ namespace cling {
       return foundDC;
     }
     else if (const RecordDecl* RD = dyn_cast<RecordDecl>(scopeDecl)) {
-      const Type* T = Context.getRecordType(RD).getTypePtr();
+      const Type* T = Context.getCanonicalTagType(RD).getTypePtr();
       classNNS = NestedNameSpecifier::Create(Context, 0, false, T);
       // We pass a 'random' but valid source range.
       SS.MakeTrivial(Context, classNNS, scopeDecl->getSourceRange());

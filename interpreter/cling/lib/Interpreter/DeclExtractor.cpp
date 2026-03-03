@@ -522,8 +522,8 @@ namespace cling {
       // see http://www.open-std.org/jtc1/sc22/wg21/docs/cwg_active.html#407
       if (m_Sema->getLangOpts().CPlusPlus) {
         if (TypedefNameDecl *TD = dyn_cast<TypedefNameDecl>(PrevDecl)) {
-          if (const TagType *TT = TD->getUnderlyingType()->getAs<TagType>()) {
-            TagDecl *Tag = TT->getDecl();
+
+          if (const TagDecl *Tag = TD->getUnderlyingType()->getAsTagDecl()) {
             if (Tag->getDeclName() == Name &&
                 Tag->getDeclContext()->getRedeclContext()
                 ->Equals(TD->getDeclContext()->getRedeclContext())) {

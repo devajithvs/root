@@ -245,7 +245,7 @@ namespace cling {
             // Since we do not use this path for template handling, this
             // is not relevant for ROOT itself ....
             ASTContext &Context = S.getASTContext();
-            QualType T = Context.getTypedefType(typedefDecl);
+            QualType T = Context.getTypedefType(ElaboratedTypeKeyword::None, /*Qualifier=*/std::nullopt, typedefDecl);
             if (const auto *TD = T->getAsTagDecl())
               next = TD;
           }
@@ -559,7 +559,7 @@ namespace cling {
           const TagDecl *tagdecl = dyn_cast<TagDecl>(quickResult);
           const TypedefNameDecl *typedefDecl = dyn_cast<TypedefNameDecl>(quickResult);
           if (typedefDecl) {
-            QualType T = Context.getTypedefType(typedefDecl);
+            QualType T = Context.getTypedefType(ElaboratedTypeKeyword::None, /*Qualifier=*/std::nullopt, typedefDecl);
             if (const auto *TD = T->getAsTagDecl())
               tagdecl = TD;
             // NOTE: Should we instantiate here? ... maybe ...

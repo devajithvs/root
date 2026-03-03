@@ -1199,8 +1199,10 @@ namespace utils {
       // If desugaring happened allocate new type in the AST.
       if (mightHaveChanged) {
         Qualifiers qualifiers = QT.getLocalQualifiers();
-        QT = Ctx.getTemplateSpecializationType(TST->getTemplateName(),
+        QT = Ctx.getTemplateSpecializationType(TST->getKeyword(),
+                                               TST->getTemplateName(),
                                                desArgs,
+                                               /*CanonicalArgs=*/{},
                                                TST->getCanonicalTypeInternal());
         QT = Ctx.getQualifiedType(QT, qualifiers);
       }
@@ -1273,7 +1275,7 @@ namespace utils {
           if (mightHaveChanged) {
             Qualifiers qualifiers = QT.getLocalQualifiers();
             TemplateName TN(TSTdecl->getSpecializedTemplate());
-            QT = Ctx.getTemplateSpecializationType(TN, desArgs,
+            QT = Ctx.getTemplateSpecializationType(ElaboratedTypeKeyword::None, TN, desArgs, /*CanonicalArgs=*/{},
                                          TSTRecord->getCanonicalTypeInternal());
             QT = Ctx.getQualifiedType(QT, qualifiers);
           }

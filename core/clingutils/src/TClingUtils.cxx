@@ -398,7 +398,7 @@ AnnotatedRecordDecl::AnnotatedRecordDecl(long index,
      fRequestedRNTupleSerializationMode(rRequestedRNTupleSerializationMode)
 // clang-format on
 {
-   TMetaUtils::GetNormalizedName(fNormalizedName, decl->getASTContext().getTypeDeclType(decl), interpreter,normCtxt);
+   TMetaUtils::GetNormalizedName(fNormalizedName, decl->getASTContext().getCanonicalTagType(decl), interpreter,normCtxt);
    fDemangledTypeInfo = BuildDemangledTypeInfo(decl, fNormalizedName);
 }
 
@@ -516,7 +516,7 @@ AnnotatedRecordDecl::AnnotatedRecordDecl(long index,
 
       fNormalizedName = fRequestedName;
    } else {
-      TMetaUtils::GetNormalizedName( fNormalizedName, decl->getASTContext().getTypeDeclType(decl),interpreter,normCtxt);
+      TMetaUtils::GetNormalizedName( fNormalizedName, decl->getASTContext().getCanonicalTagType(decl),interpreter,normCtxt);
    }
    fDemangledTypeInfo = BuildDemangledTypeInfo(decl, fNormalizedName);
 }

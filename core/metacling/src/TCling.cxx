@@ -5147,11 +5147,11 @@ void TCling::GetFunctionOverloads(ClassInfo_t *cl, const char *funcname,
 
    if (RecDecl) {
       if (RecDecl->getNameAsString() == funcname) {
-         clang::QualType QT = Ctx.getTypeDeclType(RecDecl);
-         DName = Ctx.DeclarationNames.getCXXConstructorName(Ctx.getCanonicalType(QT));
+         clang::CanQualType QT = Ctx.getCanonicalTagType(RecDecl);
+         DName = Ctx.DeclarationNames.getCXXConstructorName(QT);
       } else if (funcname[0] == '~' && RecDecl->getNameAsString() == funcname + 1) {
-         clang::QualType QT = Ctx.getTypeDeclType(RecDecl);
-         DName = Ctx.DeclarationNames.getCXXDestructorName(Ctx.getCanonicalType(QT));
+         clang::CanQualType QT = Ctx.getCanonicalTagType(RecDecl);
+         DName = Ctx.DeclarationNames.getCXXDestructorName(QT);
       } else {
          DName = &Ctx.Idents.get(funcname);
       }

@@ -1002,7 +1002,7 @@ namespace cling {
         return foundDC;
       } else {
         //const Type* T = Context.getRecordType(RD).getTypePtr();
-        const Type* T = Context.getTypeDeclType(RD).getTypePtr();
+        const Type* T = Context.getCanonicalTagType(RD).getTypePtr();
         NestedNameSpecifier* classNNS = NestedNameSpecifier::Create(Context, 0, false, T);
         // We pass a 'random' but valid source range.
         CXXScopeSpec SS;
@@ -1095,8 +1095,8 @@ namespace cling {
     Expr::Classification ObjExprClassification;
     if (CXXRecordDecl* CRD = dyn_cast<CXXRecordDecl>(foundDC)) {
       if (objectIsConst)
-        ClassType = Context.getTypeDeclType(CRD).getCanonicalType().withConst();
-      else ClassType = Context.getTypeDeclType(CRD).getCanonicalType();
+        ClassType = Context.getCanonicalTagType(CRD).withConst();
+      else ClassType = Context.getCanonicalTagType(CRD);
       OpaqueValueExpr ObjExpr(SourceLocation(),
                               ClassType, VK_LValue);
       ObjExprClassification = ObjExpr.Classify(Context);

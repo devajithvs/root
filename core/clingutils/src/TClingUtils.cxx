@@ -3217,8 +3217,10 @@ clang::QualType ROOT::TMetaUtils::AddDefaultParameters(clang::QualType instanceT
 
       // If we added default parameter, allocate new type in the AST.
       if (mightHaveChanged) {
-         instanceType = Ctx.getTemplateSpecializationType(TST->getTemplateName(),
+         instanceType = Ctx.getTemplateSpecializationType(TST->getKeyword(),
+                                                          TST->getTemplateName(),
                                                           desArgs,
+                                                          /*CanonicalArgs=*/{},
                                                           TST->getCanonicalTypeInternal());
       }
    }
@@ -3707,15 +3709,15 @@ clang::ClassTemplateDecl* ROOT::TMetaUtils::QualType2ClassTemplateDecl(const cla
 /// We may need therefore to step into the "Decl dimension" to then get back
 /// to the "type dimension".
 
-clang::TemplateName ROOT::TMetaUtils::ExtractTemplateNameFromQualType(const clang::QualType& qt)
+clang::TemplateName ROOT::TMetaUtils::ExtractTemplateNameFromQualType(const clang::QualType& qt, clang::TemplateName& theTemplateName, clang::ElaboratedTypeKeyword& theKeyword)
 {
    using namespace clang;
-   TemplateName theTemplateName;
 
    const Type* theType = qt.getTypePtr();
 
    if (const TemplateSpecializationType* tst = llvm::dyn_cast_or_null<const TemplateSpecializationType>(theType)) {
       theTemplateName = tst->getTemplateName();
+      theKeyword = tst->getKeyword();
    } // We step into the decl dimension
    else if (ClassTemplateDecl* ctd = QualType2ClassTemplateDecl(qt)) {
       theTemplateName = TemplateName(ctd);
@@ -4018,7 +4020,9 @@ static void KeepNParams(clang::QualType& normalizedType,
    const TemplateArgumentList& tArgs = ctsd->getTemplateArgs();
 
    // We extract the template name from the type
-   TemplateName theTemplateName = ExtractTemplateNameFromQualType(normalizedType);
+   TemplateName theTemplateName;
+   ElaboratedTypeKeyword theKeyword = ElaboratedTypeKeyword::None;
+   ExtractTemplateNameFromQualType(normalizedType, theTemplateName, theKeyword);
    if (theTemplateName.isNull()) {
       normalizedType=originalNormalizedType;
       return;
@@ -4128,8 +4132,10 @@ static void KeepNParams(clang::QualType& normalizedType,
    // now, let's remanipulate our Qualtype
    if (mightHaveChanged) {
       Qualifiers qualifiers = normalizedType.getLocalQualifiers();
-      normalizedType = astCtxt.getTemplateSpecializationType(theTemplateName,
+      normalizedType = astCtxt.getTemplateSpecializationType(theKeyword,
+                                                             theTemplateName,
                                                              argsToKeep,
+                                                             /*CanonicalArgs=*/{},
                                                              normalizedType.getTypePtr()->getCanonicalTypeInternal());
       normalizedType = astCtxt.getQualifiedType(normalizedType, qualifiers);
    }
@@ -4993,8 +4999,10 @@ clang::QualType ROOT::TMetaUtils::ReSubstTemplateArg(clang::QualType input, cons
       // If desugaring happened allocate new type in the AST.
       if (mightHaveChanged) {
          clang::Qualifiers qualifiers = input.getLocalQualifiers();
-         input = astCtxt.getTemplateSpecializationType(inputTST->getTemplateName(),
+         input = astCtxt.getTemplateSpecializationType(inputTST->getKeyword(),
+                                                       inputTST->getTemplateName(),
                                                        desArgs,
+                                                       /*CanonicalArgs=*/{},
                                                        inputTST->getCanonicalTypeInternal());
          input = astCtxt.getQualifiedType(input, qualifiers);
       }

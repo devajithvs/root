@@ -1,0 +1,70 @@
+From 0288721e87f2b77e42674d765e70e2f0ee0f6fb1 Mon Sep 17 00:00:00 2001
+From: OverMighty <its.overmighty@gmail.com>
+Date: Fri, 8 Mar 2024 00:01:37 +0000
+Subject: [PATCH 05/12] Implement constexpr support for `__builtin_popcountg`
+ (#84318)
+
+(cherry picked from commit 487cfbe494413e12123b55dead5ef8742ef49fb2)
+---
+ interpreter/llvm-project/clang/docs/LanguageExtensions.rst   | 1 +
+ interpreter/llvm-project/clang/docs/ReleaseNotes.rst         | 5 +++++
+ .../llvm-project/clang/include/clang/Basic/Builtins.def      | 2 +-
+ interpreter/llvm-project/clang/lib/AST/ExprConstant.cpp      | 1 +
+ 4 files changed, 8 insertions(+), 1 deletion(-)
+
+diff --git a/interpreter/llvm-project/clang/docs/LanguageExtensions.rst b/interpreter/llvm-project/clang/docs/LanguageExtensions.rst
+index 1bd67c74f2e..4c20212914a 100644
+--- a/interpreter/llvm-project/clang/docs/LanguageExtensions.rst
++++ b/interpreter/llvm-project/clang/docs/LanguageExtensions.rst
+@@ -5351,6 +5351,7 @@ The following builtin intrinsics can be used in constant expressions:
+ * ``__builtin_popcount``
+ * ``__builtin_popcountl``
+ * ``__builtin_popcountll``
++* ``__builtin_popcountg``
+ * ``__builtin_rotateleft8``
+ * ``__builtin_rotateleft16``
+ * ``__builtin_rotateleft32``
+diff --git a/interpreter/llvm-project/clang/docs/ReleaseNotes.rst b/interpreter/llvm-project/clang/docs/ReleaseNotes.rst
+index e533ecfd5ae..37d702fb939 100644
+--- a/interpreter/llvm-project/clang/docs/ReleaseNotes.rst
++++ b/interpreter/llvm-project/clang/docs/ReleaseNotes.rst
+@@ -330,6 +330,11 @@ Non-comprehensive list of changes in this release
+   PGO instrumentation profile generation, and ``__LLVM_INSTR_PROFILE_USE`` when
+   compiling with PGO profile use.
+ 
++- Added ``__builtin_popcountg`` as a type-generic alternative to
++  ``__builtin_popcount{,l,ll}`` with support for any unsigned integer type. Like
++  the previous builtins, this new builtin is constexpr and may be used in
++  constant expressions.
++
+ New Compiler Flags
+ ------------------
+ 
+diff --git a/interpreter/llvm-project/clang/include/clang/Basic/Builtins.def b/interpreter/llvm-project/clang/include/clang/Basic/Builtins.def
+index b9f5c0e6d1f..22a6088f38f 100644
+--- a/interpreter/llvm-project/clang/include/clang/Basic/Builtins.def
++++ b/interpreter/llvm-project/clang/include/clang/Basic/Builtins.def
+@@ -530,7 +530,7 @@ BUILTIN(__builtin_parityll, "iULLi", "ncE")
+ BUILTIN(__builtin_popcount  , "iUi"  , "ncE")
+ BUILTIN(__builtin_popcountl , "iULi" , "ncE")
+ BUILTIN(__builtin_popcountll, "iULLi", "ncE")
+-BUILTIN(__builtin_popcountg , "i."  , "nct")
++BUILTIN(__builtin_popcountg , "i."  , "nctE")
+ BUILTIN(__builtin_clrsb  , "ii"  , "ncE")
+ BUILTIN(__builtin_clrsbl , "iLi" , "ncE")
+ BUILTIN(__builtin_clrsbll, "iLLi", "ncE")
+diff --git a/interpreter/llvm-project/clang/lib/AST/ExprConstant.cpp b/interpreter/llvm-project/clang/lib/AST/ExprConstant.cpp
+index edf9b5e2d52..2a056518d76 100644
+--- a/interpreter/llvm-project/clang/lib/AST/ExprConstant.cpp
++++ b/interpreter/llvm-project/clang/lib/AST/ExprConstant.cpp
+@@ -12461,6 +12461,7 @@ bool IntExprEvaluator::VisitBuiltinCallExpr(const CallExpr *E,
+   case Builtin::BI__builtin_popcount:
+   case Builtin::BI__builtin_popcountl:
+   case Builtin::BI__builtin_popcountll:
++  case Builtin::BI__builtin_popcountg:
+   case Builtin::BI__popcnt16: // Microsoft variants of popcount
+   case Builtin::BI__popcnt:
+   case Builtin::BI__popcnt64: {
+-- 
+2.43.0
+

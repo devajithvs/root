@@ -1,0 +1,142 @@
+From 194e82dda9ef67413197b332d5c3e3de725902a2 Mon Sep 17 00:00:00 2001
+From: OverMighty <its.overmighty@gmail.com>
+Date: Mon, 26 Feb 2024 21:59:42 +0000
+Subject: [PATCH 01/12] Implement __builtin_popcountg (#82359)
+
+Fixes #82058.
+
+(cherry picked from commit 21d83324fbdbd91de0115d48f3b55979f57807b7)
+---
+ .../clang/docs/LanguageExtensions.rst         | 31 +++++++++++++++++++
+ .../clang/include/clang/Basic/Builtins.def    |  1 +
+ .../clang/Basic/DiagnosticSemaKinds.td        |  3 +-
+ .../clang/lib/CodeGen/CGBuiltin.cpp           |  3 +-
+ .../clang/lib/Sema/SemaChecking.cpp           | 22 +++++++++++++
+ 5 files changed, 58 insertions(+), 2 deletions(-)
+
+diff --git a/interpreter/llvm-project/clang/docs/LanguageExtensions.rst b/interpreter/llvm-project/clang/docs/LanguageExtensions.rst
+index c1420079f75..a4654604213 100644
+--- a/interpreter/llvm-project/clang/docs/LanguageExtensions.rst
++++ b/interpreter/llvm-project/clang/docs/LanguageExtensions.rst
+@@ -3437,6 +3437,37 @@ builtin, the mangler emits their usual pattern without any special treatment.
+   // Computes a unique stable name for the given type.
+   constexpr const char * __builtin_sycl_unique_stable_name( type-id );
+ 
++``__builtin_popcountg``
++-----------------------
++
++``__builtin_popcountg`` returns the number of 1 bits in the argument. The
++argument can be of any integer type.
++
++**Syntax**:
++
++.. code-block:: c++
++
++  int __builtin_popcountg(type x)
++
++**Examples**:
++
++.. code-block:: c++
++
++  int x = 1;
++  int x_pop = __builtin_popcountg(x);
++
++  unsigned long y = 3;
++  int y_pop = __builtin_popcountg(y);
++
++  _BitInt(128) z = 7;
++  int z_pop = __builtin_popcountg(z);
++
++**Description**:
++
++``__builtin_popcountg`` is meant to be a type-generic alternative to the
++``__builtin_popcount{,l,ll}`` builtins, with support for other integer types,
++such as ``__int128`` and C23 ``_BitInt(N)``.
++
+ Multiprecision Arithmetic Builtins
+ ----------------------------------
+ 
+diff --git a/interpreter/llvm-project/clang/include/clang/Basic/Builtins.def b/interpreter/llvm-project/clang/include/clang/Basic/Builtins.def
+index 4dcbaf8a7be..f600bca3bd2 100644
+--- a/interpreter/llvm-project/clang/include/clang/Basic/Builtins.def
++++ b/interpreter/llvm-project/clang/include/clang/Basic/Builtins.def
+@@ -530,6 +530,7 @@ BUILTIN(__builtin_parityll, "iULLi", "ncE")
+ BUILTIN(__builtin_popcount  , "iUi"  , "ncE")
+ BUILTIN(__builtin_popcountl , "iULi" , "ncE")
+ BUILTIN(__builtin_popcountll, "iULLi", "ncE")
++BUILTIN(__builtin_popcountg  , "i."  , "nc")
+ BUILTIN(__builtin_clrsb  , "ii"  , "ncE")
+ BUILTIN(__builtin_clrsbl , "iLi" , "ncE")
+ BUILTIN(__builtin_clrsbll, "iLLi", "ncE")
+diff --git a/interpreter/llvm-project/clang/include/clang/Basic/DiagnosticSemaKinds.td b/interpreter/llvm-project/clang/include/clang/Basic/DiagnosticSemaKinds.td
+index ef8c111b1d8..1f0bc014476 100644
+--- a/interpreter/llvm-project/clang/include/clang/Basic/DiagnosticSemaKinds.td
++++ b/interpreter/llvm-project/clang/include/clang/Basic/DiagnosticSemaKinds.td
+@@ -11954,7 +11954,8 @@ def err_builtin_invalid_arg_type: Error <
+   "pointer to a valid matrix element type|"
+   "signed integer or floating point type|vector type|"
+   "floating point type|"
+-  "vector of integers}1 (was %2)">;
++  "vector of integers|"
++  "type of integer}1 (was %2)">;
+ 
+ def err_builtin_matrix_disabled: Error<
+   "matrix types extension is disabled. Pass -fenable-matrix to enable it">;
+diff --git a/interpreter/llvm-project/clang/lib/CodeGen/CGBuiltin.cpp b/interpreter/llvm-project/clang/lib/CodeGen/CGBuiltin.cpp
+index 44ddd2428b1..31b976a9484 100644
+--- a/interpreter/llvm-project/clang/lib/CodeGen/CGBuiltin.cpp
++++ b/interpreter/llvm-project/clang/lib/CodeGen/CGBuiltin.cpp
+@@ -3219,7 +3219,8 @@ RValue CodeGenFunction::EmitBuiltinExpr(const GlobalDecl GD, unsigned BuiltinID,
+   case Builtin::BI__popcnt64:
+   case Builtin::BI__builtin_popcount:
+   case Builtin::BI__builtin_popcountl:
+-  case Builtin::BI__builtin_popcountll: {
++  case Builtin::BI__builtin_popcountll:
++  case Builtin::BI__builtin_popcountg: {
+     Value *ArgValue = EmitScalarExpr(E->getArg(0));
+ 
+     llvm::Type *ArgType = ArgValue->getType();
+diff --git a/interpreter/llvm-project/clang/lib/Sema/SemaChecking.cpp b/interpreter/llvm-project/clang/lib/Sema/SemaChecking.cpp
+index 09b7e1c62fb..bb97b3dfef3 100644
+--- a/interpreter/llvm-project/clang/lib/Sema/SemaChecking.cpp
++++ b/interpreter/llvm-project/clang/lib/Sema/SemaChecking.cpp
+@@ -2143,6 +2143,23 @@ static bool checkFPMathBuiltinElementType(Sema &S, SourceLocation Loc,
+   return false;
+ }
+ 
++/// Checks that __builtin_popcountg was called with a single argument, which is
++/// an integer.
++static bool SemaBuiltinPopcountg(Sema &S, CallExpr *TheCall) {
++  if (checkArgCount(S, TheCall, 1))
++    return true;
++
++  Expr *Arg = TheCall->getArg(0);
++  QualType ArgTy = Arg->getType();
++
++  if (!ArgTy->isIntegerType()) {
++    S.Diag(Arg->getBeginLoc(), diag::err_builtin_invalid_arg_type)
++        << 1 << /*integer ty*/ 7 << ArgTy;
++    return true;
++  }
++  return false;
++}
++
+ ExprResult
+ Sema::CheckBuiltinFunctionCall(FunctionDecl *FDecl, unsigned BuiltinID,
+                                CallExpr *TheCall) {
+@@ -2900,7 +2917,12 @@ Sema::CheckBuiltinFunctionCall(FunctionDecl *FDecl, unsigned BuiltinID,
+            diag::err_hip_invalid_args_builtin_mangled_name);
+       return ExprError();
+     }
++    break;
+   }
++  case Builtin::BI__builtin_popcountg:
++    if (SemaBuiltinPopcountg(*this, TheCall))
++      return ExprError();
++    break;
+   }
+ 
+   // Since the target specific builtins for each arch overlap, only check those
+-- 
+2.43.0
+

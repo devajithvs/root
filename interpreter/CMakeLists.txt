@@ -205,6 +205,45 @@ if(builtin_llvm)
 
   set(LLVM_ENABLE_PROJECTS "clang" CACHE STRING "")
 
+  set(mac_beta_patches ON)
+  # A very hacky way to add patches to LLVM to get mac-beta to build with the latest update
+  if(mac_beta_patches)
+    set(MAC_BETA_PATCHES
+      patches/0001-Implement-__builtin_popcountg-82359.patch
+      patches/0002-Implement-__builtin_-clzg-ctzg-83431.patch
+      patches/0003-Implement-__is_nothrow_convertible-and-use-it-in-lib.patch
+      patches/0005-Implement-constexpr-support-for-__builtin_popcountg-.patch
+    )
+
+    message(STATUS "Applying mac-beta patches")
+    find_package(Git REQUIRED)
+    foreach(patch IN LISTS MAC_BETA_PATCHES)
+      set(patch_abs ${CMAKE_CURRENT_SOURCE_DIR}/${patch})
+      # Skip if already applied in a previous cmake run (FIXME: what if changes in subsequent commits caused a conflict?)
+      # Maybe a git checkout llvm-project?, but all the changes will be discarded.
+      execute_process(
+        COMMAND git apply --check ${patch_abs}
+        WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/llvm-project
+        RESULT_VARIABLE needs_apply
+        OUTPUT_QUIET ERROR_QUIET
+      )
+
+      if(needs_apply EQUAL 0)
+        message(STATUS "Applying mac-beta patch ${patch}")
+        execute_process(
+          COMMAND git apply ${patch_abs}
+          WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/llvm-project
+          RESULT_VARIABLE res
+        )
+
+        if(NOT res EQUAL 0)
+          message(FATAL_ERROR "Failed applying ${patch}")
+        endif()
+      endif()
+
+    endforeach()
+  endif()
+
   # Always build LLVM with C++17. It is not necessary to compile with the same
   # C++ standard as the rest of ROOT and sometimes it doesn't even work.
   set(_cxx_standard ${CMAKE_CXX_STANDARD})

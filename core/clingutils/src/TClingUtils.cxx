@@ -1607,12 +1607,6 @@ bool ROOT::TMetaUtils::hasOpaqueTypedef(clang::QualType instanceType, const ROOT
       instanceType = instanceType->getPointeeType();
    }
 
-   const clang::ElaboratedType* etype
-      = llvm::dyn_cast<clang::ElaboratedType>(instanceType.getTypePtr());
-   if (etype) {
-      instanceType = clang::QualType(etype->getNamedType().getTypePtr(),0);
-   }
-
    // There is no typedef to worried about, except for the opaque ones.
 
    // Technically we should probably used our own list with just
@@ -3060,14 +3054,6 @@ clang::QualType ROOT::TMetaUtils::AddDefaultParameters(clang::QualType instanceT
    bool prefix_changed = false;
    clang::NestedNameSpecifier prefix = std::nullopt;
    clang::Qualifiers prefix_qualifiers = instanceType.getLocalQualifiers();
-   const clang::ElaboratedType* etype
-      = llvm::dyn_cast<clang::ElaboratedType>(instanceType.getTypePtr());
-   if (etype) {
-      // We have to also handle the prefix.
-      prefix = AddDefaultParametersNNS(Ctx, etype->getQualifier(), interpreter, normCtxt);
-      prefix_changed = prefix != etype->getQualifier();
-      instanceType = clang::QualType(etype->getNamedType().getTypePtr(),0);
-   }
 
    // In case of template specializations iterate over the arguments and
    // add unspecified default parameter.
@@ -3226,7 +3212,6 @@ clang::QualType ROOT::TMetaUtils::AddDefaultParameters(clang::QualType instanceT
 
    if (!prefix_changed && !mightHaveChanged) return originalType;
    if (prefix) {
-      instanceType = Ctx.getElaboratedType(clang::ElaboratedTypeKeyword::None, prefix, instanceType);
       instanceType = Ctx.getQualifiedType(instanceType,prefix_qualifiers);
    }
    return instanceType;
@@ -3761,13 +3746,6 @@ static bool areEqualTypes(const clang::TemplateArgument& tArg,
 
    // Take the template out of the parameter
 
-   const clang::ElaboratedType* etype
-      = llvm::dyn_cast<clang::ElaboratedType>(tParQualType.getTypePtr());
-   while (etype) {
-      tParQualType = clang::QualType(etype->getNamedType().getTypePtr(),0);
-      etype = llvm::dyn_cast<clang::ElaboratedType>(tParQualType.getTypePtr());
-   }
-
    const TemplateSpecializationType* tst =
             llvm::dyn_cast<TemplateSpecializationType>(tParQualType.getTypePtr());
 
@@ -3986,15 +3964,6 @@ static void KeepNParams(clang::QualType& normalizedType,
    bool prefix_changed = false;
    clang::NestedNameSpecifier prefix = std::nullopt;
    clang::Qualifiers prefix_qualifiers = normalizedType.getLocalQualifiers();
-   const clang::ElaboratedType* etype
-      = llvm::dyn_cast<clang::ElaboratedType>(normalizedType.getTypePtr());
-   if (etype) {
-      // We have to also handle the prefix.
-      // TODO: we ought to be running KeepNParams
-      prefix = AddDefaultParametersNNS(astCtxt, etype->getQualifier(), interp, normCtxt);
-      prefix_changed = prefix != etype->getQualifier();
-      normalizedType = clang::QualType(etype->getNamedType().getTypePtr(),0);
-   }
 
    // The canonical decl does not necessarily have the template default arguments.
    // Need to walk through the redecl chain to find it (we know there will be no
@@ -4142,7 +4111,6 @@ static void KeepNParams(clang::QualType& normalizedType,
    // Here we have (prefix_changed==true || mightHaveChanged), in both case
    // we need to reconstruct the type.
    if (prefix) {
-      normalizedType = astCtxt.getElaboratedType(clang::ElaboratedTypeKeyword::None, prefix, normalizedType);
       normalizedType = astCtxt.getQualifiedType(normalizedType,prefix_qualifiers);
    }
 
@@ -4730,17 +4698,6 @@ static bool hasSomeTypedefSomewhere(const clang::Type* T) {
     bool VisitTypeOfType(const TypeOfType* TOT) {
       return TOT->getUnmodifiedType().getTypePtr();
     }
-    bool VisitElaboratedType(const ElaboratedType* ET) {
-      NestedNameSpecifier NNS = ET->getQualifier();
-      while (NNS) {
-        if (NNS.getKind() == NestedNameSpecifier::Kind::Type) {
-          if (Visit(NNS.getAsType()))
-            return true;
-        }
-        NNS = NNS.getAsNamespaceAndPrefix().Prefix;
-      }
-      return Visit(ET->getNamedType().getTypePtr());
-    }
   };
 
   SearchTypedef ST;
@@ -4763,24 +4720,6 @@ clang::QualType ROOT::TMetaUtils::ReSubstTemplateArg(clang::QualType input, cons
    using namespace llvm;
    using namespace clang;
    const clang::ASTContext &Ctxt = instance->getAsCXXRecordDecl()->getASTContext();
-
-   // Treat scope (clang::ElaboratedType) if any.
-   const clang::ElaboratedType* etype
-      = llvm::dyn_cast<clang::ElaboratedType>(input.getTypePtr());
-   if (etype) {
-      // We have to also handle the prefix.
-
-      clang::Qualifiers scope_qualifiers = input.getLocalQualifiers();
-      assert(instance->getAsCXXRecordDecl() != nullptr && "ReSubstTemplateArg only makes sense with a type representing a class.");
-
-      clang::NestedNameSpecifier scope = ReSubstTemplateArgNNS(Ctxt,etype->getQualifier(),instance);
-      clang::QualType subTy = ReSubstTemplateArg(clang::QualType(etype->getNamedType().getTypePtr(),0),instance);
-
-      if (scope.getKind() != clang::NestedNameSpecifier::Kind::Null)
-         subTy = Ctxt.getElaboratedType(clang::ElaboratedTypeKeyword::None, scope, subTy);
-      subTy = Ctxt.getQualifiedType(subTy,scope_qualifiers);
-      return subTy;
-   }
 
    QualType QT = input;
 
@@ -4865,13 +4804,6 @@ clang::QualType ROOT::TMetaUtils::ReSubstTemplateArg(clang::QualType input, cons
       // Add back the qualifiers.
       QT = Ctxt.getQualifiedType(QT, quals);
       return QT;
-   }
-
-   // If the instance is also an elaborated type, we need to skip
-   etype = llvm::dyn_cast<clang::ElaboratedType>(instance);
-   if (etype) {
-      instance = etype->getNamedType().getTypePtr();
-      if (!instance) return input;
    }
 
    const clang::TemplateSpecializationType* TST
@@ -4983,8 +4915,7 @@ clang::QualType ROOT::TMetaUtils::ReSubstTemplateArg(clang::QualType input, cons
 
          clang::QualType SubTy = TA.getAsType();
          // Check if the type needs more desugaring and recurse.
-         if (llvm::isa<clang::ElaboratedType>(SubTy)
-             || llvm::isa<clang::SubstTemplateTypeParmType>(SubTy)
+         if (llvm::isa<clang::SubstTemplateTypeParmType>(SubTy)
              || llvm::isa<clang::TemplateSpecializationType>(SubTy)) {
             clang::QualType newSubTy = ReSubstTemplateArg(SubTy,instance);
             mightHaveChanged = SubTy != newSubTy;

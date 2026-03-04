@@ -666,15 +666,7 @@ namespace cling {
                 // Type name qualified with "template".
                 // Note: Do we need to check for a dependent type here?
                 NestedNameSpecifier prefix = NNS.getAsNamespaceAndPrefix().Prefix;
-                if (prefix.getKind() != clang::NestedNameSpecifier::Kind::Null) {
-                  QualType temp =
-                      Context.getElaboratedType(ElaboratedTypeKeyword::None,
-                                                prefix,
-                                                QualType(NNS.getAsType(), 0));
-                  *setResultType = temp.getTypePtr();
-                } else {
-                   *setResultType = NNS.getAsType();
-                }
+                *setResultType = NNS.getAsType();
                 if (const TagDecl *TD = (*setResultType)->getAsTagDecl()) {
                   // It is a class, struct, or union.
                     TheDecl = TD->getDefinition();

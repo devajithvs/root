@@ -647,8 +647,8 @@ namespace cling {
                                              P.getCurToken().getAnnotationRange(),
                                              SS);
       if (SS.isValid()) {
-        NestedNameSpecifier* NNS = SS.getScopeRep();
-        NestedNameSpecifier::SpecifierKind Kind = NNS->getKind();
+        NestedNameSpecifier NNS = SS.getScopeRep();
+        NestedNameSpecifier::Kind Kind = NNS.getKind();
         // Only accept the parse if we consumed all of the name.
         if (P.NextToken().getKind() == clang::tok::annot_repl_input_end) {
           //
@@ -656,42 +656,24 @@ namespace cling {
           //  and namespaces, and those are the only things we want.
           //
           switch (Kind) {
-            case NestedNameSpecifier::Identifier: {
-                // Dependent type.
-                // We do not accept these.
-              }
-              break;
-            case NestedNameSpecifier::Namespace: {
+            case NestedNameSpecifier::Kind::Namespace: {
                 // Namespace.
-                NamespaceDecl* NSD = NNS->getAsNamespace();
-                NSD = NSD->getCanonicalDecl();
-                TheDecl = NSD;
+                auto [NSD, prefix] = NNS.getAsNamespaceAndPrefix();
+                TheDecl = NSD->getCanonicalDecl();
               }
               break;
-            case NestedNameSpecifier::NamespaceAlias: {
-                // Namespace alias.
-                // Note: In the future, should we return the alias instead?
-                NamespaceAliasDecl* NSAD = NNS->getAsNamespaceAlias();
-                NamespaceDecl* NSD = NSAD->getNamespace();
-                NSD = NSD->getCanonicalDecl();
-                TheDecl = NSD;
-              }
-              break;
-            case NestedNameSpecifier::TypeSpec:
-                // Type name.
-                // Intentional fall-though
-            case NestedNameSpecifier::TypeSpecWithTemplate: {
+            case  NestedNameSpecifier::Kind::Type: {
                 // Type name qualified with "template".
                 // Note: Do we need to check for a dependent type here?
-                NestedNameSpecifier *prefix = NNS->getPrefix();
-                if (prefix) {
+                NestedNameSpecifier prefix = NNS.getAsNamespaceAndPrefix().Prefix;
+                if (prefix.getKind() != clang::NestedNameSpecifier::Kind::Null) {
                   QualType temp =
                       Context.getElaboratedType(ElaboratedTypeKeyword::None,
                                                 prefix,
-                                                QualType(NNS->getAsType(), 0));
+                                                QualType(NNS.getAsType(), 0));
                   *setResultType = temp.getTypePtr();
                 } else {
-                   *setResultType = NNS->getAsType();
+                   *setResultType = NNS.getAsType();
                 }
                 if (const TagDecl *TD = (*setResultType)->getAsTagDecl()) {
                   // It is a class, struct, or union.
@@ -731,12 +713,12 @@ namespace cling {
                 }
               }
               break;
-            case clang::NestedNameSpecifier::Global: {
+            case clang::NestedNameSpecifier::Kind::Global: {
                 // Name was just "::" and nothing more.
                 TheDecl = Context.getTranslationUnitDecl();
               }
               break;
-          case NestedNameSpecifier::Super:
+          case NestedNameSpecifier::Kind::MicrosoftSuper:
             // Microsoft's __super::
             return 0;
           }
@@ -838,27 +820,23 @@ namespace cling {
         if (!P.getCurToken().is(clang::tok::identifier)) {
           return 0;
         }
-        NestedNameSpecifier *nested = SS.getScopeRep();
+        NestedNameSpecifier nested = SS.getScopeRep();
         if (!nested) return 0;
-        switch (nested->getKind()) {
-        case NestedNameSpecifier::Global:
+        switch (nested.getKind()) {
+        case NestedNameSpecifier::Kind::Global:
           where = Context.getTranslationUnitDecl();
           break;
-        case NestedNameSpecifier::Namespace:
-          where = nested->getAsNamespace();
+        case NestedNameSpecifier::Kind::Namespace:
+          where = const_cast<clang::DeclContext*>(nested.getAsNamespaceAndPrefix().Namespace);
           break;
-        case NestedNameSpecifier::NamespaceAlias:
-        case NestedNameSpecifier::Identifier:
-           return 0;
-        case NestedNameSpecifier::TypeSpec:
-        case NestedNameSpecifier::TypeSpecWithTemplate:
+        case NestedNameSpecifier::Kind::Type:
           {
-            const Type *ntype = nested->getAsType();
+            const Type *ntype = nested.getAsType();
             where = ntype->getAsCXXRecordDecl();
             if (!where) return 0;
             break;
           }
-        case NestedNameSpecifier::Super:
+        case NestedNameSpecifier::Kind::MicrosoftSuper:
           // Microsoft's __super::
           return 0;
         };
@@ -952,16 +930,15 @@ namespace cling {
     //  Convert the passed decl into a nested name specifier,
     //  a scope spec, and a decl context.
     //
-    NestedNameSpecifier* classNNS = 0;
+    NestedNameSpecifier classNNS = std::nullopt;
     if (const NamespaceDecl* NSD = dyn_cast<NamespaceDecl>(scopeDecl)) {
-      classNNS = NestedNameSpecifier::Create(Context, 0,
-                                             const_cast<NamespaceDecl*>(NSD));
+      classNNS = NestedNameSpecifier(Context, const_cast<NamespaceDecl*>(NSD), std::nullopt);
       SS.MakeTrivial(Context, classNNS, scopeDecl->getSourceRange());
       return foundDC;
     }
     else if (const RecordDecl* RD = dyn_cast<RecordDecl>(scopeDecl)) {
       const Type* T = Context.getCanonicalTagType(RD).getTypePtr();
-      classNNS = NestedNameSpecifier::Create(Context, 0, false, T);
+      classNNS = NestedNameSpecifier(T);
       // We pass a 'random' but valid source range.
       SS.MakeTrivial(Context, classNNS, scopeDecl->getSourceRange());
       if (S.RequireCompleteDeclContext(SS, foundDC)) {
@@ -1009,7 +986,7 @@ namespace cling {
       } else {
         //const Type* T = Context.getRecordType(RD).getTypePtr();
         const Type* T = Context.getCanonicalTagType(RD).getTypePtr();
-        NestedNameSpecifier* classNNS = NestedNameSpecifier::Create(Context, 0, false, T);
+        NestedNameSpecifier classNNS = NestedNameSpecifier(T);
         // We pass a 'random' but valid source range.
         CXXScopeSpec SS;
         SS.MakeTrivial(Context, classNNS, scopeDecl->getSourceRange());
@@ -1479,23 +1456,21 @@ namespace cling {
     bool LookupSuccess = true;
     if (FuncTemplateArgsBuffer.size()) {
       // It's a template. Calculate the NNS and do qualified template lookup.
-      NestedNameSpecifier* scopeNNS = nullptr;
+      NestedNameSpecifier scopeNNS = std::nullopt;
       SourceRange scopeSrcRange;
       if (isa<TranslationUnitDecl>(foundDC)) {
         scopeNNS = NestedNameSpecifier::GlobalSpecifier(Context);
       } else if (const auto *foundNS = dyn_cast<NamespaceDecl>(foundDC)) {
-        scopeNNS = NestedNameSpecifier::Create(Context, /*NNSPrefix*/ nullptr,
-                                               foundNS);
+        scopeNNS = NestedNameSpecifier(Context, foundNS, /*NNSPrefix*/ std::nullopt);
         scopeSrcRange = foundNS->getSourceRange();
       } else if (const auto *foundRD = dyn_cast<RecordDecl>(foundDC)) {
         // a type
         const Type* foundTy = Context.getTypeDeclType(foundRD).getTypePtr();
-        scopeNNS = NestedNameSpecifier::Create(Context, /*NNSPrefix*/ nullptr,
-                                               /*Template*/ false, foundTy);
+        scopeNNS = NestedNameSpecifier(foundTy);
         scopeSrcRange = foundRD->getSourceRange();
       }
       CXXScopeSpec SS;
-      if (scopeNNS)
+      if (scopeNNS.getKind() != clang::NestedNameSpecifier::Kind::Null)
         SS.MakeTrivial(Context, scopeNNS, scopeSrcRange);
       S.LookupTemplateName(Result, P.getCurScope(), SS, QualType(),
                            /*EnteringContext*/false);

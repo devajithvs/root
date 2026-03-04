@@ -121,8 +121,8 @@ namespace utils {
                                          bool fullyQualifyTmpltArg);
 
   static
-  NestedNameSpecifier* GetPartiallyDesugaredNNS(const ASTContext& Ctx,
-                                                NestedNameSpecifier* scope,
+  NestedNameSpecifier GetPartiallyDesugaredNNS(const ASTContext& Ctx,
+                                                NestedNameSpecifier scope,
                                            const Transform::Config& TypeConfig);
 
   bool Analyze::IsWrapper(const FunctionDecl* ND) {
@@ -257,12 +257,12 @@ namespace utils {
   }
 
   static
-  NestedNameSpecifier* SelectPrefix(const ASTContext& Ctx,
+  NestedNameSpecifier SelectPrefix(const ASTContext& Ctx,
                                     const DeclContext *declContext,
-                                    NestedNameSpecifier *original_prefix,
+                                    NestedNameSpecifier original_prefix,
                              const Transform::Config& TypeConfig) {
     // We have to also desugar the prefix.
-    NestedNameSpecifier* prefix = nullptr;
+    NestedNameSpecifier prefix = std::nullopt;
     if (declContext) {
       // We had a scope prefix as input, let see if it is still
       // the same as the scope of the result and if it is, then
@@ -273,13 +273,10 @@ namespace utils {
         const NamespaceDecl *new_ns =dyn_cast<NamespaceDecl>(declContext);
         if (new_ns) {
           new_ns = new_ns->getCanonicalDecl();
-          NamespaceDecl *old_ns = nullptr;
+          const NamespaceDecl *old_ns = nullptr;
           if (original_prefix) {
-            original_prefix->getAsNamespace();
-            if (NamespaceAliasDecl *alias =
-                     original_prefix->getAsNamespaceAlias())
             {
-              old_ns = alias->getNamespace()->getCanonicalDecl();
+              old_ns = original_prefix.getAsNamespaceAndPrefix().Namespace->getNamespace();
             }
           }
           if (old_ns == new_ns) {
@@ -293,9 +290,9 @@ namespace utils {
         }
       } else {
         const CXXRecordDecl* newtype=dyn_cast<CXXRecordDecl>(declContext);
-        if (newtype && original_prefix) {
+        if (newtype && original_prefix.getKind() != clang::NestedNameSpecifier::Kind::Null) {
           // Deal with a class
-          const Type *oldtype = original_prefix->getAsType();
+          const Type *oldtype = original_prefix.getAsType();
           if (oldtype &&
               // NOTE: Should we compare the RecordDecl instead?
               oldtype->getAsCXXRecordDecl() == newtype)
@@ -328,21 +325,21 @@ namespace utils {
   }
 
   static
-  NestedNameSpecifier* SelectPrefix(const ASTContext& Ctx,
+  NestedNameSpecifier SelectPrefix(const ASTContext& Ctx,
                                     const ElaboratedType *etype,
-                                    NestedNameSpecifier *original_prefix,
+                                    NestedNameSpecifier original_prefix,
                              const Transform::Config& TypeConfig) {
     // We have to also desugar the prefix.
 
-    NestedNameSpecifier* prefix = etype->getQualifier();
-    if (original_prefix && prefix) {
+    NestedNameSpecifier prefix = etype->getQualifier();
+    if (original_prefix.getKind() != clang::NestedNameSpecifier::Kind::Null && prefix.getKind() != clang::NestedNameSpecifier::Kind::Null) {
       // We had a scope prefix as input, let see if it is still
       // the same as the scope of the result and if it is, then
       // we use it.
-      const Type *newtype = prefix->getAsType();
+      const Type *newtype = prefix.getAsType();
       if (newtype) {
         // Deal with a class
-        const Type *oldtype = original_prefix->getAsType();
+        const Type *oldtype = original_prefix.getAsType();
         if (oldtype &&
             // NOTE: Should we compare the RecordDecl instead?
             oldtype->getAsCXXRecordDecl() == newtype->getAsCXXRecordDecl())
@@ -356,23 +353,14 @@ namespace utils {
       } else {
         // Deal with namespace.  This is mostly about dealing with
         // namespace aliases (i.e. keeping the one the user used).
-        const NamespaceDecl *new_ns = prefix->getAsNamespace();
+        const NamespaceDecl *new_ns = prefix.getAsNamespaceAndPrefix().Namespace->getNamespace();
         if (new_ns) {
           new_ns = new_ns->getCanonicalDecl();
         }
-        else if (NamespaceAliasDecl *alias = prefix->getAsNamespaceAlias() )
-        {
-          new_ns = alias->getNamespace()->getCanonicalDecl();
-        }
         if (new_ns) {
-          const NamespaceDecl *old_ns = original_prefix->getAsNamespace();
+          const NamespaceDecl *old_ns = original_prefix.getAsNamespaceAndPrefix().Namespace->getNamespace();
           if (old_ns) {
             old_ns = old_ns->getCanonicalDecl();
-          }
-          else if (NamespaceAliasDecl *alias =
-                   original_prefix->getAsNamespaceAlias())
-          {
-            old_ns = alias->getNamespace()->getCanonicalDecl();
           }
           if (old_ns == new_ns) {
             // This is the same namespace, use the original prefix
@@ -391,12 +379,12 @@ namespace utils {
 
 
   static
-  NestedNameSpecifier* GetPartiallyDesugaredNNS(const ASTContext& Ctx,
-                                                NestedNameSpecifier* scope,
+  NestedNameSpecifier GetPartiallyDesugaredNNS(const ASTContext& Ctx,
+                                                NestedNameSpecifier scope,
                                           const Transform::Config& TypeConfig) {
     // Desugar the scope qualifier if needed.
 
-    if (const Type* scope_type = scope->getAsType()) {
+    if (const Type* scope_type = scope.getAsType()) {
 
       // this is not a namespace, so we might need to desugar
       QualType desugared = GetPartiallyDesugaredTypeImpl(Ctx,
@@ -405,7 +393,7 @@ namespace utils {
                                                          /*qualifyType=*/false,
                                                       /*qualifyTmpltArg=*/true);
 
-      NestedNameSpecifier* outer_scope = scope->getPrefix();
+      NestedNameSpecifier outer_scope = scope.getAsNamespaceAndPrefix().Prefix;
       const ElaboratedType* etype
          = dyn_cast<ElaboratedType>(desugared.getTypePtr());
       if (etype) {
@@ -451,15 +439,13 @@ namespace utils {
             outer_scope = SelectPrefix(Ctx,decl->getDeclContext(),
                                        outer_scope,TypeConfig);
           } else {
-            outer_scope = nullptr;
+            outer_scope = std::nullopt;
           }
         } else if (outer_scope) {
           outer_scope = GetPartiallyDesugaredNNS(Ctx, outer_scope, TypeConfig);
         }
       }
-      return NestedNameSpecifier::Create(Ctx,outer_scope,
-                                         false /* template keyword wanted */,
-                                         desugared.getTypePtr());
+      return NestedNameSpecifier(desugared.getTypePtr());
     } else {
       return  GetFullyQualifiedNameSpecifier(Ctx,scope);
     }
@@ -925,7 +911,7 @@ namespace utils {
     // NOTE: however we problably want to add the std::vector typedefs
     // to the list of things to skip!
 
-    NestedNameSpecifier* original_prefix = nullptr;
+    NestedNameSpecifier original_prefix = std::nullopt;
     Qualifiers prefix_qualifiers;
     const ElaboratedType* etype_input
       = dyn_cast<ElaboratedType>(QT.getTypePtr());
@@ -935,7 +921,7 @@ namespace utils {
       // desugaring (and/or name normaliztation) is to remove it.
       original_prefix = etype_input->getQualifier();
       if (original_prefix) {
-        const NamespaceDecl *ns = original_prefix->getAsNamespace();
+        const NamespaceDecl *ns = original_prefix.getAsNamespaceAndPrefix().Namespace->getNamespace();;
         if (!(ns && ns->isAnonymousNamespace())) {
           // We have to also desugar the prefix unless
           // it does not have a name (anonymous namespaces).
@@ -943,7 +929,7 @@ namespace utils {
           prefix_qualifiers = QT.getLocalQualifiers();
           QT = QualType(etype_input->getNamedType().getTypePtr(),0);
         } else {
-          original_prefix = nullptr;
+          original_prefix = std::nullopt;
         }
       }
     }
@@ -988,7 +974,7 @@ namespace utils {
                                            fullyQualifyTmpltArg);
     }
 
-    NestedNameSpecifier* prefix = nullptr;
+    NestedNameSpecifier prefix = std::nullopt;
     const ElaboratedType* etype
       = dyn_cast<ElaboratedType>(QT.getTypePtr());
     if (etype) {
@@ -1030,7 +1016,7 @@ namespace utils {
             && !(outer_ns && outer_ns->isAnonymousNamespace())
             && !outer->getNameAsString().empty() ) {
           if (original_prefix) {
-            const Type *oldtype = original_prefix->getAsType();
+            const Type *oldtype = original_prefix.getAsType();
             if (oldtype) {
               if (oldtype->getAsCXXRecordDecl() == outer) {
                 // Same type, use the original spelling
@@ -1039,14 +1025,9 @@ namespace utils {
                 outer = nullptr; // Cancel the later creation.
               }
             } else {
-              const NamespaceDecl *old_ns = original_prefix->getAsNamespace();
+              const NamespaceDecl *old_ns = original_prefix.getAsNamespaceAndPrefix().Namespace->getNamespace();
               if (old_ns) {
                 old_ns = old_ns->getCanonicalDecl();
-              }
-              else if (NamespaceAliasDecl *alias =
-                       original_prefix->getAsNamespaceAlias())
-              {
-                old_ns = alias->getNamespace()->getCanonicalDecl();
               }
               const NamespaceDecl *new_ns = dyn_cast<NamespaceDecl>(outer);
               if (new_ns) new_ns = new_ns->getCanonicalDecl();

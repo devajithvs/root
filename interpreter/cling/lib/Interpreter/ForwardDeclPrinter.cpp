@@ -1297,22 +1297,23 @@ namespace cling {
   }
 
   void ForwardDeclPrinter::VisitNestedNameSpecifier(
-                                        const clang::NestedNameSpecifier* NNS) {
-    if (const clang::NestedNameSpecifier* Prefix = NNS->getPrefix())
-      VisitNestedNameSpecifier(Prefix);
+                                        const clang::NestedNameSpecifier NNS) {
 
-    switch (NNS->getKind()) {
-    case clang::NestedNameSpecifier::Namespace:
-      Visit(NNS->getAsNamespace());
+    auto [ns, prefix] = NNS.getAsNamespaceAndPrefix();
+    if (prefix)
+      VisitNestedNameSpecifier(prefix);
+
+    switch (NNS.getKind()) {
+    case clang::NestedNameSpecifier::Kind::Namespace:
+      Visit(ns->getNamespace());
       break;
-    case clang::NestedNameSpecifier::TypeSpec: // fall-through:
-    case clang::NestedNameSpecifier::TypeSpecWithTemplate:
+    case clang::NestedNameSpecifier::Kind::Type: // fall-through:
       // We cannot fwd declare nested types.
       skipDecl(nullptr, "NestedNameSpec TypeSpec/TypeSpecWithTemplate");
       break;
     default:
       Log() << "VisitNestedNameSpecifier: Unexpected kind "
-            << NNS->getKind() << '\n';
+            << NNS.getKind() << '\n';
       skipDecl(nullptr, nullptr);
       break;
    };

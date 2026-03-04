@@ -110,16 +110,18 @@ namespace {
 ////////////////////////////////////////////////////////////////////////////////
 /// Add default parameter to the scope if needed.
 
-static clang::NestedNameSpecifier *AddDefaultParametersNNS(const clang::ASTContext& Ctx,
-                                                           clang::NestedNameSpecifier* scope,
+static clang::NestedNameSpecifier AddDefaultParametersNNS(const clang::ASTContext& Ctx,
+                                                           clang::NestedNameSpecifier scope,
                                                            const cling::Interpreter &interpreter,
                                                            const ROOT::TMetaUtils::TNormalizedCtxt &normCtxt) {
-   if (!scope) return nullptr;
 
-   const clang::Type* scope_type = scope->getAsType();
+   auto Kind = scope.getKind();
+   if (Kind == clang::NestedNameSpecifier::Kind::Null) return std::nullopt;
+
+   const clang::Type* scope_type = scope.getAsType();
    if (scope_type) {
       // this is not a namespace, so we might need to desugar
-      clang::NestedNameSpecifier* outer_scope = scope->getPrefix();
+      clang::NestedNameSpecifier outer_scope = scope.getAsNamespaceAndPrefix().Prefix;
       if (outer_scope) {
          outer_scope = AddDefaultParametersNNS(Ctx, outer_scope, interpreter, normCtxt);
       }
@@ -128,9 +130,7 @@ static clang::NestedNameSpecifier *AddDefaultParametersNNS(const clang::ASTConte
          ROOT::TMetaUtils::AddDefaultParameters(clang::QualType(scope_type,0), interpreter, normCtxt );
       // NOTE: Should check whether the type has changed or not.
       if (addDefault.getTypePtr() != scope_type)
-         return clang::NestedNameSpecifier::Create(Ctx,outer_scope,
-                                                   false /* template keyword wanted */,
-                                                   addDefault.getTypePtr());
+         return clang::NestedNameSpecifier(addDefault.getTypePtr());
    }
    return scope;
 }
@@ -159,24 +159,23 @@ static bool CheckDefinition(const clang::CXXRecordDecl *cl, const clang::CXXReco
 /// instantiating the class template instance and replace it with the
 /// partially sugared types we have from 'instance'.
 
-static clang::NestedNameSpecifier *ReSubstTemplateArgNNS(const clang::ASTContext &Ctxt,
-                                                         clang::NestedNameSpecifier *scope,
+static clang::NestedNameSpecifier ReSubstTemplateArgNNS(const clang::ASTContext &Ctxt,
+                                                         clang::NestedNameSpecifier scope,
                                                          const clang::Type *instance)
 {
-   if (!scope) return nullptr;
+   auto Kind = scope.getKind();
+   if (Kind == clang::NestedNameSpecifier::Kind::Null) return std::nullopt;
 
-   const clang::Type* scope_type = scope->getAsType();
+   const clang::Type* scope_type = scope.getAsType();
    if (scope_type) {
-      clang::NestedNameSpecifier* outer_scope = scope->getPrefix();
+      clang::NestedNameSpecifier outer_scope = scope.getAsNamespaceAndPrefix().Prefix;
       if (outer_scope) {
          outer_scope = ReSubstTemplateArgNNS(Ctxt, outer_scope, instance);
       }
       clang::QualType substScope =
          ROOT::TMetaUtils::ReSubstTemplateArg(clang::QualType(scope_type,0), instance);
       // NOTE: Should check whether the type has changed or not.
-      scope = clang::NestedNameSpecifier::Create(Ctxt,outer_scope,
-                                                 false /* template keyword wanted */,
-                                                 substScope.getTypePtr());
+      scope = clang::NestedNameSpecifier(substScope.getTypePtr());
    }
    return scope;
 }
@@ -3059,7 +3058,7 @@ clang::QualType ROOT::TMetaUtils::AddDefaultParameters(clang::QualType instanceT
 
    // Treat the Scope.
    bool prefix_changed = false;
-   clang::NestedNameSpecifier *prefix = nullptr;
+   clang::NestedNameSpecifier prefix = std::nullopt;
    clang::Qualifiers prefix_qualifiers = instanceType.getLocalQualifiers();
    const clang::ElaboratedType* etype
       = llvm::dyn_cast<clang::ElaboratedType>(instanceType.getTypePtr());
@@ -3124,7 +3123,7 @@ clang::QualType ROOT::TMetaUtils::AddDefaultParameters(clang::QualType instanceT
 
                   if (declCtxt && !templateName.getAsQualifiedTemplateName()){
                      clang::NamespaceDecl* ns = clang::dyn_cast<clang::NamespaceDecl>(declCtxt);
-                     clang::NestedNameSpecifier* nns;
+                     clang::NestedNameSpecifier nns;
                      if (ns) {
                         nns = cling::utils::TypeName::CreateNestedNameSpecifier(Ctx, ns);
                      } else if (clang::TagDecl* TD = llvm::dyn_cast<clang::TagDecl>(declCtxt)) {
@@ -3985,7 +3984,7 @@ static void KeepNParams(clang::QualType& normalizedType,
 
    // Treat the Scope (factorise the code out to reuse it in AddDefaultParameters)
    bool prefix_changed = false;
-   clang::NestedNameSpecifier* prefix = nullptr;
+   clang::NestedNameSpecifier prefix = std::nullopt;
    clang::Qualifiers prefix_qualifiers = normalizedType.getLocalQualifiers();
    const clang::ElaboratedType* etype
       = llvm::dyn_cast<clang::ElaboratedType>(normalizedType.getTypePtr());
@@ -4732,13 +4731,13 @@ static bool hasSomeTypedefSomewhere(const clang::Type* T) {
       return TOT->getUnmodifiedType().getTypePtr();
     }
     bool VisitElaboratedType(const ElaboratedType* ET) {
-      NestedNameSpecifier* NNS = ET->getQualifier();
+      NestedNameSpecifier NNS = ET->getQualifier();
       while (NNS) {
-        if (NNS->getKind() == NestedNameSpecifier::TypeSpec) {
-          if (Visit(NNS->getAsType()))
+        if (NNS.getKind() == NestedNameSpecifier::Kind::Type) {
+          if (Visit(NNS.getAsType()))
             return true;
         }
-        NNS = NNS->getPrefix();
+        NNS = NNS.getAsNamespaceAndPrefix().Prefix;
       }
       return Visit(ET->getNamedType().getTypePtr());
     }
@@ -4774,10 +4773,10 @@ clang::QualType ROOT::TMetaUtils::ReSubstTemplateArg(clang::QualType input, cons
       clang::Qualifiers scope_qualifiers = input.getLocalQualifiers();
       assert(instance->getAsCXXRecordDecl() != nullptr && "ReSubstTemplateArg only makes sense with a type representing a class.");
 
-      clang::NestedNameSpecifier *scope = ReSubstTemplateArgNNS(Ctxt,etype->getQualifier(),instance);
+      clang::NestedNameSpecifier scope = ReSubstTemplateArgNNS(Ctxt,etype->getQualifier(),instance);
       clang::QualType subTy = ReSubstTemplateArg(clang::QualType(etype->getNamedType().getTypePtr(),0),instance);
 
-      if (scope)
+      if (scope.getKind() != clang::NestedNameSpecifier::Kind::Null)
          subTy = Ctxt.getElaboratedType(clang::ElaboratedTypeKeyword::None, scope, subTy);
       subTy = Ctxt.getQualifiedType(subTy,scope_qualifiers);
       return subTy;

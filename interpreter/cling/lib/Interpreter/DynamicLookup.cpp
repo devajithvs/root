@@ -58,8 +58,8 @@ namespace {
         // Exclude the artificially dependent DeclRefExprs, created by the
         // Lookup
         if (!Node->isTypeDependent()) {
-          if (NestedNameSpecifier* Qualifier = Node->getQualifier())
-            Qualifier->print(OS, m_Policy);
+          if (NestedNameSpecifier Qualifier = Node->getQualifier())
+            Qualifier.print(OS, m_Policy);
           m_Addresses.push_back(Node);
 
           OS << "((";

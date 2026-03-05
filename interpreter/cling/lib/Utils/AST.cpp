@@ -82,12 +82,6 @@ namespace utils {
     return clang::TypeName::createNestedNameSpecifier(
         Ctx, TD, FullyQualify, /*WithGlobalNsPrefix=*/false);
   }
-  // FIXME: Doesn't exist upstream
-  NestedNameSpecifier TypeName::CreateNestedNameSpecifier(
-      const ASTContext& Ctx, const UsingShadowDecl* USD, bool FullyQualify) {
-    return clang::TypeName::createNestedNameSpecifier(
-        Ctx, USD->getTargetDecl(), FullyQualify, /*WithGlobalNsPrefix=*/false);
-  }
 
   NestedNameSpecifier
   TypeName::CreateNestedNameSpecifier(const ASTContext& Ctx, const TagDecl* TD,

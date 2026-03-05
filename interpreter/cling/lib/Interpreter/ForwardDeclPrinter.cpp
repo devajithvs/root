@@ -797,7 +797,7 @@ namespace cling {
     std::string closeBraces = PrintEnclosingDeclContexts(Out(),
                                                          D->getDeclContext());
     Out() << "__asm (";
-    D->getAsmString()->printPretty(Out(), nullptr, m_Policy, m_Indentation);
+    D->getAsmStringExpr()->printPretty(Out(), nullptr, m_Policy, m_Indentation);
     Out() << ");" << closeBraces << '\n';
   }
 
@@ -849,7 +849,7 @@ namespace cling {
                                                          D->getDeclContext());
     Out() << "using namespace ";
     if (D->getQualifier())
-      D->getQualifier()->print(Out(), m_Policy);
+      D->getQualifier().print(Out(), m_Policy);
     Out() << *D->getNominatedNamespaceAsWritten() << ';' << closeBraces << '\n';
   }
 
@@ -881,7 +881,7 @@ namespace cling {
                                                          D->getDeclContext());
     Out() << "namespace " << *D << " = ";
     if (D->getQualifier())
-      D->getQualifier()->print(Out(), m_Policy);
+      D->getQualifier().print(Out(), m_Policy);
     Out() << *D->getAliasedNamespace() << ';' << closeBraces << '\n';
   }
 
@@ -1175,7 +1175,16 @@ namespace cling {
           skipDecl(nullptr, "pointee type failed");
           return;
         }
-        Visit(MPT->getClass());
+
+        // FIXME: Provide a NestedNameSpecifier visitor.
+        NestedNameSpecifier Qualifier = MPT->getQualifier();
+        if (NestedNameSpecifier::Kind K = Qualifier.getKind();
+            K == NestedNameSpecifier::Kind::Type)
+          Visit(Qualifier.getAsType());
+        if (MPT->isSugared())
+          Visit(cast<MemberPointerType>(MPT->getCanonicalTypeUnqualified())
+                    ->getQualifier()
+                    .getAsType());
       }
       break;
 
@@ -1304,7 +1313,7 @@ namespace cling {
 
     switch (NNS.getKind()) {
     case clang::NestedNameSpecifier::Kind::Namespace:
-      Visit(ns->getNamespace());
+      // Visit(nns.getAsType());
       break;
     case clang::NestedNameSpecifier::Kind::Type: // fall-through:
       // We cannot fwd declare nested types.

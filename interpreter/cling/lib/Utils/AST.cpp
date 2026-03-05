@@ -342,7 +342,7 @@ namespace utils {
         if (typedeftype) {
           decl = typedeftype->getDecl();
         } else if (usingtype) {
-          decl = usingtype->getFoundDecl();
+          decl = usingtype->getDecl();
         } else {
           // There are probably other cases ...
           const TagType* tagdecltype = dyn_cast_or_null<TagType>(&(*desugared));
@@ -885,7 +885,7 @@ namespace utils {
       if (typedeftype) {
         decl = typedeftype->getDecl();
       } else if (usingtype) {
-        decl = usingtype->getFoundDecl();
+        decl = usingtype->getDecl();
       } else {
         // There are probably other cases ...
         const TagType* tagdecltype = dyn_cast_or_null<TagType>(QT.getTypePtr());

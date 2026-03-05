@@ -15,40 +15,6 @@ namespace clang {
 
 namespace TypeName {
 
-/// Create a NestedNameSpecifier for Namesp and its enclosing
-/// scopes.
-///
-/// \param[in] Ctx - the AST Context to be used.
-/// \param[in] Namesp - the NamespaceDecl for which a NestedNameSpecifier
-/// is requested.
-/// \param[in] WithGlobalNsPrefix - Indicate whether the global namespace
-/// specifier "::" should be prepended or not.
-static NestedNameSpecifier *createNestedNameSpecifier(
-    const ASTContext &Ctx,
-    const NamespaceDecl *Namesp,
-    bool WithGlobalNsPrefix);
-
-/// Create a NestedNameSpecifier for TagDecl and its enclosing
-/// scopes.
-///
-/// \param[in] Ctx - the AST Context to be used.
-/// \param[in] TD - the TagDecl for which a NestedNameSpecifier is
-/// requested.
-/// \param[in] FullyQualify - Convert all template arguments into fully
-/// qualified names.
-/// \param[in] WithGlobalNsPrefix - Indicate whether the global namespace
-/// specifier "::" should be prepended or not.
-static NestedNameSpecifier *createNestedNameSpecifier(
-    const ASTContext &Ctx, const TypeDecl *TD,
-    bool FullyQualify, bool WithGlobalNsPrefix);
-
-static NestedNameSpecifier *createNestedNameSpecifierForScopeOf(
-    const ASTContext &Ctx, const Decl *decl,
-    bool FullyQualified, bool WithGlobalNsPrefix);
-
-static NestedNameSpecifier *getFullyQualifiedNestedNameSpecifier(
-    const ASTContext &Ctx, NestedNameSpecifier *scope, bool WithGlobalNsPrefix);
-
 static bool getFullyQualifiedTemplateName(const ASTContext &Ctx,
                                           TemplateName &TName,
                                           bool WithGlobalNsPrefix) {

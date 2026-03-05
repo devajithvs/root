@@ -64,6 +64,42 @@
 
 namespace clang {
 namespace TypeName {
+static bool getFullyQualifiedTemplateName(const ASTContext &Ctx,
+                                          TemplateName &TName,
+                                          bool WithGlobalNsPrefix);
+
+static bool getFullyQualifiedTemplateArgument(const ASTContext &Ctx,
+                                              TemplateArgument &Arg,
+                                              bool WithGlobalNsPrefix);
+
+static const Type *getFullyQualifiedTemplateType(const ASTContext &Ctx,
+                                                 const Type *TypePtr,
+                                                 bool WithGlobalNsPrefix);
+
+static NestedNameSpecifier *createOuterNNS(const ASTContext &Ctx, const Decl *D,
+                                           bool FullyQualify,
+                                           bool WithGlobalNsPrefix);
+static NestedNameSpecifier *getFullyQualifiedNestedNameSpecifier(
+    const ASTContext &Ctx, NestedNameSpecifier *Scope, bool WithGlobalNsPrefix);
+
+static NestedNameSpecifier *
+createNestedNameSpecifierForScopeOf(const ASTContext &Ctx, const Decl *Decl,
+                                    bool FullyQualified,
+                                    bool WithGlobalNsPrefix);
+
+static NestedNameSpecifier *
+createNestedNameSpecifierForScopeOf(const ASTContext &Ctx, const Type *TypePtr,
+                                    bool FullyQualified,
+                                    bool WithGlobalNsPrefix);
+
+NestedNameSpecifier *createNestedNameSpecifier(const ASTContext &Ctx,
+                                               const NamespaceDecl *Namespace,
+                                               bool WithGlobalNsPrefix);
+
+NestedNameSpecifier *createNestedNameSpecifier(const ASTContext &Ctx,
+                                               const TypeDecl *TD,
+                                               bool FullyQualify,
+                                               bool WithGlobalNsPrefix = false);
 /// Get the fully qualified name for a type. This includes full
 /// qualification of all template parameters etc.
 ///

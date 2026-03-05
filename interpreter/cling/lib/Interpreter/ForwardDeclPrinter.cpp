@@ -1312,8 +1312,7 @@ namespace cling {
       skipDecl(nullptr, "NestedNameSpec TypeSpec/TypeSpecWithTemplate");
       break;
     default:
-      Log() << "VisitNestedNameSpecifier: Unexpected kind "
-            << NNS.getKind() << '\n';
+      Log() << "VisitNestedNameSpecifier: Unexpected kind " << '\n';
       skipDecl(nullptr, nullptr);
       break;
    };

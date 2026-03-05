@@ -1020,8 +1020,7 @@ namespace utils {
         QT = Ctx.getDependentSizedArrayType (newQT,
                                             arr->getSizeExpr(),
                                             arr->getSizeModifier(),
-                                            arr->getIndexTypeCVRQualifiers(),
-                                            arr->getBracketsRange());
+                                            arr->getIndexTypeCVRQualifiers());
 
       } else if (isa<IncompleteArrayType>(QT.getTypePtr())) {
         const IncompleteArrayType *arr
@@ -1044,8 +1043,7 @@ namespace utils {
         QT = Ctx.getVariableArrayType (newQT,
                                        arr->getSizeExpr(),
                                        arr->getSizeModifier(),
-                                       arr->getIndexTypeCVRQualifiers(),
-                                       arr->getBracketsRange());
+                                       arr->getIndexTypeCVRQualifiers());
       }
 
       // Add back the qualifiers.

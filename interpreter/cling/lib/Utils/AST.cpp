@@ -49,27 +49,27 @@ namespace utils {
         Ctx, tname, /*WithGlobalNsPrefix=*/false);
   }
 
-  static NestedNameSpecifier*
+  static NestedNameSpecifier
   GetFullyQualifiedNameSpecifier(const ASTContext& Ctx,
-                                 NestedNameSpecifier* scope) {
+                                 NestedNameSpecifier scope) {
     return clang::TypeName::getFullyQualifiedNestedNameSpecifier(
         Ctx, scope, /*WithGlobalNsPrefix=*/false);
   }
 
-  static NestedNameSpecifier*
+  static NestedNameSpecifier
   CreateNestedNameSpecifierForScopeOf(const ASTContext& Ctx, const Decl* decl,
                                       bool FullyQualified) {
     return clang::TypeName::createNestedNameSpecifierForScopeOf(
         Ctx, decl, FullyQualified, /*WithGlobalNsPrefix=*/false);
   }
 
-  static NestedNameSpecifier* CreateNestedNameSpecifierForScopeOf(
+  static NestedNameSpecifier CreateNestedNameSpecifierForScopeOf(
       const ASTContext& Ctx, const Type* TypePtr, bool FullyQualified) {
     return clang::TypeName::createNestedNameSpecifierForScopeOf(
         Ctx, TypePtr, FullyQualified, /*WithGlobalNsPrefix=*/false);
   }
 
-  NestedNameSpecifier*
+  NestedNameSpecifier
   TypeName::CreateNestedNameSpecifier(const ASTContext& Ctx,
                                       const NamespaceDecl* Namesp) {
     return clang::TypeName::createNestedNameSpecifier(
@@ -77,19 +77,19 @@ namespace utils {
   }
 
   // FIXME: Doesn't exist upstream
-  NestedNameSpecifier* TypeName::CreateNestedNameSpecifier(
+  NestedNameSpecifier TypeName::CreateNestedNameSpecifier(
       const ASTContext& Ctx, const TypedefNameDecl* TD, bool FullyQualify) {
     return clang::TypeName::createNestedNameSpecifier(
         Ctx, TD, FullyQualify, /*WithGlobalNsPrefix=*/false);
   }
   // FIXME: Doesn't exist upstream
-  NestedNameSpecifier* TypeName::CreateNestedNameSpecifier(
+  NestedNameSpecifier TypeName::CreateNestedNameSpecifier(
       const ASTContext& Ctx, const UsingShadowDecl* USD, bool FullyQualify) {
     return clang::TypeName::createNestedNameSpecifier(
         Ctx, USD->getTargetDecl(), FullyQualify, /*WithGlobalNsPrefix=*/false);
   }
 
-  NestedNameSpecifier*
+  NestedNameSpecifier
   TypeName::CreateNestedNameSpecifier(const ASTContext& Ctx, const TagDecl* TD,
                                       bool FullyQualify) {
     return clang::TypeName::createNestedNameSpecifier(

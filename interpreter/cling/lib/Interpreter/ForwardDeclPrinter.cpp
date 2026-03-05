@@ -1156,7 +1156,6 @@ namespace cling {
       VISIT_DECL(LValueReference, getPointeeType);
       VISIT_DECL(RValueReference, getPointeeType);
       VISIT_DECL(TypeOf, getUnmodifiedType);
-      VISIT_DECL(Elaborated, getNamedType);
       VISIT_DECL(UnaryTransform, getUnderlyingType);
 #undef VISIT_DECL
 

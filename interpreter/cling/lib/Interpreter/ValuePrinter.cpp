@@ -876,7 +876,7 @@ static std::string printUnpackedClingValue(const Value &V) {
     if (CXXRD->isLambda())
       return printAddress(V.getPtr(), '@');
 
-    std::string Str = printStringType(V, CXXRD->getTypeForDecl());
+    // std::string Str = printStringType(V, CXXRD->getTypeForDecl());
     if (!Str.empty())
       return Str;
   } else if (const clang::BuiltinType *BT

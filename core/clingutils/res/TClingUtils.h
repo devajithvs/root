@@ -67,6 +67,7 @@ namespace clang {
    class Type;
    class TypeDecl;
    class TypedefNameDecl;
+   enum class ElaboratedTypeKeyword;
    struct PrintingPolicy;
 }
 

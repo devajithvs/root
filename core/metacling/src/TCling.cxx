@@ -1982,7 +1982,7 @@ bool TCling::RegisterPrebuiltModulePath(const std::string &FullPath,
       llvm::sys::path::append(ModuleMapFileName, ModuleMapName);
       if (auto FE = FM.getOptionalFileRef(ModuleMapFileName, /*openFile*/ false,
                                           /*CacheFailure*/ false)) {
-         if (!HS.loadModuleMapFile(*FE, /*IsSystem*/ false))
+         if (!HS.parseAndLoadModuleMapFile(*FE, /*IsSystem*/ false))
             return true;
          Error("RegisterPrebuiltModulePath", "Could not load modulemap in %s", ModuleMapFileName.c_str());
       }

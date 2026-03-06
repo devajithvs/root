@@ -819,7 +819,7 @@ ROOT::TMetaUtils::ScopeSearch(const char *name, const cling::Interpreter &interp
 
 bool ROOT::TMetaUtils::RequireCompleteType(const cling::Interpreter &interp, const clang::CXXRecordDecl *cl)
 {
-   clang::QualType qType(cl->getTypeForDecl(),0);
+   clang::QualType qType = cl->getASTContext().getCanonicalTagType(cl);
    return RequireCompleteType(interp,cl->getLocation(),qType);
 }
 
@@ -1455,8 +1455,7 @@ std::string ROOT::TMetaUtils::GetQualifiedName(const clang::NamedDecl &cl){
 
 void ROOT::TMetaUtils::GetQualifiedName(std::string &qual_name, const clang::RecordDecl &recordDecl)
 {
-   const clang::Type* declType ( recordDecl.getTypeForDecl() );
-   clang::QualType qualType(declType,0);
+   clang::QualType qualType = recordDecl.getASTContext().getCanonicalTagType(&recordDecl);
    ROOT::TMetaUtils::GetQualifiedName(qual_name,
                                       qualType,
                                       recordDecl);

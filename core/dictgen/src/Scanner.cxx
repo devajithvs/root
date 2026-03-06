@@ -815,7 +815,7 @@ void RScanner::AddDelayedAnnotatedRecordDecls()
    for (auto &&info: fDelayedAnnotatedRecordDecls) {
       const clang::Type *thisType = info.fSelected->GetRequestedType();
       if (!thisType)
-         thisType = info.fDecl->getTypeForDecl();
+         thisType = info.fDecl->getQualifier().getAsType();
       const clang::CXXRecordDecl *recordDecl = info.fDecl;
       auto nameTypeForIO = ROOT::TMetaUtils::GetNameTypeForIO(clang::QualType(thisType, 0), fInterpreter, fNormCtxt);
       auto typeForIO = nameTypeForIO.second;

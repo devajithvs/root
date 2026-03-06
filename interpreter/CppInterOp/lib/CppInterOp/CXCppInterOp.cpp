@@ -185,7 +185,6 @@ CXTypeKind cxtype_GetTypeKind(QualType T) {
     TKCASE(ExtVector);
     TKCASE(MemberPointer);
     TKCASE(Auto);
-    TKCASE(Elaborated);
     TKCASE(Pipe);
     TKCASE(Attributed);
     TKCASE(BTFTagAttributed);

@@ -820,7 +820,7 @@ void* IncrementalJIT::getSymbolAddress(StringRef Name, bool IncludeHostSymbols){
   if (!IncludeHostSymbols)
     G.lock();
 
-  std::pair<llvm::StringMapIterator<std::nullopt_t>, bool> insertInfo;
+  std::pair<llvm::StringSet<>::iterator, bool> insertInfo;
   if (!IncludeHostSymbols)
     insertInfo = m_ForbidDlSymbols.insert(Name);
 

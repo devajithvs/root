@@ -1969,7 +1969,7 @@ bool TCling::RegisterPrebuiltModulePath(const std::string &FullPath,
    // We should look for modulemap files there too.
    if (auto DE = FM.getOptionalDirectoryRef(FullPath)) {
       HeaderSearch &HS = PP.getHeaderSearchInfo();
-      HeaderSearchOptions &HSOpts = HS.getHeaderSearchOpts();
+      HeaderSearchOptions &HSOpts = const_cast<HeaderSearchOptions&>(HS.getHeaderSearchOpts());
       const auto &ModPaths = HSOpts.PrebuiltModulePaths;
       bool pathExists = std::find(ModPaths.begin(), ModPaths.end(), FullPath) != ModPaths.end();
       if (!pathExists)

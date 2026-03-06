@@ -3085,8 +3085,7 @@ clang::QualType ROOT::TMetaUtils::AddDefaultParameters(clang::QualType instanceT
 
       unsigned int dropDefault = normCtxt.GetConfig().DropDefaultArg(*Template);
 
-      llvm::SmallVector<clang::TemplateArgument, 4> desArgs;
-      llvm::SmallVector<clang::TemplateArgument, 4> canonArgs;
+      clang::Sema::CheckTemplateArgumentInfo CTAI;
       llvm::ArrayRef<clang::TemplateArgument> template_arguments = TST->template_arguments();
       unsigned int Idecl = 0, Edecl = TSTdecl->getTemplateArgs().size();
       // If we have more arguments than the TSTdecl, it is a variadic template
@@ -3115,14 +3114,14 @@ clang::QualType ROOT::TMetaUtils::AddDefaultParameters(clang::QualType instanceT
                         nns = cling::utils::TypeName::CreateNestedNameSpecifier(Ctx,TD, false /*FullyQualified*/);
                      } else {
                         // TU scope
-                        desArgs.push_back(*I);
+                        CTAI.SugaredConverted.push_back(*I);
                         continue;
                      }
                      clang::TemplateName UnderlyingTN(templateDecl);
                      if (clang::UsingShadowDecl *USD = templateName.getAsUsingShadowDecl())
                         UnderlyingTN = clang::TemplateName(USD);
                      clang::TemplateName templateNameWithNSS ( Ctx.getQualifiedTemplateName(nns, false, UnderlyingTN) );
-                     desArgs.push_back(clang::TemplateArgument(templateNameWithNSS));
+                     CTAI.SugaredConverted.push_back(clang::TemplateArgument(templateNameWithNSS));
                      mightHaveChanged = true;
                      continue;
                   }
@@ -3130,7 +3129,7 @@ clang::QualType ROOT::TMetaUtils::AddDefaultParameters(clang::QualType instanceT
             }
 
             if (I->getKind() != clang::TemplateArgument::Type) {
-               desArgs.push_back(*I);
+               CTAI.SugaredConverted.push_back(*I);
                continue;
             }
 
@@ -3145,9 +3144,9 @@ clang::QualType ROOT::TMetaUtils::AddDefaultParameters(clang::QualType instanceT
                                                             normCtxt);
             if (SubTy != newSubTy) {
                mightHaveChanged = true;
-               desArgs.push_back(clang::TemplateArgument(newSubTy));
+               CTAI.SugaredConverted.push_back(clang::TemplateArgument(newSubTy));
             } else {
-               desArgs.push_back(*I);
+               CTAI.SugaredConverted.push_back(*I);
             }
             // Converted.push_back(TemplateArgument(ArgTypeForTemplate));
          } else if (!isStdDropDefault && Idecl < maxAddArg) {
@@ -3157,7 +3156,7 @@ clang::QualType ROOT::TMetaUtils::AddDefaultParameters(clang::QualType instanceT
             const clang::TemplateArgument& templateArg
                = TSTdecl->getTemplateArgs().get(Idecl);
             if (templateArg.getKind() != clang::TemplateArgument::Type) {
-               desArgs.push_back(templateArg);
+               CTAI.SugaredConverted.push_back(templateArg);
                continue;
             }
             clang::QualType SubTy = templateArg.getAsType();
@@ -3172,11 +3171,12 @@ clang::QualType ROOT::TMetaUtils::AddDefaultParameters(clang::QualType instanceT
                bool HasDefaultArgs;
                clang::TemplateArgumentLoc ArgType = S.SubstDefaultTemplateArgumentIfAvailable(
                                                                                               Template,
+                                                                                              /*TemplateKWLoc=*/clang::SourceLocation(),
                                                                                               TemplateLoc,
                                                                                               RAngleLoc,
                                                                                               TTP,
-                                                                                              desArgs,
-                                                                                              canonArgs,
+                                                                                              CTAI.SugaredConverted,
+                                                                                              CTAI.CanonicalConverted,
                                                                                               HasDefaultArgs);
                // The substition can fail, in which case there would have been compilation
                // error printed on the screen.
@@ -3191,7 +3191,7 @@ clang::QualType ROOT::TMetaUtils::AddDefaultParameters(clang::QualType instanceT
                SubTy = cling::utils::Transform::GetPartiallyDesugaredType(Ctx,BetterSubTy,normCtxt.GetConfig(),/*fullyQualified=*/ true);
             }
             SubTy = AddDefaultParameters(SubTy,interpreter,normCtxt);
-            desArgs.push_back(clang::TemplateArgument(SubTy));
+            CTAI.SugaredConverted.push_back(clang::TemplateArgument(SubTy));
          } else {
             // We are past the end of the list of specified arguements and we
             // do not want to add the default, no need to continue.
@@ -3203,7 +3203,7 @@ clang::QualType ROOT::TMetaUtils::AddDefaultParameters(clang::QualType instanceT
       if (mightHaveChanged) {
          instanceType = Ctx.getTemplateSpecializationType(TST->getKeyword(),
                                                           TST->getTemplateName(),
-                                                          desArgs,
+                                                          CTAI.SugaredConverted,
                                                           /*CanonicalArgs=*/{},
                                                           TST->getCanonicalTypeInternal());
       }
@@ -3775,6 +3775,7 @@ static bool areEqualTypes(const clang::TemplateArgument& tArg,
       llvm::SmallVector<clang::TemplateArgument, 4> canonArgs;
       bool HasDefaultArgs;
       TemplateArgumentLoc defTArgLoc = S.SubstDefaultTemplateArgumentIfAvailable(Template,
+                                                                                 /*TemplateKWLoc=*/clang::SourceLocation(),
                                                                                  TemplateLoc,
                                                                                  LAngleLoc,
                                                                                  ttpdPtr,

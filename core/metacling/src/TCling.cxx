@@ -6800,7 +6800,7 @@ void TCling::UpdateClassInfoWithDecl(const NamedDecl* ND)
          return;
       }
 
-      clang::QualType type(tdDef->getTypeForDecl(), 0);
+      clang::QualType type = tdDef->getASTContext().getCanonicalTagType(tdDef);
       ROOT::TMetaUtils::GetNormalizedName(name, type, *fInterpreter, *fNormalizedCtxt);
    } else if (ns) {
       canon = ns->getCanonicalDecl();

@@ -560,7 +560,8 @@ namespace cling {
             if (tagdecl && resultType) *resultType = T.getTypePtr();
 
           } else if (tagdecl && resultType) {
-            *resultType = tagdecl->getTypeForDecl();
+            QualType T = Context.getCanonicalTagType(tagdecl);
+            *resultType = T.getTypePtr();
           }
           // fprintf(stderr,"Short cut taken for %s.\n",className.str().c_str());
           if (tagdecl) {
@@ -633,7 +634,7 @@ namespace cling {
       return 0;
     }
 
-    Decl* TheDecl = 0;
+    const Decl* TheDecl = nullptr;
 
     if (P.getCurToken().getKind() == tok::annot_cxxscope) {
       CXXScopeSpec SS;
@@ -668,14 +669,14 @@ namespace cling {
 
                       // Make sure it is not just forward declared, and
                       // instantiate any templates.
-                      DeclContext *ctxt = TD;
+                      DeclContext *ctxt = const_cast<TagDecl*>(TD);
                       if (!S.RequireCompleteDeclContext(SS, ctxt)) {
                         // Success, type is complete, instantiations have
                         // been done.
                         TheDecl = TD->getDefinition();
                         if (TheDecl->isInvalidDecl()) {
                           // if the decl is invalid try to clean up
-                          UnloadDecl(&S, TheDecl);
+                          UnloadDecl(&S, const_cast<Decl*>(TheDecl));
                           *setResultType = nullptr;
                           return 0;
                         }
@@ -813,7 +814,7 @@ namespace cling {
           where = Context.getTranslationUnitDecl();
           break;
         case NestedNameSpecifier::Kind::Namespace:
-          where = const_cast<clang::DeclContext*>(nested.getAsNamespaceAndPrefix().Namespace);
+          where = const_cast<clang::NamespaceDecl*>(nested.getAsNamespaceAndPrefix().Namespace->getNamespace());
           break;
         case NestedNameSpecifier::Kind::Type:
           {
@@ -1291,7 +1292,7 @@ namespace cling {
           // We have a class or struct or something.
           if (funcName.substr(1) == decl->getName()) {
             ParsedType PT;
-            QualType QT(decl->getTypeForDecl(), 0);
+            QualType QT = Context.getCanonicalTagType(decl);
             PT.set(QT);
             FuncId.setDestructorName(SourceLocation(), PT, SourceLocation());
             return true;
@@ -1307,7 +1308,7 @@ namespace cling {
           // We have a class or struct or something.
           if (funcName == decl->getName()) {
             ParsedType PT;
-            QualType QT(decl->getTypeForDecl(), 0);
+            QualType QT = Context.getCanonicalTagType(decl);
             PT.set(QT);
             FuncId.setConstructorName(PT, SourceLocation(), SourceLocation());
           } else {
@@ -1445,13 +1446,13 @@ namespace cling {
       NestedNameSpecifier scopeNNS = std::nullopt;
       SourceRange scopeSrcRange;
       if (isa<TranslationUnitDecl>(foundDC)) {
-        scopeNNS = NestedNameSpecifier::GlobalSpecifier(Context);
+        scopeNNS = NestedNameSpecifier::getGlobal();
       } else if (const auto *foundNS = dyn_cast<NamespaceDecl>(foundDC)) {
         scopeNNS = NestedNameSpecifier(Context, foundNS, /*NNSPrefix*/ std::nullopt);
         scopeSrcRange = foundNS->getSourceRange();
       } else if (const auto *foundRD = dyn_cast<RecordDecl>(foundDC)) {
         // a type
-        const Type* foundTy = Context.getTypeDeclType(foundRD).getTypePtr();
+        const Type* foundTy = Context.getCanonicalTagType(foundRD).getTypePtr();
         scopeNNS = NestedNameSpecifier(foundTy);
         scopeSrcRange = foundRD->getSourceRange();
       }
@@ -1490,8 +1491,8 @@ namespace cling {
     //
     //  Check for lookup failure.
     //
-    if (Result.getResultKind() != LookupResult::Found &&
-        Result.getResultKind() != LookupResult::FoundOverloaded) {
+    if (Result.getResultKind() != LookupResultKind::Found &&
+        Result.getResultKind() != LookupResultKind::FoundOverloaded) {
        // Lookup failed.
        return 0;
     }

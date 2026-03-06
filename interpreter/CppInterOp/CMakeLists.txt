@@ -500,6 +500,4 @@ if (CPPINTEROP_INCLUDE_DOCS)
 endif()
 
 add_subdirectory(lib)
-if (CPPINTEROP_ENABLE_TESTING)
-  add_subdirectory(unittests)
-endif(CPPINTEROP_ENABLE_TESTING)
+

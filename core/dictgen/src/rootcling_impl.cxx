@@ -4307,7 +4307,7 @@ int RootClingMain(int argc,
          = interp.getCI()->getASTContext().getLangOpts();
 
       // FIXME: Replace with C++20 `using enum LangOptions::CompatibilityKind`.
-      using CK = LangOptions::CompatibilityKind;
+      using CK = clang::LangOptions::CompatibilityKind;
 #define LANGOPT(Name, Bits, Default, Compatibility, Description) \
    if constexpr (CK::Compatibility != CK::Benign)                \
       ROOT::TMetaUtils::Info(nullptr, "%s = %d // %s\n", #Name, (int)LangOpts.Name, Description);

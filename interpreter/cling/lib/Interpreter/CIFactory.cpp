@@ -1097,7 +1097,7 @@ namespace {
 
           // FIXME: Replace with C++20 `using enum
           // LangOptions::CompatibilityKind`.
-          using CK = LangOptions::CompatibilityKind;
+          using CK = clang::LangOptions::CompatibilityKind;
 #define LANGOPT(Name, Bits, Default, Compatibility, Description)               \
   if constexpr (CK::Compatibility != CK::Benign)                               \
     DUMP_BOOLEAN(LangOpts.Name, Description);

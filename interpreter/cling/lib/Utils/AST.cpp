@@ -333,7 +333,7 @@ namespace utils {
                                                          /*qualifyType=*/false,
                                                       /*qualifyTmpltArg=*/true);
 
-      NestedNameSpecifier outer_scope = scope.getAsNamespaceAndPrefix().Prefix;
+      NestedNameSpecifier outer_scope = scope_type->getPrefix();
         Decl* decl = nullptr;
         const TypedefType* typedeftype =
           dyn_cast_or_null<TypedefType>(&(*desugared));
@@ -913,9 +913,9 @@ namespace utils {
                 outer = nullptr; // Cancel the later creation.
               }
             } else {
-              const NamespaceDecl *old_ns = original_prefix.getAsNamespaceAndPrefix().Namespace->getNamespace();
-              if (old_ns) {
-                old_ns = old_ns->getCanonicalDecl();
+              const NamespaceDecl *old_ns = nullptr;
+              if (original_prefix.getKind() == NestedNameSpecifier::Kind::Namespace) {
+                old_ns = original_prefix.getAsNamespaceAndPrefix().Namespace->getNamespace()->getCanonicalDecl();
               }
               const NamespaceDecl *new_ns = dyn_cast<NamespaceDecl>(outer);
               if (new_ns) new_ns = new_ns->getCanonicalDecl();

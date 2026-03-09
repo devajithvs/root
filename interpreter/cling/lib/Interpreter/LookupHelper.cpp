@@ -554,8 +554,8 @@ namespace cling {
           const TypedefNameDecl *typedefDecl = dyn_cast<TypedefNameDecl>(quickResult);
           if (typedefDecl) {
             QualType T = Context.getTypedefType(ElaboratedTypeKeyword::None, /*Qualifier=*/std::nullopt, typedefDecl);
-            if (const auto *TD = T->getAsTagDecl())
-              tagdecl = TD;
+            const TagType *TagTy = T->getAs<TagType>();
+            if (TagTy) tagdecl = TagTy->getDecl();
             // NOTE: Should we instantiate here? ... maybe ...
             if (tagdecl && resultType) *resultType = T.getTypePtr();
 
@@ -651,19 +651,28 @@ namespace cling {
           //  and namespaces, and those are the only things we want.
           //
           switch (Kind) {
+            case NestedNameSpecifier::Kind::Null: {
+              break;
+            }
             case NestedNameSpecifier::Kind::Namespace: {
                 // Namespace.
-                auto [NSD, prefix] = NNS.getAsNamespaceAndPrefix();
-                TheDecl = NSD->getCanonicalDecl();
+                auto [NSBase, prefix] = NNS.getAsNamespaceAndPrefix();
+                if (auto* NSD = dyn_cast<NamespaceDecl>(NSBase)) {
+                  TheDecl = NSD->getCanonicalDecl();
+                } else if (auto* NSAD = dyn_cast<NamespaceAliasDecl>(NSBase)) {
+                  TheDecl = NSAD->getNamespace()->getCanonicalDecl();
+                }
               }
               break;
             case  NestedNameSpecifier::Kind::Type: {
                 // Type name qualified with "template".
                 // Note: Do we need to check for a dependent type here?
-                NestedNameSpecifier prefix = NNS.getAsNamespaceAndPrefix().Prefix;
                 *setResultType = NNS.getAsType();
-                if (const TagDecl *TD = (*setResultType)->getAsTagDecl()) {
+                const TagType* TagTy = (*setResultType)->getAs<TagType>();
+                if (TagTy) {
                   // It is a class, struct, or union.
+                  TagDecl* TD = TagTy->getDecl();
+                  if (TD) {
                     TheDecl = TD->getDefinition();
                     if (!TheDecl && instantiateTemplate) {
 
@@ -697,6 +706,7 @@ namespace cling {
                         return 0;
                       }
                     }
+                  }
                 }
               }
               break;
@@ -813,9 +823,15 @@ namespace cling {
         case NestedNameSpecifier::Kind::Global:
           where = Context.getTranslationUnitDecl();
           break;
-        case NestedNameSpecifier::Kind::Namespace:
-          where = const_cast<clang::NamespaceDecl*>(nested.getAsNamespaceAndPrefix().Namespace->getNamespace());
+        case NestedNameSpecifier::Kind::Namespace: {
+          // LLVM22: covers both Namespace and NamespaceAlias
+          auto [NSBase, Prefix] = nested.getAsNamespaceAndPrefix();
+          if (auto* NSD = dyn_cast<NamespaceDecl>(NSBase))
+            where = const_cast<clang::NamespaceDecl*>(NSD);
+          else
+            return 0; // NamespaceAlias not supported here
           break;
+        }
         case NestedNameSpecifier::Kind::Type:
           {
             const Type *ntype = nested.getAsType();
@@ -823,6 +839,7 @@ namespace cling {
             if (!where) return 0;
             break;
           }
+        case NestedNameSpecifier::Kind::Null:
         case NestedNameSpecifier::Kind::MicrosoftSuper:
           // Microsoft's __super::
           return 0;
@@ -1457,7 +1474,7 @@ namespace cling {
         scopeSrcRange = foundRD->getSourceRange();
       }
       CXXScopeSpec SS;
-      if (scopeNNS.getKind() != clang::NestedNameSpecifier::Kind::Null)
+      if (scopeNNS)
         SS.MakeTrivial(Context, scopeNNS, scopeSrcRange);
       S.LookupTemplateName(Result, P.getCurScope(), SS, QualType(),
                            /*EnteringContext*/false);

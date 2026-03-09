@@ -643,14 +643,13 @@ namespace cling {
                                              SS);
       if (SS.isValid()) {
         NestedNameSpecifier NNS = SS.getScopeRep();
-        NestedNameSpecifier::Kind Kind = NNS.getKind();
         // Only accept the parse if we consumed all of the name.
         if (P.NextToken().getKind() == clang::tok::annot_repl_input_end) {
           //
           //  Be careful, not all nested name specifiers refer to classes
           //  and namespaces, and those are the only things we want.
           //
-          switch (Kind) {
+          switch (NNS.getKind()) {
             case NestedNameSpecifier::Kind::Null: {
               break;
             }

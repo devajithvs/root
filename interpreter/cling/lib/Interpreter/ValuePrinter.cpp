@@ -876,9 +876,9 @@ static std::string printUnpackedClingValue(const Value &V) {
     if (CXXRD->isLambda())
       return printAddress(V.getPtr(), '@');
 
-    // std::string Str = printStringType(V, CXXRD->getTypeForDecl());
-    // if (!Str.empty())
-    //   return Str;
+    std::string Str = printStringType(V, C.getCanonicalTagType(CXXRD).getTypePtr());
+    if (!Str.empty())
+      return Str;
   } else if (const clang::BuiltinType *BT
       = llvm::dyn_cast<clang::BuiltinType>(Td.getCanonicalType().getTypePtr())) {
     switch (BT->getKind()) {

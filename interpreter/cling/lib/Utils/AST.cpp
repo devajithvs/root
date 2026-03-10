@@ -1301,12 +1301,26 @@ namespace utils {
     // TODO: Find a way to avoid creating new types, if the input is already
     // fully qualified.
     if (prefix) {
-      // We intentionally always use ElaboratedTypeKeyword::None, we never want
-      // the keyword (humm ... what about anonymous types?)
+      // In case of template specializations iterate over the arguments and
+      // fully qualify them as well.
+      if (const auto *TT = dyn_cast<TagType>(QT.getTypePtr())) {
+        // We are asked to fully qualify and we have a Record Type (which
+        // may point to a template specialization) or Template
+        // Specialization Type. We need to fully qualify their arguments.
+
+        const Type *TypePtr = clang::TypeName::getFullyQualifiedTemplateType(
+            Ctx, TT, TT->getKeyword(), prefix, /*WithGlobalNsPrefix=*/false);
+        QT = QualType(TypePtr, 0);
+      } else if (const auto *TT = dyn_cast<TypedefType>(QT.getTypePtr())) {
+        QT = Ctx.getTypedefType(
+            TT->getKeyword(), prefix, TT->getDecl(),
+            clang::TypeName::getFullyQualifiedType(TT->desugar(), Ctx, /*WithGlobalNsPrefix=*/false));
+      }
       QT = Ctx.getQualifiedType(QT, prefix_qualifiers);
     } else if (original_prefix) {
       QT = Ctx.getQualifiedType(QT, prefix_qualifiers);
     }
+
     return QT;
   }
 

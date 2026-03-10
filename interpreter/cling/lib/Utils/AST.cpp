@@ -313,7 +313,7 @@ namespace utils {
         if (newtype && original_prefix) {
           // Deal with a class
           const Type *oldtype = original_prefix.getAsType();
-          if (oldtype &&
+          if (original_prefix.getKind() == NestedNameSpecifier::Kind::Type &&
               // NOTE: Should we compare the RecordDecl instead?
               oldtype->getAsCXXRecordDecl() == newtype)
           {
@@ -356,11 +356,11 @@ namespace utils {
       // We had a scope prefix as input, let see if it is still
       // the same as the scope of the result and if it is, then
       // we use it.
-      const Type *newtype = prefix.getAsType();
-      if (newtype) {
+      if (prefix.getKind() == NestedNameSpecifier::Kind::Type) {
+        const Type *newtype = prefix.getAsType();
         // Deal with a class
         const Type *oldtype = original_prefix.getAsType();
-        if (oldtype &&
+        if (original_prefix.getKind() == NestedNameSpecifier::Kind::Type &&
             // NOTE: Should we compare the RecordDecl instead?
             oldtype->getAsCXXRecordDecl() == newtype->getAsCXXRecordDecl())
         {

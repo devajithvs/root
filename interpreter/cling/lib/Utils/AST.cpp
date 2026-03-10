@@ -1317,6 +1317,13 @@ namespace utils {
         QT = Ctx.getTypedefType(
             TT->getKeyword(), prefix, TT->getDecl(),
             clang::TypeName::getFullyQualifiedType(TT->desugar(), Ctx, /*WithGlobalNsPrefix=*/false));
+      } else if (const auto *TST =
+                 dyn_cast<TemplateSpecializationType>(QT.getTypePtr())) {
+        // e.g. TDataPoint<float> with prefix NS:: reconstructed as
+        // NS::TDataPoint<float>
+        const Type *TypePtr = clang::TypeName::getFullyQualifiedTemplateType(
+            Ctx, TST, /*WithGlobalNsPrefix=*/false);
+        QT = QualType(TypePtr, 0);
       }
       QT = Ctx.getQualifiedType(QT, prefix_qualifiers);
     } else if (original_prefix) {

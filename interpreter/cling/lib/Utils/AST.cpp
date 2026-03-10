@@ -1049,8 +1049,8 @@ namespace utils {
             && !(outer_ns && outer_ns->isAnonymousNamespace())
             && !outer->getNameAsString().empty() ) {
           if (original_prefix) {
-            const Type *oldtype = original_prefix.getAsType();
-            if (oldtype) {
+            if (original_prefix.getKind() == NestedNameSpecifier::Kind::Type) {
+              const Type *oldtype = original_prefix.getAsType();
               if (oldtype->getAsCXXRecordDecl() == outer) {
                 // Same type, use the original spelling
                 prefix

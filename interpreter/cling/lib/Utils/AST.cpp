@@ -413,7 +413,9 @@ namespace utils {
                                           const Transform::Config& TypeConfig) {
     // Desugar the scope qualifier if needed.
 
-    if (const Type* scope_type = scope.getAsType()) {
+    if (scope.getKind() == NestedNameSpecifier::Kind::Type) {
+
+      const Type* scope_type = scope.getAsType();
 
       // this is not a namespace, so we might need to desugar
       QualType desugared = GetPartiallyDesugaredTypeImpl(Ctx,

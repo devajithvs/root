@@ -511,6 +511,31 @@ namespace cling {
     if (!Previous.empty()) {
       NamedDecl *PrevDecl = (*Previous.begin())->getUnderlyingDecl();
 
+      // It's okay to have a tag decl in the same scope as a typedef
+      // which hides a tag decl in the same scope.  Finding this
+      // insanity with a redeclaration lookup can only actually happen
+      // in C++.
+      //
+      // This is also okay for elaborated-type-specifiers, which is
+      // technically forbidden by the current standard but which is
+      // okay according to the likely resolution of an open issue;
+      // see http://www.open-std.org/jtc1/sc22/wg21/docs/cwg_active.html#407
+      if (m_Sema->getLangOpts().CPlusPlus) {
+        if (TypedefNameDecl *TD = dyn_cast<TypedefNameDecl>(PrevDecl)) {
+          if (const TagType *TT = TD->getUnderlyingType()->getAs<TagType>()) {
+            TagDecl *Tag = TT->getDecl();
+            if (Tag->getDeclName() == Name &&
+                Tag->getDeclContext()->getRedeclContext()
+                ->Equals(TD->getDeclContext()->getRedeclContext())) {
+              PrevDecl = Tag;
+              Previous.clear();
+              Previous.addDecl(Tag);
+              Previous.resolveKind();
+            }
+          }
+        }
+      }
+
       if (TagDecl *PrevTagDecl = dyn_cast<TagDecl>(PrevDecl)) {
         // If this is a use of a previous tag, or if the tag is already declared
         // in the same scope (so that the definition/declaration completes or

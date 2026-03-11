@@ -1175,16 +1175,7 @@ namespace cling {
           skipDecl(nullptr, "pointee type failed");
           return;
         }
-
-        // FIXME: Provide a NestedNameSpecifier visitor.
-        NestedNameSpecifier Qualifier = MPT->getQualifier();
-        if (NestedNameSpecifier::Kind K = Qualifier.getKind();
-            K == NestedNameSpecifier::Kind::Type)
-          Visit(Qualifier.getAsType());
-        if (MPT->isSugared())
-          Visit(cast<MemberPointerType>(MPT->getCanonicalTypeUnqualified())
-                    ->getQualifier()
-                    .getAsType());
+        VisitNestedNameSpecifier(MPT->getQualifier());
       }
       break;
 

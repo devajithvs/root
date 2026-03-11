@@ -1175,7 +1175,6 @@ namespace cling {
           skipDecl(nullptr, "pointee type failed");
           return;
         }
-
         VisitNestedNameSpecifier(MPT->getQualifier());
       }
       break;

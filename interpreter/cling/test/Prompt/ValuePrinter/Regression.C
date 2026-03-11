@@ -137,7 +137,7 @@ namespace PR180 {
   using Foo = Derived<base>;
 }
 auto bar = PR180::Foo()
-// CHECK: (PR180::Foo &) @0x{{[0-9a-f]+}}
+// CHECK: (PR180::PR180::Foo &) @0x{{[0-9a-f]+}}
 
 namespace PR14968 {
   struct non_common_range {

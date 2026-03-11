@@ -12,7 +12,7 @@
 extern "C" int printf(const char*,...);
 
 class TestDecl { public: int methodDefLater(); } t
-// CHECK: (TestDecl &) @0x{{.*}}
+// CHECK: (class TestDecl &) @0x{{.*}}
 int TestDecl::methodDefLater() { return 2; }
 t.methodDefLater()
 // CHECK: (int) 2
@@ -285,11 +285,11 @@ Nest2.simpleAdd(3)
 class Test2 classReturn() { return Test2(10, 11); }
 classReturn()
 // CHECK: Test2::Test2(10,11)
-// CHECK: (Test2) @0x{{.*}}
+// CHECK: (class Test2) @0x{{.*}}
 
 class Test2* classReturnPtr() { return nullptr; }
 classReturnPtr()
-// CHECK: (Test2 *) nullptr
+// CHECK: (class Test2 *) nullptr
 
 int Ref = 42;
 const int& cIntRef(const int &val) {

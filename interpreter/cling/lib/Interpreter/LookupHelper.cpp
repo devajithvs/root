@@ -655,7 +655,7 @@ namespace cling {
             }
             case NestedNameSpecifier::Kind::Namespace: {
                 // Namespace.
-                auto [NSBase, prefix] = NNS.getAsNamespaceAndPrefix();
+                auto NSBase = NNS.getAsNamespaceAndPrefix().Namespace;
                 if (auto* NSD = dyn_cast<NamespaceDecl>(NSBase)) {
                   TheDecl = NSD->getCanonicalDecl();
                 } else if (auto* NSAD = dyn_cast<NamespaceAliasDecl>(NSBase)) {
@@ -663,7 +663,7 @@ namespace cling {
                 }
               }
               break;
-            case  NestedNameSpecifier::Kind::Type: {
+            case NestedNameSpecifier::Kind::Type: {
                 // Type name qualified with "template".
                 // Note: Do we need to check for a dependent type here?
                 *setResultType = NNS.getAsType();
@@ -824,7 +824,7 @@ namespace cling {
           break;
         case NestedNameSpecifier::Kind::Namespace: {
           // LLVM22: covers both Namespace and NamespaceAlias
-          auto [NSBase, Prefix] = nested.getAsNamespaceAndPrefix();
+          auto NSBase = nested.getAsNamespaceAndPrefix().Namespace;
           if (auto* NSD = dyn_cast<NamespaceDecl>(NSBase))
             where = const_cast<clang::NamespaceDecl*>(NSD);
           else

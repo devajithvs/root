@@ -1276,6 +1276,7 @@ namespace utils {
             if (isa<TypedefType>(SubTy)
                 || isa<UsingType>(SubTy)
                 || isa<TemplateSpecializationType>(SubTy)
+                || SubTy->getPrefix() // LLVM22: was isa<ElaboratedType>
                 || fullyQualifyTmpltArg) {
               mightHaveChanged = true;
               QualType PDQT

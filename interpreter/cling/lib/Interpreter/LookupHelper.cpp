@@ -240,8 +240,8 @@ namespace cling {
             // is not relevant for ROOT itself ....
             ASTContext &Context = S.getASTContext();
             QualType T = Context.getTypedefType(ElaboratedTypeKeyword::None, /*Qualifier=*/std::nullopt, typedefDecl);
-            if (const auto *TD = T->getAsTagDecl())
-              next = TD;
+            const TagType *TagTy = T->getAs<TagType>();
+            if (TagTy) next = TagTy->getDecl();
           }
 
           // To use Lookup::Named we need to fit the assertion:

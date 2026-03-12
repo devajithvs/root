@@ -98,9 +98,8 @@ TClingClassInfo::TClingClassInfo(cling::Interpreter *interp, const char *name, b
       }
    }
    if (!decl && type) {
-      const TagType *tagtype =type->getAs<TagType>();
-      if (tagtype) {
-         decl = tagtype->getDecl();
+      if (const auto *TD = type->getAsTagDecl()) {
+         decl = TD;
       }
    }
    SetDecl(decl);
@@ -745,9 +744,8 @@ void TClingClassInfo::Init(const char *name)
       }
    }
    if (!GetDecl() && fType) {
-      const TagType *tagtype =fType->getAs<TagType>();
-      if (tagtype) {
-         SetDecl(tagtype->getDecl());
+      if (const auto *TD = fType->getAsTagDecl()) {
+         SetDecl(TD);
       }
    }
 }
@@ -775,11 +773,9 @@ void TClingClassInfo::Init(const Type &tag)
 
    R__LOCKGUARD(gInterpreterMutex);
 
-   const TagType *tagtype = fType->getAs<TagType>();
-   if (tagtype) {
-      SetDecl(tagtype->getDecl());
-   }
-   else {
+   if (const auto *TD = fType->getAsTagDecl()) {
+      SetDecl(TD);
+   } else {
       SetDecl(nullptr);
    }
    if (!GetDecl()) {
@@ -1050,7 +1046,7 @@ int TClingClassInfo::InternalNext()
             }
             if (const RecordDecl *RD =
                   llvm::dyn_cast<RecordDecl>(GetDecl())) {
-               fType = RD->getASTContext().getRecordType(RD).getTypePtr();
+               fType = RD->getASTContext().getCanonicalTagType(RD).getTypePtr();
             }
          }
          return 1;

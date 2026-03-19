@@ -15487,6 +15487,11 @@ Sema::CheckForFunctionRedefinition(FunctionDecl *FD,
   if (TypoCorrectedFunctionDefinitions.count(Definition))
     return;
 
+  if (FD->getName() == "__terminate") {
+    llvm::errs() << "\n[DEBUG] __terminate running " << "\n";
+    llvm::errs() << "[DEBUG] Def->isUnconditionallyVisible() running " << Definition->isUnconditionallyVisible() << "\n";
+    llvm::errs() << "[DEBUG] !hasVisibleDefinition(Definition): " << !hasVisibleDefinition(Definition) << "\n";
+  }
   // If we don't have a visible definition of the function, and it's inline or
   // a template, skip the new definition.
   if (SkipBody && !hasVisibleDefinition(Definition) &&
@@ -15505,9 +15510,10 @@ Sema::CheckForFunctionRedefinition(FunctionDecl *FD,
       Definition->getStorageClass() == SC_Extern)
     Diag(FD->getLocation(), diag::err_redefinition_extern_inline)
         << FD << getLangOpts().CPlusPlus;
-  else
+  else {
+    llvm::errs() << "[DEBUG] SemaDecl3:Redefinition coming in for " << FD->getDeclName() << "\n";
     Diag(FD->getLocation(), diag::err_redefinition) << FD;
-
+  }
   Diag(Definition->getLocation(), diag::note_previous_definition);
   FD->setInvalidDecl();
 }

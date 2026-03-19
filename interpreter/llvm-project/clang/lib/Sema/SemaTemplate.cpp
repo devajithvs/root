@@ -2044,10 +2044,16 @@ DeclResult Sema::CheckClassTemplate(
     // Check for redefinition of this class template.
     if (TUK == TagUseKind::Definition) {
       if (TagDecl *Def = PrevRecordDecl->getDefinition()) {
+        if (Name->getName() == "__is_integer_nonstrict") {
+          llvm::errs() << "[DEBUG] __is_integer_nonstrict running " << "\n";
+          llvm::errs() << "[DEBUG] Def->isUnconditionallyVisible() running " << Def->isUnconditionallyVisible() << "\n";
+        }
+        llvm::errs() << "[DEBUG] Redefinition check coming in for " << Name->getName() << "\n";
         // If we have a prior definition that is not visible, treat this as
         // simply making that previous definition visible.
         NamedDecl *Hidden = nullptr;
         if (SkipBody && !hasVisibleDefinition(Def, &Hidden)) {
+          llvm::errs() << "[DEBUG] Redefinition check hasVisibleDefinition for " << Name->getName() << "\n";
           SkipBody->ShouldSkip = true;
           SkipBody->Previous = Def;
           auto *Tmpl = cast<CXXRecordDecl>(Hidden)->getDescribedClassTemplate();
@@ -2056,6 +2062,7 @@ DeclResult Sema::CheckClassTemplate(
           makeMergedDefinitionVisible(Hidden);
           makeMergedDefinitionVisible(Tmpl);
         } else {
+          llvm::errs() << "[DEBUG] Redefinition coming in for " << Name->getName() << "\n";
           Diag(NameLoc, diag::err_redefinition) << Name;
           Diag(Def->getLocation(), diag::note_previous_definition);
           // FIXME: Would it make sense to try to "forget" the previous

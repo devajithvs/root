@@ -27,7 +27,6 @@
 #include "llvm/ADT/StringMap.h"
 #include "llvm/ADT/StringRef.h"
 #include "llvm/ADT/iterator_range.h"
-#include "llvm/Support/raw_ostream.h"
 #include <array>
 #include <cassert>
 #include <cstdint>
@@ -868,23 +867,6 @@ public:
 
   /// Get the location at which the import of a module was triggered.
   SourceLocation getImportLoc(const Module *M) const {
-if (M->getFullModuleName().find("std.bits_stl_algobase_h") != std::string::npos) {
-    if (!M) {
-      llvm::errs() << "[VM] getImportLoc: null module\n";
-    }
-    unsigned ID = M->getVisibilityID();
-
-    llvm::errs() << "[VM] getImportLoc: M=" << M
-                << " (" << M->getFullModuleName() << ")"
-                << " ID=" << ID
-                << " ImportLocs.size()=" << ImportLocs.size();
-    if (ID < ImportLocs.size()) {
-      auto Loc = ImportLocs[ID];
-      bool Valid = Loc.isValid();
-      llvm::errs() << " -> in range, loc getRawEncoding=" << Loc.getRawEncoding() << "\n";
-      llvm::errs() << " -> in range, loc valid=" << Valid << "\n";
-    }
-  }
     return M->getVisibilityID() < ImportLocs.size()
                ? ImportLocs[M->getVisibilityID()]
                : SourceLocation();

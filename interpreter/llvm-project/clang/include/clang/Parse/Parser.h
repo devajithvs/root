@@ -678,7 +678,9 @@ private:
     assert(Tok.isAnnotation() && "wrong consume method");
     SourceLocation Loc = Tok.getLocation();
     PrevTokLocation = Tok.getAnnotationEndLoc();
+    llvm::errs() << "tok::annot_module_begin, going to lex in ConsumeAnnotationToken\n";
     PP.Lex(Tok);
+    llvm::errs() << "tok::annot_module_begin, going to lex done in ConsumeAnnotationToken\n";
     return Loc;
   }
 

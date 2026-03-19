@@ -2085,6 +2085,7 @@ void Preprocessor::HandleIncludeDirective(SourceLocation HashLoc,
   // in C99 6.10.2p4.
   SourceLocation EndLoc =
       CheckEndOfDirective(IncludeTok.getIdentifierInfo()->getNameStart(), true);
+  llvm::errs() << "Preprocessor::HandleIncludeDirective going to run HandleHeaderIncludeOrImport\n";
 
   auto Action = HandleHeaderIncludeOrImport(HashLoc, IncludeTok, FilenameTok,
                                             EndLoc, LookupFrom, LookupFromFile);
@@ -2245,6 +2246,7 @@ Preprocessor::ImportAction Preprocessor::HandleHeaderIncludeOrImport(
     SourceLocation HashLoc, Token &IncludeTok, Token &FilenameTok,
     SourceLocation EndLoc, ConstSearchDirIterator LookupFrom,
     const FileEntry *LookupFromFile) {
+  llvm::errs() << "in HandleHeaderIncludeOrImport\n";
   SmallString<128> FilenameBuffer;
   StringRef Filename = getSpelling(FilenameTok, FilenameBuffer);
   SourceLocation CharEnd = FilenameTok.getEndLoc();
@@ -2628,7 +2630,9 @@ Preprocessor::ImportAction Preprocessor::HandleHeaderIncludeOrImport(
     // If this is a module import, make it visible if needed.
     assert(ModuleToImport && "no module to import");
 
+    llvm::errs() << "makeModuleVisible going to be runnning\n";
     makeModuleVisible(ModuleToImport, EndLoc);
+    llvm::errs() << "makeModuleVisible going ran\n";
 
     if (IncludeTok.getIdentifierInfo()->getPPKeywordID() ==
         tok::pp___include_macros)
@@ -2690,16 +2694,20 @@ Preprocessor::ImportAction Preprocessor::HandleHeaderIncludeOrImport(
     // that behaves the same as the header would behave in a compilation using
     // that PCH, which means we should enter the submodule. We need to teach
     // the AST serialization layer to deal with the resulting AST.
+    llvm::errs() << "ModuleToImport->isForBuilding going to be runnning\n";
     if (getLangOpts().CompilingPCH &&
         ModuleToImport->isForBuilding(getLangOpts()))
       return {ImportAction::None};
+    llvm::errs() << "ModuleToImport->isForBuilding ran\n";
 
     assert(!CurLexerSubmodule && "should not have marked this as a module yet");
     CurLexerSubmodule = ModuleToImport;
 
     // Let the macro handling code know that any future macros are within
     // the new submodule.
+    llvm::errs() << "EnterSubmodule going to be runnning" << ModuleToImport->getFullModuleName() << "\n";
     EnterSubmodule(ModuleToImport, EndLoc, /*ForPragma*/ false);
+    llvm::errs() << "EnterSubmodule ran and returning\n" << "\n";
 
     // Let the parser know that any future declarations are within the new
     // submodule.

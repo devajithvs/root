@@ -680,9 +680,11 @@ void VisibleModuleSet::setVisible(Module *M, SourceLocation Loc,
   std::function<void(Visiting)> VisitModule = [&](Visiting V) {
     // Nothing to do for a module that's already visible.
     unsigned ID = V.M->getVisibilityID();
+    auto moduleName = V.M->getFullModuleName();
+    bool shouldPrint = (ID == 100) || (moduleName == "std.bits_stl_iterator_base_types_h");
 
     // ---- DEBUG ENTRY ----
-    if (ID == 100) {
+    if (shouldPrint) {
       llvm::errs() << "[DBG] Enter VisitModule ID=100 M=" << V.M << "ImportLocs.size()=" << ImportLocs.size();
       if (ImportLocs.size() > ID) { 
         llvm::errs() << " ImportLocs[ID].isValid()=" << ImportLocs[ID].isValid() << " ImportLocs[ID].getRawEncoding()" << ImportLocs[ID].getRawEncoding();
@@ -694,36 +696,36 @@ void VisibleModuleSet::setVisible(Module *M, SourceLocation Loc,
     }
 
     if (ImportLocs.size() <= ID) {
-      if (ID == 100)
+      if (shouldPrint)
         llvm::errs() << "[DBG] Resizing ImportLocs to " << (ID + 1) << "\n";
       ImportLocs.resize(ID + 1);
     } else if (ImportLocs[ID].isValid()) {
-      if (ID == 100)
+      if (shouldPrint)
         llvm::errs() << "[DBG] Early return: ImportLocs[" << ID << "] already valid\n";
       return;
     }
 
     ImportLocs[ID] = Loc;
 
-    if (ID == 100)
+    if (shouldPrint)
       llvm::errs() << "[DBG] Marked visible, calling Vis() Loc: " << Loc.getRawEncoding() << "\n";
 
     Vis(V.M);
 
     // ---- EXPORTS ----
-      if (ID == 100)
+      if (shouldPrint)
         llvm::errs() << "[DBG] Processing exports\n";
 
       SmallVector<Module *, 16> Exports;
       V.M->getExportedModules(Exports);
 
       for (Module *E : Exports) {
-        if (ID == 100)
+        if (shouldPrint)
           llvm::errs() << "[DBG] Found export E=" << E
                        << " unimportable=" << E->isUnimportable() << "\n";
 
         if (!E->isUnimportable()) {
-          if (ID == 100)
+          if (shouldPrint)
             llvm::errs() << "[DBG] Visiting export\n";
           VisitModule({E, &V});
         }
@@ -731,17 +733,17 @@ void VisibleModuleSet::setVisible(Module *M, SourceLocation Loc,
 
     // ---- CONFLICTS ----
     for (auto &C : V.M->Conflicts) {
-      if (ID == 100)
+      if (shouldPrint)
         llvm::errs() << "[DBG] Checking conflict with module " << C.Other << "\n";
 
       if (isVisible(C.Other)) {
-        if (ID == 100)
+        if (shouldPrint)
           llvm::errs() << "[DBG] Conflict triggered!\n";
 
         llvm::SmallVector<Module*, 8> Path;
         for (Visiting *I = &V; I; I = I->ExportedBy) {
           Path.push_back(I->M);
-          if (ID == 100)
+          if (shouldPrint)
             llvm::errs() << "  [DBG] Path element: " << I->M << "\n";
         }
 
@@ -749,8 +751,8 @@ void VisibleModuleSet::setVisible(Module *M, SourceLocation Loc,
       }
     }
 
-    if (ID == 100)
-      llvm::errs() << "[DBG] Exit VisitModule ID=100\n";
+    if (shouldPrint)
+      llvm::errs() << "[DBG] Exit VisitModule ID=" << ID << "\n";
   };
 
   VisitModule({M, nullptr});

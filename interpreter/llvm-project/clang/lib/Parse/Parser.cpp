@@ -693,24 +693,18 @@ bool Parser::ParseTopLevelDecl(DeclGroupPtrTy &Result,
   }
 
   case tok::annot_module_begin:
-    llvm::errs() << "tok::annot_module_begin, going to ActOnAnnotModuleBegin\n";
     Actions.ActOnAnnotModuleBegin(
         Tok.getLocation(),
         reinterpret_cast<Module *>(Tok.getAnnotationValue()));
-    llvm::errs() << "tok::annot_module_begin, going to ConsumeAnnotationToken\n";
     ConsumeAnnotationToken();
-    llvm::errs() << "tok::annot_module_begin, done ConsumeAnnotationToken\n";
     ImportState = Sema::ModuleImportState::NotACXX20Module;
     return false;
 
   case tok::annot_module_end:
-    llvm::errs() << "tok::annot_module_end, going to ActOnAnnotModuleEnd\n";
     Actions.ActOnAnnotModuleEnd(
         Tok.getLocation(),
         reinterpret_cast<Module *>(Tok.getAnnotationValue()));
-    llvm::errs() << "tok::annot_module_begin, going to ConsumeAnnotationToken\n";
     ConsumeAnnotationToken();
-    llvm::errs() << "tok::annot_module_begin, done ConsumeAnnotationToken\n";
     ImportState = Sema::ModuleImportState::NotACXX20Module;
     return false;
 

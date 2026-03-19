@@ -755,8 +755,6 @@ void Preprocessor::EnterSubmodule(Module *M, SourceLocation ImportLoc,
   CurSubmoduleState = &State;
 
   // This module is visible to itself.
-  llvm::errs() << "EnterSubmodule makeModuleVisible? " << FirstTime << " \n";
-  
   if (FirstTime)
     makeModuleVisible(M, ImportLoc);
 }

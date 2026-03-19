@@ -902,8 +902,6 @@ bool Preprocessor::HandleIdentifier(Token &Identifier) {
 
 void Preprocessor::Lex(Token &Result) {
   ++LexLevel;
-  bool isannot = Result.isAnnotation();
-  if (isannot) llvm::errs() << "Annotation in Lex\n";
 
   // We loop here until a lex function returns a token; this avoids recursion.
   while (!CurLexerCallback(*this, Result))
@@ -946,7 +944,6 @@ void Preprocessor::Lex(Token &Result) {
     // into "import a.h;". Mimic the notional ';'.
     case tok::annot_module_include:
     case tok::semi:
-      if (isannot) llvm::errs() << "Annotation in Lex annot_module_include\n";
       TrackGMFState.handleSemi();
       StdCXXImportSeqState.handleSemi();
       ModuleDeclState.handleSemi();
@@ -969,7 +966,6 @@ void Preprocessor::Lex(Token &Result) {
     case tok::identifier:
       // Check "import" and "module" when there is no open bracket. The two
       // identifiers are not meaningful with open brackets.
-      if (isannot) llvm::errs() << "Annotation in Lex tok::identifier\n";
       if (StdCXXImportSeqState.atTopLevel()) {
         if (Result.getIdentifierInfo()->isModulesImport()) {
           TrackGMFState.handleImport(StdCXXImportSeqState.afterTopLevelSeq());
@@ -983,7 +979,6 @@ void Preprocessor::Lex(Token &Result) {
           }
           break;
         } else if (Result.getIdentifierInfo() == getIdentifierInfo("module")) {
-          if (isannot) llvm::errs() << "Annotation in Lex tok::identifier module\n";
           TrackGMFState.handleModule(StdCXXImportSeqState.afterTopLevelSeq());
           ModuleDeclState.handleModule();
           break;

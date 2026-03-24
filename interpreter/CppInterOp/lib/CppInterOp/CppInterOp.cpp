@@ -1970,7 +1970,7 @@ TCppType_t GetType(const std::string& name) {
 
   auto* D = (Decl*)GetNamed(name, /* Within= */ 0);
   if (auto* TD = llvm::dyn_cast_or_null<TypeDecl>(D)) {
-    return QualType(TD->getTypeForDecl(), 0).getAsOpaquePtr();
+    return getASTContext().getTypeDeclType(TD).getAsOpaquePtr();
   }
 
   return (TCppType_t)0;
@@ -2049,7 +2049,7 @@ static void GetDeclName(const clang::Decl* D, ASTContext& Context,
       // Handle the typedefs to anonymous types.
       QT = Typedef->getTypeSourceInfo()->getType();
     } else
-      QT = {TD->getTypeForDecl(), 0};
+      QT = TD->getASTContext().getTypeDeclType(TD);
     get_type_as_string(QT, name, Context, Policy);
   } else if (const NamedDecl* ND = dyn_cast<NamedDecl>(D)) {
     // This is a namespace member.

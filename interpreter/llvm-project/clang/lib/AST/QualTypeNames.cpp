@@ -426,6 +426,16 @@ QualType getFullyQualifiedType(QualType QT, const ASTContext &Ctx,
     QT = Ctx.getQualifiedType(Underlying, Quals);
   }
 
+  // UnaryTransformType represents compiler built-ins like __remove_extent(T).
+  // We must peel these layers back to reach the underlying type so it can be
+  // fully qualified.
+  while (const auto *UTT = dyn_cast<UnaryTransformType>(QT.getTypePtr())) {
+    if (!UTT->isSugared())
+      break;
+    Qualifiers Quals = QT.getQualifiers();
+    QT = Ctx.getQualifiedType(UTT->desugar(), Quals);
+  }
+
   if (const auto *TST =
           dyn_cast<const TemplateSpecializationType>(QT.getTypePtr())) {
 

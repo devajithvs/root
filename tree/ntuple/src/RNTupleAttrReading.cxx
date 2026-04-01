@@ -8,6 +8,7 @@
 #include <ROOT/RNTupleAttrReading.hxx>
 #include <ROOT/RNTupleAttrUtils.hxx>
 #include <ROOT/RNTupleReader.hxx>
+#include <ROOT/RNTupleModel.hxx>
 
 using namespace ROOT::Experimental::Internal::RNTupleAttributes;
 
@@ -81,3 +82,4 @@ std::unique_ptr<ROOT::REntry> ROOT::Experimental::RNTupleAttrSetReader::CreateEn
 {
    return fUserModel->CreateEntry();
 }
+

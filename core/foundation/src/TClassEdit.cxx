@@ -887,79 +887,164 @@ bool TClassEdit::IsDefHash(const char *hashname, const char *classname)
 ///
 /// Compare to TMetaUtils::GetNormalizedName, this routines does not
 /// and can not add default template parameters.
-
+#include <iostream>
 void TClassEdit::GetNormalizedName(std::string &norm_name, std::string_view name)
 {
+   bool debug = name.find("DataVector") != std::string_view::npos;
+
+   if (debug) {
+      std::cerr << "DEBUG GetNormalizedName ENTER name=" << name << "\n";
+   }
+
    if (name.empty()) {
+      if (debug) {
+         std::cerr << "DEBUG empty name -> clear\n";
+      }
       norm_name.clear();
       return;
    }
 
-   norm_name = std::string(name); // NOTE: Is that the shortest version?
+   norm_name = std::string(name);
+   if (debug) {
+      std::cerr << "DEBUG initial norm_name=" << norm_name << "\n";
+   }
 
    if (TClassEdit::IsArtificial(name)) {
-      // If there is a @ symbol (followed by a version number) then this is a synthetic class name created
-      // from an already normalized name for the purpose of supporting schema evolution.
+      if (debug) {
+         std::cerr << "DEBUG artificial name, returning early norm_name=" << norm_name << "\n";
+      }
       return;
    }
 
    AtomicTypeNameHandlerRAII nameHandler(norm_name);
+
    if (gInterpreterHelper) {
-      // Early check whether there is an existing type corresponding to `norm_name`
-      // It is *crucial* to run this block here, before `norm_name` gets split
-      // and reconstructed in the following lines. The reason is that we need
-      // to make string comparisons in `ExistingTypeCheck` and they will give
-      // different results if `norm_name` loses whitespaces. A notable example
-      // is when looking for registered alternate names of a custom user class
-      // present in the class dictionary.
       std::string typeresult;
+      if (debug) {
+         std::cerr << "DEBUG CheckInClassTable input=" << norm_name << "\n";
+      }
+
       if (gInterpreterHelper->CheckInClassTable(norm_name, typeresult)) {
+         if (debug) {
+            std::cerr << "DEBUG CheckInClassTable matched typeresult=" << typeresult << "\n";
+         }
+
          if (!typeresult.empty()) {
             norm_name = typeresult;
+            if (debug) {
+               std::cerr << "DEBUG updated norm_name from class table=" << norm_name << "\n";
+            }
          }
       }
    }
 
-   // Remove the std:: and default template argument and insert the Long64_t and change basic_string to string.
-   TClassEdit::TSplitType splitname(norm_name.c_str(),(TClassEdit::EModType)(TClassEdit::kLong64 | TClassEdit::kDropStd | TClassEdit::kDropStlDefault | TClassEdit::kKeepOuterConst));
-   splitname.ShortType(norm_name, TClassEdit::kDropStd | TClassEdit::kDropStlDefault | TClassEdit::kResolveTypedef | TClassEdit::kKeepOuterConst);
+   if (debug) {
+      std::cerr << "DEBUG before TSplitType norm_name=" << norm_name << "\n";
+   }
 
-   // 4 elements expected: "pair", "first type name", "second type name", "trailing stars"
-   if (splitname.fElements.size() == 4 && (splitname.fElements[0] == "std::pair" || splitname.fElements[0] == "pair" || splitname.fElements[0] == "__pair_base")) {
-      // We don't want to lookup the std::pair itself.
+   TClassEdit::TSplitType splitname(
+      norm_name.c_str(),
+      (TClassEdit::EModType)(TClassEdit::kLong64 | TClassEdit::kDropStd |
+                             TClassEdit::kDropStlDefault | TClassEdit::kKeepOuterConst));
+
+   splitname.ShortType(norm_name,
+                       TClassEdit::kDropStd | TClassEdit::kDropStlDefault |
+                       TClassEdit::kResolveTypedef | TClassEdit::kKeepOuterConst);
+
+   if (debug) {
+      std::cerr << "DEBUG after ShortType norm_name=" << norm_name << "\n";
+      std::cerr << "DEBUG split elements size=" << splitname.fElements.size() << "\n";
+      for (size_t i = 0; i < splitname.fElements.size(); ++i) {
+         std::cerr << "DEBUG split[" << i << "]=" << splitname.fElements[i] << "\n";
+      }
+   }
+
+   if (splitname.fElements.size() == 4 &&
+       (splitname.fElements[0] == "std::pair" ||
+        splitname.fElements[0] == "pair" ||
+        splitname.fElements[0] == "__pair_base")) {
+
+      if (debug) {
+         std::cerr << "DEBUG handling pair normalization\n";
+      }
+
       std::string first, second;
+
+      if (debug) {
+         std::cerr << "DEBUG recurse first=" << splitname.fElements[1] << "\n";
+      }
       GetNormalizedName(first, splitname.fElements[1]);
+
+      if (debug) {
+         std::cerr << "DEBUG recurse second=" << splitname.fElements[2] << "\n";
+      }
       GetNormalizedName(second, splitname.fElements[2]);
+
       norm_name = splitname.fElements[0] + "<" + first + "," + second;
-      if (!second.empty() && second.back() == '>')
+
+      if (!second.empty() && second.back() == '>') {
          norm_name += " >";
-      else
+      } else {
          norm_name += ">";
+      }
+
+      if (debug) {
+         std::cerr << "DEBUG pair result norm_name=" << norm_name << "\n";
+      }
+
       return;
    }
 
-   // Depending on how the user typed their code, in particular typedef
-   // declarations, we may end up with an explicit '::' being
-   // part of the result string.  For consistency, we must remove it.
+   if (debug) {
+      std::cerr << "DEBUG before RemoveScopeResolution norm_name=" << norm_name << "\n";
+   }
+
    RemoveScopeResolution(norm_name);
 
+   if (debug) {
+      std::cerr << "DEBUG after RemoveScopeResolution norm_name=" << norm_name << "\n";
+   }
+
    if (gInterpreterHelper) {
-      // See if the expanded name itself is a typedef.
       std::string typeresult;
+
+      if (debug) {
+         std::cerr << "DEBUG ExistingTypeCheck input=" << norm_name << "\n";
+      }
+
+      if (debug) {
+         std::cerr << "DEBUG typedef/desugar matched typeresult=" << typeresult << " gInterpreterHelper->ExistingTypeCheck(norm_name, typeresult)=" << gInterpreterHelper->ExistingTypeCheck(norm_name, typeresult) << " gInterpreterHelper->GetPartiallyDesugaredNameWithScopeHandling(norm_name, typeresult)=" << gInterpreterHelper->GetPartiallyDesugaredNameWithScopeHandling(norm_name, typeresult) << "\n";
+      }
+
       if (gInterpreterHelper->ExistingTypeCheck(norm_name, typeresult)
           || gInterpreterHelper->GetPartiallyDesugaredNameWithScopeHandling(norm_name, typeresult)) {
 
          if (!typeresult.empty()) {
-            // For STL containers, typeresult comes back with default template arguments, so a last
-            // stripping step is required
             TClassEdit::TSplitType stripDefaultTemplateArgs(
                typeresult.c_str(),
-               static_cast<TClassEdit::EModType>(TClassEdit::kLong64 | TClassEdit::kDropStd |
-                                                 TClassEdit::kDropStlDefault | TClassEdit::kKeepOuterConst));
-            stripDefaultTemplateArgs.ShortType(norm_name, TClassEdit::kDropStd | TClassEdit::kDropStlDefault);
+               static_cast<TClassEdit::EModType>(
+                  TClassEdit::kLong64 | TClassEdit::kDropStd |
+                  TClassEdit::kDropStlDefault | TClassEdit::kKeepOuterConst));
+
+            stripDefaultTemplateArgs.ShortType(norm_name,
+                                               TClassEdit::kDropStd |
+                                               TClassEdit::kDropStlDefault);
+
+            if (debug) {
+               std::cerr << "DEBUG after stripping defaults norm_name=" << norm_name << "\n";
+            }
+
             RemoveScopeResolution(norm_name);
+
+            if (debug) {
+               std::cerr << "DEBUG after final RemoveScopeResolution norm_name=" << norm_name << "\n";
+            }
          }
       }
+   }
+
+   if (debug) {
+      std::cerr << "DEBUG GetNormalizedName EXIT norm_name=" << norm_name << "\n";
    }
 }
 

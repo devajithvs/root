@@ -2983,34 +2983,67 @@ TClass *TClass::GetClass(const char *name, Bool_t load, Bool_t silent)
 
 TClass *TClass::GetClass(const char *name, Bool_t load, Bool_t silent, size_t hint_pair_offset, size_t hint_pair_size)
 {
-   if (!name || !name[0]) return nullptr;
+   std::cerr << "DEBUG [TClass] GetClass ENTER name=" << (name ? name : "<null>") << " load=" << load << " silent=" << silent << "\n";
 
-   if (strstr(name, "(anonymous)")) return nullptr;
-   if (strstr(name, "(unnamed)")) return nullptr;
-   if (strncmp(name,"class ",6)==0) name += 6;
-   if (strncmp(name,"struct ",7)==0) name += 7;
+   if (!name || !name[0]) {
+      std::cerr << "DEBUG [TClass] early return: empty name\n";
+      return nullptr;
+   }
 
-   if (!gROOT->GetListOfClasses())  return nullptr;
+   if (strstr(name, "(anonymous)")) {
+      std::cerr << "DEBUG [TClass] early return: anonymous\n";
+      return nullptr;
+   }
+   if (strstr(name, "(unnamed)")) {
+      std::cerr << "DEBUG [TClass] early return: unnamed\n";
+      return nullptr;
+   }
+
+   if (strncmp(name,"class ",6)==0) {
+      std::cerr << "DEBUG [TClass] stripping 'class '\n";
+      name += 6;
+   }
+   if (strncmp(name,"struct ",7)==0) {
+      std::cerr << "DEBUG [TClass] stripping 'struct '\n";
+      name += 7;
+   }
+
+   if (!gROOT->GetListOfClasses())  {
+      std::cerr << "DEBUG [TClass] no class list\n";
+      return nullptr;
+   }
 
    // FindObject will take the read lock before actually getting the
    // TClass pointer so we will need not get a partially initialized
    // object.
    TClass *cl = (TClass*)gROOT->GetListOfClasses()->FindObject(name);
 
+   std::cerr << "DEBUG [TClass] initial lookup name=" << name << " cl=" << cl << "\n";
    // Early return to release the lock without having to execute the
    // long-ish normalization.
    if (cl && (cl->IsLoaded() || cl->TestBit(kUnloading)))
+   {
+      std::cerr << "DEBUG [TClass] early return: already loaded\n";
       return cl;
+   }
 
    R__WRITE_LOCKGUARD(ROOT::gCoreMutex);
 
    // Now that we got the write lock, another thread may have constructed the
    // TClass while we were waiting, so we need to do the checks again.
 
+   std::cerr << "DEBUG [TClass] acquired write lock\n";
    cl = (TClass*)gROOT->GetListOfClasses()->FindObject(name);
    if (cl) {
+      std::cerr << "DEBUG [TClass] found class after lock cl=" << cl
+                   << " IsLoaded=" << cl->IsLoaded()
+                   << " unloading=" << cl->TestBit(kUnloading) << "\n";
+
       if (cl->IsLoaded() || cl->TestBit(kUnloading))
+      {
+         std::cerr << "DEBUG [TClass] return loaded after lock\n";
          return cl;
+      }
 
       // We could speed-up some of the search by adding (the equivalent of)
       //
@@ -3029,6 +3062,7 @@ TClass *TClass::GetClass(const char *name, Bool_t load, Bool_t silent, size_t hi
       // TClass that their dictionary is now available.
 
       //we may pass here in case of a dummy class created by TVirtualStreamerInfo
+      std::cerr << "DEBUG [TClass] forcing load=true due to partial class\n";
       load = kTRUE;
    }
 
@@ -3038,20 +3072,28 @@ TClass *TClass::GetClass(const char *name, Bool_t load, Bool_t silent, size_t hi
       // There is no dictionary or interpreter information about this kind of class, the only
       // (undesirable) side-effect of doing the search would be a waste of CPU time and potential
       // auto-loading or auto-parsing based on the scope of the name.
+      std::cerr << "DEBUG [TClass] artificial class, returning existing\n";
       return cl;
    }
 
    // To avoid spurious auto parsing, let's check if the name as-is is
    // known in the TClassTable.
    if (DictFuncPtr_t dict = TClassTable::GetDictNorm(name)) {
+      std::cerr << "DEBUG [TClass] found dict for name=" << name << "\n";
       // The name is normalized, so the result of the first search is
       // authoritative.
       if (!cl && !load)
+      {
+         std::cerr << "DEBUG [TClass] no class and load disabled\n";
          return nullptr;
+      }
 
       TClass *loadedcl = (dict)();
+      std::cerr << "DEBUG [TClass] dict returned " << loadedcl << "\n";
+
       if (loadedcl) {
          loadedcl->PostLoadCheck();
+         std::cerr << "DEBUG [TClass] returning dict-loaded class\n";
          return loadedcl;
       }
 
@@ -3065,8 +3107,10 @@ TClass *TClass::GetClass(const char *name, Bool_t load, Bool_t silent, size_t hi
    static const bool requestDisableAutoParsing =
       !gEnv->GetValue("Root.TClass.GetClass.AutoParsing", true) ||
       gSystem->Getenv("ROOT_DISABLE_TCLASS_GET_CLASS_AUTOPARSING") != nullptr;
-   if (requestDisableAutoParsing)
+   if (requestDisableAutoParsing) {
+      std::cerr << "DEBUG [TClass] disabling autoparsing via config\n";
       disableAutoParsing = true;
+   }
    TInterpreter::SuspendAutoParsing autoparseFence(gInterpreter, disableAutoParsing);
 
    // Note: this variable does not always holds the fully normalized name
@@ -3077,30 +3121,42 @@ TClass *TClass::GetClass(const char *name, Bool_t load, Bool_t silent, size_t hi
 
    if (!cl) {
       // First look at known types but without triggering any loads
+      std::cerr << "DEBUG [TClass] no class found, attempting normalization\n";
       {
          THashTable *typeTable = dynamic_cast<THashTable *>(gROOT->GetListOfTypes());
          TDataType *type = (TDataType *)typeTable->THashTable::FindObject(name);
          if (type) {
-            if (type->GetType() > 0)
+            std::cerr << "DEBUG [TClass] found type entry type=" << type->GetType() << "\n";
+            if (type->GetType() > 0) {
                // This is a numerical type
+               std::cerr << "DEBUG [TClass] numeric type, returning nullptr\n";
                return nullptr;
+            }
             // This is a typedef
             normalizedName = type->GetTypeName();
             nameChanged = kTRUE;
+            std::cerr << "DEBUG [TClass] typedef normalization -> " << normalizedName << "\n";
          }
       }
+
       {
          TInterpreter::SuspendAutoLoadingRAII autoloadOff(gInterpreter);
          TClassEdit::GetNormalizedName(normalizedName, name);
       }
       // Try the normalized name.
+      std::cerr << "DEBUG [TClass] normalizedName=" << normalizedName << "\n";
       if (normalizedName != name) {
          cl = (TClass*)gROOT->GetListOfClasses()->FindObject(normalizedName.c_str());
 
-         if (cl) {
-            if (cl->IsLoaded() || cl->TestBit(kUnloading))
-               return cl;
+         std::cerr << "DEBUG [TClass] lookup normalized name -> cl=" << cl << "\n";
 
+         if (cl) {
+            if (cl->IsLoaded() || cl->TestBit(kUnloading)) {
+               std::cerr << "DEBUG [TClass] normalized class already loaded\n";
+               return cl;
+            }
+
+            std::cerr << "DEBUG [TClass] normalized class exists but not loaded\n";
             //we may pass here in case of a dummy class created by TVirtualStreamerInfo
             load = kTRUE;
          }
@@ -3108,10 +3164,13 @@ TClass *TClass::GetClass(const char *name, Bool_t load, Bool_t silent, size_t hi
      }
    } else {
       normalizedName = cl->GetName(); // Use the fact that all TClass names are normalized.
+      std::cerr << "DEBUG [TClass] using existing class normalizedName=" << normalizedName << "\n";
    }
 
-   if (!load)
+   if (!load) {
+      std::cerr << "DEBUG [TClass] load disabled, returning nullptr\n";
       return nullptr;
+   }
 
    // We want to avoid auto-parsing due to intentionally missing dictionary for std::pair.
    // However, we don't need this special treatement in rootcling (there is no auto-parsing)
@@ -3119,13 +3178,16 @@ TClass *TClass::GetClass(const char *name, Bool_t load, Bool_t silent, size_t hi
    // mechanism (i.e. in rootcling they should be in kInterpreted state and never in
    // kEmulated state) so that they have proper interpreter (ClassInfo) information which
    // will be used to create the TProtoClass (if one is requested for the pair).
+   std::cerr << "DEBUG [TClass] proceeding with load, normalizedName=" << normalizedName << "\n";
    const bool ispair = TClassEdit::IsStdPair(normalizedName) && !IsFromRootCling();
    const bool ispairbase = TClassEdit::IsStdPairBase(normalizedName) && !IsFromRootCling();
 
    auto loadClass = [](const char *requestedname) -> TClass* {
+      std::cerr << "DEBUG [TClass] loadClass called for " << requestedname << "\n";
       DictFuncPtr_t dict = TClassTable::GetDictNorm(requestedname);
       if (dict) {
          TClass *loadedcl = (dict)();
+         std::cerr << "DEBUG [TClass] loadClass dict returned " << loadedcl << "\n";
          if (loadedcl) {
             loadedcl->PostLoadCheck();
             return loadedcl;
@@ -3136,11 +3198,14 @@ TClass *TClass::GetClass(const char *name, Bool_t load, Bool_t silent, size_t hi
 
    // Check with the changed name first.
    if (nameChanged) {
+      std::cerr << "DEBUG [TClass] trying loadClass with normalizedName\n";
       if(TClass *loadedcl = loadClass(normalizedName.c_str()))
          return loadedcl;
    }
+
    if (gInterpreter->AutoLoad(normalizedName.c_str(),kTRUE)) {
       // Check if we just loaded the necessary dictionary.
+      std::cerr << "DEBUG [TClass] AutoLoad triggered\n";
       if (TClass *loadedcl = loadClass(normalizedName.c_str()))
          return loadedcl;
 
@@ -3155,19 +3220,26 @@ TClass *TClass::GetClass(const char *name, Bool_t load, Bool_t silent, size_t hi
          TInterpreter::SuspendAutoLoadingRAII autoloadOff(gInterpreter);
          std::string normalizedNameAfterAutoLoad;
          TClassEdit::GetNormalizedName(normalizedNameAfterAutoLoad, name);
+
+         std::cerr << "DEBUG [TClass] renormalized after autoload: "
+                      << normalizedNameAfterAutoLoad << "\n";
+
          nameChanged = normalizedNameAfterAutoLoad != normalizedName;
          normalizedName = normalizedNameAfterAutoLoad;
       }
+
       if (nameChanged) {
          // Try to load with an attempt to autoload with the new name
+         std::cerr << "DEBUG [TClass] name changed after autoload\n";
          if (TClass *loadedcl = LoadClassDefault(normalizedName.c_str(), silent))
             return loadedcl;
       }
    }
 
-   // If name is known to be an enum, we don't need to try to load it.
-   if (TEnum::GetEnum(normalizedName.c_str(), TEnum::kNone))
+   if (TEnum::GetEnum(normalizedName.c_str(), TEnum::kNone)) {
+      std::cerr << "DEBUG [TClass] enum detected, returning nullptr\n";
       return nullptr;
+   }
 
    // Maybe this was a typedef: let's try to see if this is the case
    if (!ispair && !ispairbase) {
@@ -3292,6 +3364,14 @@ TClass *TClass::GetClass(const char *name, Bool_t load, Bool_t silent, size_t hi
          delete ncl;
       }
    }
+
+   if (cl) {
+      std::cerr << "DEBUG [TClass] existing emulated class cl=" << cl << "\n";
+   }
+
+   std::cerr << "DEBUG [TClass] final fallback, returning nullptr for "
+                << normalizedName << "\n";
+
    return nullptr;
 }
 

@@ -290,13 +290,7 @@ ROOT::RFieldBase::Create(const std::string &fieldName, const std::string &typeNa
    using ROOT::Internal::ParseUIntTypeToken;
    using ROOT::Internal::TokenizeTypeList;
 
-   std::cerr << "DEBUG Create: fieldName=" << fieldName
-             << " typeName=" << typeName
-             << " fieldId=" << fieldId << "\n";
-
    const auto resolvedType = ROOT::Internal::GetCanonicalTypePrefix(TClassEdit::ResolveTypedef(typeName.c_str()));
-
-   std::cerr << "DEBUG Create: resolvedType=" << resolvedType << "\n";
 
    thread_local CreateContext createContext;
    CreateContextGuard createContextGuard(createContext);
@@ -307,9 +301,6 @@ ROOT::RFieldBase::Create(const std::string &fieldName, const std::string &typeNa
                   &resolvedType](const std::string &errMsg,
                                  RInvalidField::ECategory cat =
                                     RInvalidField::ECategory::kTypeError) -> RResult<std::unique_ptr<RFieldBase>> {
-      std::cerr << "DEBUG Create: FAIL fieldName=" << fieldName
-                << " resolvedType=" << resolvedType
-                << " errMsg=" << errMsg << "\n";
       if (createContext.GetContinueOnError()) {
          return std::unique_ptr<RFieldBase>(std::make_unique<RInvalidField>(fieldName, resolvedType, errMsg, cat));
       } else {
@@ -317,21 +308,16 @@ ROOT::RFieldBase::Create(const std::string &fieldName, const std::string &typeNa
       }
    };
 
-   if (resolvedType.empty()) {
-      std::cerr << "DEBUG Create: resolvedType empty\n";
+   if (resolvedType.empty())
       return R__FORWARD_RESULT(fnFail("no type name specified for field '" + fieldName + "'"));
-   }
 
    std::unique_ptr<ROOT::RFieldBase> result;
 
    const auto maybeGetChildId = [desc, fieldId](int childId) {
       if (desc) {
          const auto &fieldDesc = desc->GetFieldDescriptor(fieldId);
-         auto id = fieldDesc.GetLinkIds().at(childId);
-         std::cerr << "DEBUG Create: maybeGetChildId(" << childId << ") -> " << id << "\n";
-         return id;
+         return fieldDesc.GetLinkIds().at(childId);
       } else {
-         std::cerr << "DEBUG Create: maybeGetChildId(" << childId << ") -> invalid\n";
          return ROOT::kInvalidDescriptorId;
       }
    };
@@ -340,10 +326,8 @@ ROOT::RFieldBase::Create(const std::string &fieldName, const std::string &typeNa
    // function never throws but returns RResult::Error instead.
    try {
       if (resolvedType == "bool") {
-         std::cerr << "DEBUG Create: matched bool\n";
          result = std::make_unique<RField<bool>>(fieldName);
       } else if (resolvedType == "char") {
-         std::cerr << "DEBUG Create: matched char\n";
          result = std::make_unique<RField<char>>(fieldName);
       } else if (resolvedType == "std::byte") {
          result = std::make_unique<RField<std::byte>>(fieldName);
@@ -377,43 +361,28 @@ ROOT::RFieldBase::Create(const std::string &fieldName, const std::string &typeNa
       } else if (resolvedType == "TObject") {
          result = std::make_unique<RField<TObject>>(fieldName);
       } else if (resolvedType == "std::vector<bool>") {
-         std::cerr << "DEBUG Create: matched std::vector<bool>\n";
          result = std::make_unique<RField<std::vector<bool>>>(fieldName);
       } else if (resolvedType.substr(0, 12) == "std::vector<") {
-         std::cerr << "DEBUG Create: entering std::vector branch\n";
          std::string itemTypeName = resolvedType.substr(12, resolvedType.length() - 13);
-         std::cerr << "DEBUG Create: vector itemTypeName=" << itemTypeName << "\n";
          auto itemField = Create("_0", itemTypeName, options, desc, maybeGetChildId(0));
-         std::cerr << "DEBUG Create: vector itemField created\n";
          result = std::make_unique<RVectorField>(fieldName, itemField.Unwrap());
       } else if (resolvedType.substr(0, 19) == "ROOT::VecOps::RVec<") {
-         std::cerr << "DEBUG Create: entering RVec branch\n";
          std::string itemTypeName = resolvedType.substr(19, resolvedType.length() - 20);
-         std::cerr << "DEBUG Create: RVec itemTypeName=" << itemTypeName << "\n";
          auto itemField = Create("_0", itemTypeName, options, desc, maybeGetChildId(0));
-         std::cerr << "DEBUG Create: RVec itemField created\n";
          result = std::make_unique<RRVecField>(fieldName, itemField.Unwrap());
       } else if (resolvedType.substr(0, 11) == "std::array<") {
-         std::cerr << "DEBUG Create: entering std::array branch\n";
          auto arrayDef = TokenizeTypeList(resolvedType.substr(11, resolvedType.length() - 12));
-         std::cerr << "DEBUG Create: arrayDef size=" << arrayDef.size() << "\n";
          if (arrayDef.size() != 2) {
             return R__FORWARD_RESULT(fnFail("the template list for std::array must have exactly two elements"));
          }
          auto arrayLength = ParseUIntTypeToken(arrayDef[1]);
-         std::cerr << "DEBUG Create: arrayLength=" << arrayLength << "\n";
          auto itemField = Create("_0", arrayDef[0], options, desc, maybeGetChildId(0));
-         std::cerr << "DEBUG Create: array itemField created\n";
          result = std::make_unique<RArrayField>(fieldName, itemField.Unwrap(), arrayLength);
       } else if (resolvedType.substr(0, 13) == "std::variant<") {
-         std::cerr << "DEBUG Create: entering std::variant branch\n";
          auto innerTypes = TokenizeTypeList(resolvedType.substr(13, resolvedType.length() - 14));
-         std::cerr << "DEBUG Create: variant innerTypes size=" << innerTypes.size() << "\n";
          std::vector<std::unique_ptr<RFieldBase>> items;
          items.reserve(innerTypes.size());
          for (unsigned int i = 0; i < innerTypes.size(); ++i) {
-            std::cerr << "DEBUG Create: variant processing index=" << i
-                      << " type=" << innerTypes[i] << "\n";
             items.emplace_back(
                Create("_" + std::to_string(i), innerTypes[i], options, desc, maybeGetChildId(i)).Unwrap());
          }
@@ -517,36 +486,18 @@ ROOT::RFieldBase::Create(const std::string &fieldName, const std::string &typeNa
       }
 
       if (!result) {
-         std::cerr << "DEBUG Create: trying enum lookup for " << resolvedType << "\n";
          auto e = TEnum::GetEnum(resolvedType.c_str());
          if (e != nullptr) {
-            std::cerr << "DEBUG Create: enum matched\n";
             result = std::make_unique<REnumField>(fieldName, typeName);
          }
       }
 
       if (!result) {
-         std::cerr << "DEBUG Create: trying TClass lookup for " << typeName << "\n";
          auto cl = TClass::GetClass(typeName.c_str());
-
-
-
-         if (cl) {
-            std::cerr << "DEBUG Create: class=" << typeName
-                     << " state=" << cl->GetState()
-                     << " IsLoaded=" << cl->IsLoaded()
-                     << " HasCollectionProxy=" << (cl->GetCollectionProxy() != nullptr)
-                     << "\n";
-         } else {
-            std::cerr << "DEBUG Create: TClass NOT found\n";
-         }
 
          if (cl && cl->GetState() > TClass::kForwardDeclared) {
             createContextGuard.AddClassToStack(resolvedType);
-            std::cerr << "DEBUG Create: class is usable\n";
-
             if (cl->GetCollectionProxy()) {
-               std::cerr << "DEBUG Create: using RProxiedCollectionField\n";
                result = std::make_unique<RProxiedCollectionField>(fieldName, typeName);
             }
             // NOTE: if the class is not at least "Interpreted" we currently don't try to construct
@@ -554,16 +505,12 @@ ROOT::RFieldBase::Create(const std::string &fieldName, const std::string &typeNa
             // rather than from TClass. This might be desirable in the future, but for now in this
             // situation we rely on field emulation instead.
             else if (cl->GetState() >= TClass::kInterpreted) {
-               std::cerr << "DEBUG Create: class interpreted\n";
                if (!ROOT::Internal::GetRNTupleSoARecord(cl).empty()) {
-                  std::cerr << "DEBUG Create: using RSoAField\n";
                   result = std::make_unique<ROOT::Experimental::RSoAField>(fieldName, typeName);
                } else if (ROOT::Internal::GetRNTupleSerializationMode(cl) ==
                           ROOT::Internal::ERNTupleSerializationMode::kForceStreamerMode) {
-                  std::cerr << "DEBUG Create: using RStreamerField\n";
                   result = std::make_unique<RStreamerField>(fieldName, typeName);
                } else {
-                  std::cerr << "DEBUG Create: using RClassField\n";
                   result = std::make_unique<RClassField>(fieldName, typeName);
                }
             }
@@ -572,11 +519,38 @@ ROOT::RFieldBase::Create(const std::string &fieldName, const std::string &typeNa
          // If we get here then we failed to meet all the conditions to create a "properly typed" field.
          // Resort to field emulation if the user asked us to.
          if (!result && options.GetEmulateUnknownTypes()) {
-            std::cerr << "DEBUG Create: entering emulation fallback\n";
+            assert(desc);
+            const auto &fieldDesc = desc->GetFieldDescriptor(fieldId);
+            if (fieldDesc.GetStructure() == ENTupleStructure::kRecord) {
+               std::vector<std::unique_ptr<RFieldBase>> memberFields;
+               memberFields.reserve(fieldDesc.GetLinkIds().size());
+               for (auto id : fieldDesc.GetLinkIds()) {
+                  const auto &memberDesc = desc->GetFieldDescriptor(id);
+                  auto field = Create(memberDesc.GetFieldName(), memberDesc.GetTypeName(), options, desc, id).Unwrap();
+                  memberFields.emplace_back(std::move(field));
+               }
+               R__ASSERT(typeName == fieldDesc.GetTypeName());
+               auto recordField =
+                  Internal::CreateEmulatedRecordField(fieldName, std::move(memberFields), fieldDesc.GetTypeName());
+               recordField->fTypeAlias = fieldDesc.GetTypeAlias();
+               return recordField;
+            } else if (fieldDesc.GetStructure() == ENTupleStructure::kCollection) {
+               if (fieldDesc.GetLinkIds().size() != 1)
+                  throw ROOT::RException(R__FAIL("invalid structure for collection field " + fieldName));
+
+               auto itemFieldId = fieldDesc.GetLinkIds()[0];
+               const auto &itemFieldDesc = desc->GetFieldDescriptor(itemFieldId);
+               auto itemField =
+                  Create(itemFieldDesc.GetFieldName(), itemFieldDesc.GetTypeName(), options, desc, itemFieldId)
+                     .Unwrap();
+               auto vecField =
+                  ROOT::Internal::CreateEmulatedVectorField(fieldName, std::move(itemField), fieldDesc.GetTypeName());
+               vecField->fTypeAlias = fieldDesc.GetTypeAlias();
+               return vecField;
+            }
          }
       }
    } catch (const RException &e) {
-      std::cerr << "DEBUG Create: caught RException: " << e.what() << "\n";
       auto error = e.GetError();
       if (createContext.GetContinueOnError()) {
          return std::unique_ptr<RFieldBase>(std::make_unique<RInvalidField>(fieldName, typeName, error.GetReport(),
@@ -585,7 +559,7 @@ ROOT::RFieldBase::Create(const std::string &fieldName, const std::string &typeNa
          return error;
       }
    } catch (const std::logic_error &e) {
-      std::cerr << "DEBUG Create: caught logic_error: " << e.what() << "\n";
+      // Integer parsing error
       if (createContext.GetContinueOnError()) {
          return std::unique_ptr<RFieldBase>(
             std::make_unique<RInvalidField>(fieldName, typeName, e.what(), RInvalidField::ECategory::kGeneric));
@@ -596,17 +570,11 @@ ROOT::RFieldBase::Create(const std::string &fieldName, const std::string &typeNa
 
    if (result) {
       const auto normOrigType = ROOT::Internal::GetNormalizedUnresolvedTypeName(typeName);
-      std::cerr << "DEBUG RFieldBase::Create: got GetNormalizedUnresolvedTypeName\n";
-      std::cerr << "DEBUG RFieldBase::Create: normOrigType =" << normOrigType
-                << " result->GetTypeName() = " << result->GetTypeName() << "\n";
       if (normOrigType != result->GetTypeName()) {
          result->fTypeAlias = normOrigType;
       }
-      std::cerr << "DEBUG RFieldBase::Create: Returning result\n";
       return result;
    }
-
-   std::cerr << "DEBUG Create: no result, final failure for typeName=" << typeName << "\n";
    return R__FORWARD_RESULT(fnFail("unknown type: " + typeName, RInvalidField::ECategory::kUnknownType));
 }
 

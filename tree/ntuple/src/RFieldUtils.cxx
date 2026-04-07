@@ -569,111 +569,71 @@ bool ROOT::Internal::NeedsMetaNameAsAlias(const std::string &metaNormalizedName,
 
 std::string ROOT::Internal::GetNormalizedUnresolvedTypeName(const std::string &origName)
 {
-   std::cerr << "DEBUG GetNormalizedUnresolvedTypeName: ENTRY origName = " << origName << "\n";
-   
    const TClassEdit::EModType modType = static_cast<TClassEdit::EModType>(
       TClassEdit::kDropStlDefault | TClassEdit::kDropComparator | TClassEdit::kDropHash);
    TClassEdit::TSplitType splitname(origName.c_str(), modType);
    std::string shortType;
    splitname.ShortType(shortType, modType);
-   std::cerr << "DEBUG GetNormalizedUnresolvedTypeName: shortType = " << shortType << "\n";
-   
    const auto canonicalTypePrefix = GetCanonicalTypePrefix(shortType);
-   std::cerr << "DEBUG GetNormalizedUnresolvedTypeName: canonicalTypePrefix = " << canonicalTypePrefix << "\n";
 
    if (canonicalTypePrefix.find('<') == std::string::npos) {
       // If there are no templates, the function is done.
-      std::cerr << "DEBUG GetNormalizedUnresolvedTypeName: no templates, returning canonicalTypePrefix\n";
       return canonicalTypePrefix;
    }
 
    const auto angleBrackets = FindTemplateAngleBrackets(canonicalTypePrefix);
    R__ASSERT(!angleBrackets.empty());
-   std::cerr << "DEBUG GetNormalizedUnresolvedTypeName: found " << angleBrackets.size() << " angle bracket pairs\n";
 
    // For user-defined class types, we will need to get the default-initialized template arguments.
    const bool isUserClass = IsUserClass(canonicalTypePrefix);
-   std::cerr << "DEBUG GetNormalizedUnresolvedTypeName: isUserClass = " << isUserClass << "\n";
 
    std::string normName;
    std::string::size_type currentPos = 0;
    for (std::size_t i = 0; i < angleBrackets.size(); i++) {
       const auto [posOpen, posClose] = angleBrackets[i];
-      std::cerr << "DEBUG GetNormalizedUnresolvedTypeName: LOOP i=" << i 
-                   << " posOpen=" << posOpen << " posClose=" << posClose << "\n";
-      
       // Append the type prefix until the open angle bracket.
       normName += canonicalTypePrefix.substr(currentPos, posOpen + 1 - currentPos);
-      std::cerr << "DEBUG GetNormalizedUnresolvedTypeName: normName after prefix = " << normName << "\n";
 
       const auto argList = canonicalTypePrefix.substr(posOpen + 1, posClose - posOpen - 1);
-      std::cerr << "DEBUG GetNormalizedUnresolvedTypeName: argList = " << argList << "\n";
-      
       const auto templateArgs = TokenizeTypeList(argList);
       R__ASSERT(!templateArgs.empty());
-      std::cerr << "DEBUG GetNormalizedUnresolvedTypeName: templateArgs.size() = " << templateArgs.size() << "\n";
 
       for (const auto &a : templateArgs) {
-         std::cerr << "DEBUG GetNormalizedUnresolvedTypeName: processing templateArg = " << a << "\n";
          normName += GetNormalizedTemplateArg(a, isUserClass, GetNormalizedUnresolvedTypeName) + ",";
-         std::cerr << "DEBUG GetNormalizedUnresolvedTypeName: normName after arg = " << normName << "\n";
       }
 
       // For user-defined classes, append default-initialized template arguments.
       if (isUserClass) {
-         std::cerr << "DEBUG GetNormalizedUnresolvedTypeName: looking up TClass for default args\n";
          const auto cl = TClass::GetClass(canonicalTypePrefix.substr(0, posClose + 1).c_str());
-         std::cerr << "DEBUG GetNormalizedUnresolvedTypeName: TClass lookup for " 
-                      << canonicalTypePrefix.substr(0, posClose + 1) 
-                      << " returned " << (cl ? cl->GetName() : "nullptr") << "\n";
          if (cl) {
             const std::string expandedName = cl->GetName();
-            std::cerr << "DEBUG GetNormalizedUnresolvedTypeName: expandedName = " << expandedName << "\n";
-            
             const auto expandedAngleBrackets = FindTemplateAngleBrackets(expandedName);
             // We can have fewer pairs than angleBrackets, for example in case of type aliases.
             R__ASSERT(!expandedAngleBrackets.empty());
-            std::cerr << "DEBUG GetNormalizedUnresolvedTypeName: expandedAngleBrackets.size() = " 
-                         << expandedAngleBrackets.size() << "\n";
 
             const auto [expandedPosOpen, expandedPosClose] = expandedAngleBrackets.back();
-            std::cerr << "DEBUG GetNormalizedUnresolvedTypeName: expandedPosOpen=" << expandedPosOpen 
-                         << " expandedPosClose=" << expandedPosClose << "\n";
-            
             const auto expandedArgList =
                expandedName.substr(expandedPosOpen + 1, expandedPosClose - expandedPosOpen - 1);
-            std::cerr << "DEBUG GetNormalizedUnresolvedTypeName: expandedArgList = " << expandedArgList << "\n";
-            
             const auto expandedTemplateArgs = TokenizeTypeList(expandedArgList);
-            std::cerr << "DEBUG GetNormalizedUnresolvedTypeName: expandedTemplateArgs.size() = " 
-                         << expandedTemplateArgs.size() << "\n";
             // Note that we may be in a sitation where expandedTemplateArgs.size() is _smaller_ than
             // templateArgs.size(), which is when the input type name has the optional template arguments explicitly
             // spelled out but ROOT Meta is told to ignore some template arguments.
 
             for (std::size_t j = templateArgs.size(); j < expandedTemplateArgs.size(); ++j) {
-               std::cerr << "DEBUG GetNormalizedUnresolvedTypeName: adding default arg " 
-                            << expandedTemplateArgs[j] << "\n";
                normName +=
                   GetNormalizedTemplateArg(expandedTemplateArgs[j], isUserClass, GetNormalizedUnresolvedTypeName) + ",";
-               std::cerr << "DEBUG GetNormalizedUnresolvedTypeName: normName after default arg = " << normName << "\n";
             }
          }
       }
 
       normName[normName.size() - 1] = '>';
-      std::cerr << "DEBUG GetNormalizedUnresolvedTypeName: normName after closing bracket = " << normName << "\n";
       currentPos = posClose + 1;
-      std::cerr << "DEBUG GetNormalizedUnresolvedTypeName: currentPos = " << currentPos << "\n";
    }
 
    // Append the rest of the type from the last closing angle bracket.
    const auto lastClosePos = angleBrackets.back().second;
-   std::cerr << "DEBUG GetNormalizedUnresolvedTypeName: lastClosePos = " << lastClosePos << "\n";
    normName += canonicalTypePrefix.substr(lastClosePos + 1);
-   std::cerr << "DEBUG GetNormalizedUnresolvedTypeName: normName after suffix = " << normName << "\n";
 
-   std::cerr << "DEBUG GetNormalizedUnresolvedTypeName: RETURNING " << normName << "\n";
    return normName;
 }
 

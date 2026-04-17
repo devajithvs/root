@@ -972,6 +972,24 @@ namespace utils {
       // desugaring (and/or name normaliztation) is to remove it.
 
         const NamespaceDecl* ns = getNNSNamespace(embedded_prefix);
+        if (embedded_prefix.getKind() == NestedNameSpecifier::Kind::Global && !ns) {
+          if (const TemplateSpecializationType* TST =
+                  QT->getAs<TemplateSpecializationType>()) {
+
+            TemplateName TName = TST->getTemplateName();
+            if (TemplateDecl* TD = TName.getAsTemplateDecl()) {
+              // Rebuild TemplateName WITHOUT prefix
+              TemplateName NewName(TD);
+              // Recreate the type
+              QT = Ctx.getTemplateSpecializationType(ElaboratedTypeKeyword::None,
+                                                    NewName,
+                                                    TST->template_arguments(),
+                                                    /*CanonicalArgs=*/{},
+                                                    TST->getCanonicalTypeInternal());
+
+            }
+          }
+        }
         if (!(ns && ns->isAnonymousNamespace())) {
           // We have to also desugar the prefix unless
           // it does not have a name (anonymous namespaces).

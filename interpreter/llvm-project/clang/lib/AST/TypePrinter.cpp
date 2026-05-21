@@ -1526,10 +1526,12 @@ void TypePrinter::printTagType(const TagType *T, raw_ostream &OS) {
       OS << ' ';
     }
   } else {
-    OS << TypeWithKeyword::getKeywordName(T->getKeyword());
-    if (T->getKeyword() != ElaboratedTypeKeyword::None) {
-      PrintedKindDecoration = true;
-      OS << ' ';
+    if (!Policy.SuppressTagKeyword) {
+      OS << TypeWithKeyword::getKeywordName(T->getKeyword());
+      if (T->getKeyword() != ElaboratedTypeKeyword::None) {
+        PrintedKindDecoration = true;
+        OS << ' ';
+      }
     }
   }
 

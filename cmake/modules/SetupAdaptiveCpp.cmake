@@ -6,7 +6,7 @@ if(NOT DEFINED ADAPTIVE_CPP_SOURCE_DIR)
   FetchContent_Declare(
     AdaptiveCpp
     GIT_REPOSITORY https://github.com/root-project/AdaptiveCpp.git
-    GIT_TAG ROOT-acpp-v25.02.0-20250926-01)
+    GIT_TAG ROOT-acpp-v25.10.0-20260609-01)
   FetchContent_GetProperties(AdaptiveCpp)
   if(NOT AdaptiveCpp_POPULATED)
     FetchContent_Populate(AdaptiveCpp)
@@ -21,6 +21,8 @@ endif()
 
 set(LLVM_BINARY_DIR ${CMAKE_BINARY_DIR}/interpreter/llvm-project/llvm)
 set(CLANG_EXECUTABLE_PATH ${LLVM_BINARY_DIR}/bin/clang${CMAKE_EXECUTABLE_SUFFIX})
+
+set(ACPP_LLD_PATH "${CMAKE_LINKER}" CACHE STRING "Linker used by AdaptiveCpp")
 
 set(ACPP_CLANG
     ${CLANG_EXECUTABLE_PATH}

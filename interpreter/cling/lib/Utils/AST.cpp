@@ -602,6 +602,21 @@ namespace utils {
         Ctx, tname, /*WithGlobalNsPrefix=*/false);
   }
 
+  const Type* GetFullyQualifiedTemplateType(
+      const ASTContext& Ctx, const clang::TagType* TSTRecord,
+      clang::ElaboratedTypeKeyword Keyword,
+      clang::NestedNameSpecifier Qualifier, bool WithGlobalNsPrefix) {
+    getFullyQualifiedTemplateType(Ctx, TSTRecord, Keyword, Qualifier,
+                                  WithGlobalNsPrefix);
+  }
+
+  const Type*
+  GetFullyQualifiedTemplateType(const clang::ASTContext& Ctx,
+                                const clang::TemplateSpecializationType* TST,
+                                bool WithGlobalNsPrefix) {
+    getFullyQualifiedTemplateType(Ctx, TST, WithGlobalNsPrefix);
+  }
+
   static NestedNameSpecifier
   GetFullyQualifiedNameSpecifier(const ASTContext& Ctx,
                                  NestedNameSpecifier scope) {

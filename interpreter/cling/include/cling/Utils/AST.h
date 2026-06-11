@@ -20,6 +20,7 @@ namespace clang {
   class Decl;
   class DeclContext;
   class DeclarationName;
+  class ElaboratedTypeKeyword;
   class FunctionDecl;
   class GlobalDecl;
   class IntegerLiteral;
@@ -30,7 +31,9 @@ namespace clang {
   class QualType;
   class Sema;
   class TagDecl;
+  class TagType;
   class TemplateDecl;
+  class TemplateSpecializationType;
   class Type;
   class TypedefNameDecl;
   class UsingShadowDecl;
@@ -359,6 +362,16 @@ namespace utils {
     CreateNestedNameSpecifier(const clang::ASTContext& Ctx,
                               const clang::UsingShadowDecl *USD,
                               bool FullyQualify);
+
+    const clang::Type* GetFullyQualifiedTemplateType(
+        const clang::ASTContext& Ctx, const clang::TagType* TSTRecord,
+        clang::ElaboratedTypeKeyword Keyword,
+        clang::NestedNameSpecifier Qualifier, bool WithGlobalNsPrefix);
+
+    const clang::Type*
+    GetFullyQualifiedTemplateType(const clang::ASTContext& Ctx,
+                                  const clang::TemplateSpecializationType* TST,
+                                  bool WithGlobalNsPrefix);
 
   } // end namespace TypeName
 } // end namespace utils

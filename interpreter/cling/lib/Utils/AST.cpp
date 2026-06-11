@@ -583,6 +583,20 @@ namespace TypeName {
         Ctx, TypePtr, FullyQualified, /*WithGlobalNsPrefix=*/false);
   }
 
+  const Type* TypeName::GetFullyQualifiedTemplateType(
+      const ASTContext& Ctx, const clang::TagType* TSTRecord,
+      clang::ElaboratedTypeKeyword Keyword,
+      clang::NestedNameSpecifier Qualifier, bool WithGlobalNsPrefix) {
+    TypeName::getFullyQualifiedTemplateType(Ctx, TSTRecord, Keyword, Qualifier,
+                                            WithGlobalNsPrefix);
+  }
+
+  const Type* TypeName::GetFullyQualifiedTemplateType(
+      const clang::ASTContext& Ctx,
+      const clang::TemplateSpecializationType* TST, bool WithGlobalNsPrefix) {
+    TypeName::getFullyQualifiedTemplateType(Ctx, TST, WithGlobalNsPrefix);
+  }
+
   NestedNameSpecifier
   TypeName::CreateNestedNameSpecifier(const ASTContext& Ctx,
                                       const NamespaceDecl* Namesp,

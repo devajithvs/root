@@ -3263,8 +3263,8 @@ clang::QualType ROOT::TMetaUtils::AddDefaultParameters(clang::QualType instanceT
         // may point to a template specialization) or Template
         // Specialization Type. We need to fully qualify their arguments.
 
-        const clang::Type *TypePtr = clang::TypeName::getFullyQualifiedTemplateType(
-            Ctx, TT, TT->getKeyword(), prefix, /*WithGlobalNsPrefix=*/false);
+        const clang::Type *TypePtr = cling::utils::TypeName::GetFullyQualifiedTemplateType(
+           Ctx, TT, TT->getKeyword(), prefix, /*WithGlobalNsPrefix=*/false);
         instanceType = clang::QualType(TypePtr, 0);
       } else if (const auto *TT = llvm::dyn_cast<clang::TypedefType>(instanceType.getTypePtr())) {
         instanceType = Ctx.getTypedefType(
@@ -4196,8 +4196,8 @@ static void KeepNParams(clang::QualType& normalizedType,
         // may point to a template specialization) or Template
         // Specialization Type. We need to fully qualify their arguments.
 
-        const Type *TypePtr = clang::TypeName::getFullyQualifiedTemplateType(
-            astCtxt, TT, TT->getKeyword(), prefix, /*WithGlobalNsPrefix=*/false);
+        const Type *TypePtr = cling::utils::TypeName::GetFullyQualifiedTemplateType(
+           astCtxt, TT, TT->getKeyword(), prefix, /*WithGlobalNsPrefix=*/false);
         normalizedType = QualType(TypePtr, 0);
       } else if (const auto *TT = dyn_cast<TypedefType>(normalizedType.getTypePtr())) {
         normalizedType = astCtxt.getTypedefType(
@@ -4207,8 +4207,8 @@ static void KeepNParams(clang::QualType& normalizedType,
                  dyn_cast<TemplateSpecializationType>(normalizedType.getTypePtr())) {
         // e.g. TDataPoint<float> with prefix NS:: reconstructed as
         // NS::TDataPoint<float>
-        const Type *TypePtr = clang::TypeName::getFullyQualifiedTemplateType(
-            astCtxt, TST, /*WithGlobalNsPrefix=*/false);
+        const Type *TypePtr =
+           cling::utils::TypeName::GetFullyQualifiedTemplateType(astCtxt, TST, /*WithGlobalNsPrefix=*/false);
         normalizedType = QualType(TypePtr, 0);
       }
       normalizedType = astCtxt.getQualifiedType(normalizedType,prefix_qualifiers);

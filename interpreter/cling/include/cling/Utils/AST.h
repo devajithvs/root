@@ -300,11 +300,8 @@ namespace utils {
     ///\param[in] QT - the type for which the fully qualified type will be
     /// returned.
     ///\param[in] Ctx - the ASTContext to be used.
-    ///\param[in] WithGlobalNsPrefix - If true, then the global namespace
-    /// specifier "::" will be prepended to the fully qualified name.
     clang::QualType GetFullyQualifiedType(clang::QualType QT,
-                                          const clang::ASTContext& Ctx,
-                                          bool WithGlobalNsPrefix = false);
+                                          const clang::ASTContext& Ctx);
 
     ///\brief Get the fully qualified name for a type. This includes full
     /// qualification of all template parameters etc.
@@ -312,11 +309,8 @@ namespace utils {
     ///\param[in] QT - the type for which the fully qualified name will be
     /// returned.
     ///\param[in] Ctx - the ASTContext to be used.
-    ///\param[in] WithGlobalNsPrefix - If true, then the global namespace
-    /// specifier "::" will be prepended to the fully qualified name.
     std::string GetFullyQualifiedName(clang::QualType QT,
-                                      const clang::ASTContext &Ctx,
-                                      bool WithGlobalNsPrefix = false);
+                                      const clang::ASTContext &Ctx);
 
     ///\brief Create a NestedNameSpecifier for Namesp and its enclosing
     /// scopes.
@@ -324,12 +318,9 @@ namespace utils {
     ///\param[in] Ctx - the AST Context to be used.
     ///\param[in] Namesp - the NamespaceDecl for which a NestedNameSpecifier
     /// is requested.
-    ///\param[in] WithGlobalNsPrefix - If true, then the global namespace
-    /// specifier "::" will be prepended to the fully qualified name.
     clang::NestedNameSpecifier
     CreateNestedNameSpecifier(const clang::ASTContext& Ctx,
-                              const clang::NamespaceDecl* Namesp,
-                              bool WithGlobalNsPrefix = false);
+                              const clang::NamespaceDecl* Namesp);
 
     ///\brief Create a NestedNameSpecifier for TagDecl and its enclosing
     /// scopes.
@@ -339,12 +330,9 @@ namespace utils {
     /// requested.
     ///\param[in] FullyQualify - Convert all template arguments into fully
     /// qualified names.
-    ///\param[in] WithGlobalNsPrefix - If true, then the global namespace
-    /// specifier "::" will be prepended to the fully qualified name.
     clang::NestedNameSpecifier
     CreateNestedNameSpecifier(const clang::ASTContext& Ctx,
-                              const clang::TagDecl *TD, bool FullyQualify,
-                              bool WithGlobalNsPrefix = false);
+                              const clang::TagDecl *TD, bool FullyQualify);
 
     ///\brief Create a NestedNameSpecifier for TypedefDecl and its enclosing
     /// scopes.
@@ -354,13 +342,10 @@ namespace utils {
     /// requested.
     ///\param[in] FullyQualify - Convert all template arguments (of possible
     /// parent scopes) into fully qualified names.
-    ///\param[in] WithGlobalNsPrefix - If true, then the global namespace
-    /// specifier "::" will be prepended to the fully qualified name.
     clang::NestedNameSpecifier
     CreateNestedNameSpecifier(const clang::ASTContext& Ctx,
                               const clang::TypedefNameDecl *TD,
-                              bool FullyQualify,
-                              bool WithGlobalNsPrefix = false);
+                              bool FullyQualify);
 
     ///\brief Create a NestedNameSpecifier for UsingShadowDecl and its enclosing
     /// scopes.
@@ -370,13 +355,10 @@ namespace utils {
     /// requested.
     ///\param[in] FullyQualify - Convert all template arguments (of possible
     /// parent scopes) into fully qualified names.
-    ///\param[in] WithGlobalNsPrefix - If true, then the global namespace
-    /// specifier "::" will be prepended to the fully qualified name.
     clang::NestedNameSpecifier
     CreateNestedNameSpecifier(const clang::ASTContext& Ctx,
                               const clang::UsingShadowDecl *USD,
-                              bool FullyQualify,
-                              bool WithGlobalNsPrefix = false);
+                              bool FullyQualify);
 
   } // end namespace TypeName
 } // end namespace utils

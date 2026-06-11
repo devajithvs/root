@@ -16,7 +16,42 @@ namespace clang {
 
 namespace TypeName {
 
-bool getFullyQualifiedTemplateName(const ASTContext &Ctx,
+/// Create a NestedNameSpecifier for Namesp and its enclosing
+/// scopes.
+///
+/// \param[in] Ctx - the AST Context to be used.
+/// \param[in] Namesp - the NamespaceDecl for which a NestedNameSpecifier
+/// is requested.
+/// \param[in] WithGlobalNsPrefix - Indicate whether the global namespace
+/// specifier "::" should be prepended or not.
+static NestedNameSpecifier
+createNestedNameSpecifier(const ASTContext &Ctx, const NamespaceDecl *Namesp,
+                          bool WithGlobalNsPrefix);
+
+/// Create a NestedNameSpecifier for TagDecl and its enclosing
+/// scopes.
+///
+/// \param[in] Ctx - the AST Context to be used.
+/// \param[in] TD - the TagDecl for which a NestedNameSpecifier is
+/// requested.
+/// \param[in] FullyQualify - Convert all template arguments into fully
+/// qualified names.
+/// \param[in] WithGlobalNsPrefix - Indicate whether the global namespace
+/// specifier "::" should be prepended or not.
+static NestedNameSpecifier createNestedNameSpecifier(const ASTContext &Ctx,
+                                                     const TypeDecl *TD,
+                                                     bool FullyQualify,
+                                                     bool WithGlobalNsPrefix);
+
+static NestedNameSpecifier
+createNestedNameSpecifierForScopeOf(const ASTContext &Ctx, const Decl *decl,
+                                    bool FullyQualified,
+                                    bool WithGlobalNsPrefix);
+
+static NestedNameSpecifier getFullyQualifiedNestedNameSpecifier(
+    const ASTContext &Ctx, NestedNameSpecifier NNS, bool WithGlobalNsPrefix);
+
+static bool getFullyQualifiedTemplateName(const ASTContext &Ctx,
                                           TemplateName &TName,
                                           bool WithGlobalNsPrefix) {
   bool Changed = false;
@@ -55,7 +90,7 @@ bool getFullyQualifiedTemplateName(const ASTContext &Ctx,
   return Changed;
 }
 
-bool getFullyQualifiedTemplateArgument(const ASTContext &Ctx,
+static bool getFullyQualifiedTemplateArgument(const ASTContext &Ctx,
                                               TemplateArgument &Arg,
                                               bool WithGlobalNsPrefix) {
   bool Changed = false;
@@ -81,7 +116,7 @@ bool getFullyQualifiedTemplateArgument(const ASTContext &Ctx,
   return Changed;
 }
 
-const Type *getFullyQualifiedTemplateType(const ASTContext &Ctx,
+static const Type *getFullyQualifiedTemplateType(const ASTContext &Ctx,
                                                  const TagType *TSTRecord,
                                                  ElaboratedTypeKeyword Keyword,
                                                  NestedNameSpecifier Qualifier,
@@ -126,7 +161,7 @@ const Type *getFullyQualifiedTemplateType(const ASTContext &Ctx,
   return QT.getTypePtr();
 }
 
-const Type *
+static const Type *
 getFullyQualifiedTemplateType(const ASTContext &Ctx,
                               const TemplateSpecializationType *TST,
                               bool WithGlobalNsPrefix) {
@@ -154,7 +189,7 @@ getFullyQualifiedTemplateType(const ASTContext &Ctx,
   return NewQT.getTypePtr();
 }
 
-NestedNameSpecifier createOuterNNS(const ASTContext &Ctx, const Decl *D,
+static NestedNameSpecifier createOuterNNS(const ASTContext &Ctx, const Decl *D,
                                           bool FullyQualify,
                                           bool WithGlobalNsPrefix) {
   const DeclContext *DC = D->getDeclContext();
@@ -179,7 +214,7 @@ NestedNameSpecifier createOuterNNS(const ASTContext &Ctx, const Decl *D,
 }
 
 /// Return a fully qualified version of this name specifier.
-NestedNameSpecifier getFullyQualifiedNestedNameSpecifier(
+static NestedNameSpecifier getFullyQualifiedNestedNameSpecifier(
     const ASTContext &Ctx, NestedNameSpecifier Scope, bool WithGlobalNsPrefix) {
   switch (Scope.getKind()) {
   case NestedNameSpecifier::Kind::Null:
@@ -211,7 +246,7 @@ NestedNameSpecifier getFullyQualifiedNestedNameSpecifier(
 
 /// Create a nested name specifier for the declaring context of
 /// the type.
-NestedNameSpecifier
+static NestedNameSpecifier
 createNestedNameSpecifierForScopeOf(const ASTContext &Ctx, const Decl *Decl,
                                     bool FullyQualified,
                                     bool WithGlobalNsPrefix) {
@@ -269,7 +304,7 @@ createNestedNameSpecifierForScopeOf(const ASTContext &Ctx, const Decl *Decl,
 
 /// Create a nested name specifier for the declaring context of
 /// the type.
-NestedNameSpecifier
+static NestedNameSpecifier
 createNestedNameSpecifierForScopeOf(const ASTContext &Ctx, const Type *TypePtr,
                                     bool FullyQualified,
                                     bool WithGlobalNsPrefix) {
@@ -295,7 +330,7 @@ createNestedNameSpecifierForScopeOf(const ASTContext &Ctx, const Type *TypePtr,
       Ctx, Decl, FullyQualified, WithGlobalNsPrefix);
 }
 
-NestedNameSpecifier
+static NestedNameSpecifier
 createNestedNameSpecifier(const ASTContext &Ctx, const NamespaceDecl *Namespace,
                           bool WithGlobalNsPrefix) {
   while (Namespace && Namespace->isInline()) {

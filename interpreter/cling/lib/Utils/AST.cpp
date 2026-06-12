@@ -1946,28 +1946,7 @@ namespace utils {
     // TODO: Find a way to avoid creating new types, if the input is already
     // fully qualified.
     if (prefix) {
-      // In case of template specializations iterate over the arguments and
-      // fully qualify them as well.
-      if (const auto *TT = dyn_cast<TagType>(QT.getTypePtr())) {
-        // We are asked to fully qualify and we have a Record Type (which
-        // may point to a template specialization) or Template
-        // Specialization Type. We need to fully qualify their arguments.
-
-        const Type *TypePtr = TypeName::getFullyQualifiedTemplateType(
-            Ctx, TT, TT->getKeyword(), prefix, /*WithGlobalNsPrefix=*/false);
-        QT = QualType(TypePtr, 0);
-      } else if (const auto *TT = dyn_cast<TypedefType>(QT.getTypePtr())) {
-        QT = Ctx.getTypedefType(
-            TT->getKeyword(), prefix, TT->getDecl(),
-            TypeName::getFullyQualifiedType(TT->desugar(), Ctx, /*WithGlobalNsPrefix=*/false));
-      } else if (const auto *TST =
-                 dyn_cast<TemplateSpecializationType>(QT.getTypePtr())) {
-        // e.g. TDataPoint<float> with prefix NS:: reconstructed as
-        // NS::TDataPoint<float>
-        const Type *TypePtr = TypeName::getFullyQualifiedTemplateType(
-            Ctx, TST, /*WithGlobalNsPrefix=*/false);
-        QT = QualType(TypePtr, 0);
-      }
+      QT = TypeName::QualifyTypeUnderPrefix(Ctx, QT, prefix);
       QT = Ctx.getQualifiedType(QT, prefix_qualifiers);
     } else if (original_prefix) {
       QT = Ctx.getQualifiedType(QT, prefix_qualifiers);

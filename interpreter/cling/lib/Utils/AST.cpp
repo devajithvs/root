@@ -1041,21 +1041,7 @@ namespace utils {
       //                                    false /* template keyword wanted */,
       //                                    desugared.getTypePtr());
       if (outer_scope) {
-        // In case of template specializations iterate over the arguments and
-        // fully qualify them as well.
-        if (const auto *TT = dyn_cast<TagType>(desugared.getTypePtr())) {
-          // We are asked to fully qualify and we have a Record Type (which
-          // may point to a template specialization) or Template
-          // Specialization Type. We need to fully qualify their arguments.
-
-          const Type *TypePtr = TypeName::getFullyQualifiedTemplateType(
-              Ctx, TT, TT->getKeyword(), outer_scope, /*WithGlobalNsPrefix=*/false);
-          desugared = QualType(TypePtr, 0);
-        } else if (const auto *TT = dyn_cast<TypedefType>(desugared.getTypePtr())) {
-          desugared = Ctx.getTypedefType(
-              TT->getKeyword(), outer_scope, TT->getDecl(),
-              TypeName::getFullyQualifiedType(TT->desugar(), Ctx, /*WithGlobalNsPrefix=*/false));
-        }
+        desugared = TypeName::QualifyTypeUnderPrefix(Ctx, desugared, outer_scope);
       }
       return NestedNameSpecifier(desugared.getTypePtr());
     } else {

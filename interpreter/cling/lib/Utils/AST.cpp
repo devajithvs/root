@@ -556,7 +556,11 @@ namespace TypeName {
                                                WithGlobalNsPrefix);
   }
 }  // end namespace TypeName
+}
+}
 
+namespace cling {
+namespace utils {
   static bool GetFullyQualifiedTemplateName(const ASTContext& Ctx,
                                             TemplateName& tname) {
     return TypeName::getFullyQualifiedTemplateName(

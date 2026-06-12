@@ -45,7 +45,6 @@
 #include "clang/Lex/HeaderSearch.h"
 #include "clang/Lex/ModuleMap.h"
 #include "clang/Lex/Preprocessor.h"
-#include "clang/AST/QualTypeNames.h"
 #include "clang/Lex/PreprocessorOptions.h"
 
 #include "clang/Sema/Lookup.h"
@@ -3269,7 +3268,7 @@ clang::QualType ROOT::TMetaUtils::AddDefaultParameters(clang::QualType instanceT
       } else if (const auto *TT = llvm::dyn_cast<clang::TypedefType>(instanceType.getTypePtr())) {
         instanceType = Ctx.getTypedefType(
             TT->getKeyword(), prefix, TT->getDecl(),
-            clang::TypeName::getFullyQualifiedType(TT->desugar(), Ctx, /*WithGlobalNsPrefix=*/false));
+            cling::utils::TypeName::GetFullyQualifiedType(TT->desugar(), Ctx));
       }
       instanceType = Ctx.getQualifiedType(instanceType,prefix_qualifiers);
    }
@@ -4196,18 +4195,18 @@ static void KeepNParams(clang::QualType& normalizedType,
         // may point to a template specialization) or Template
         // Specialization Type. We need to fully qualify their arguments.
 
-        const Type *TypePtr = cling::utils::TypeName::GetFullyQualifiedTemplateType(
+        const clang::Type *TypePtr = cling::utils::TypeName::GetFullyQualifiedTemplateType(
            astCtxt, TT, TT->getKeyword(), prefix, /*WithGlobalNsPrefix=*/false);
         normalizedType = QualType(TypePtr, 0);
       } else if (const auto *TT = dyn_cast<TypedefType>(normalizedType.getTypePtr())) {
         normalizedType = astCtxt.getTypedefType(
             TT->getKeyword(), prefix, TT->getDecl(),
-            clang::TypeName::getFullyQualifiedType(TT->desugar(), astCtxt, /*WithGlobalNsPrefix=*/false));
+            cling::utils::TypeName::GetFullyQualifiedType(TT->desugar(), astCtxt));
       } else if (const auto *TST =
                  dyn_cast<TemplateSpecializationType>(normalizedType.getTypePtr())) {
         // e.g. TDataPoint<float> with prefix NS:: reconstructed as
         // NS::TDataPoint<float>
-        const Type *TypePtr =
+        const clang::Type *TypePtr =
            cling::utils::TypeName::GetFullyQualifiedTemplateType(astCtxt, TST, /*WithGlobalNsPrefix=*/false);
         normalizedType = QualType(TypePtr, 0);
       }

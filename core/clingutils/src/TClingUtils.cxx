@@ -652,19 +652,7 @@ bool TClingLookupHelper::GetPartiallyDesugaredNameWithScopeHandling(const std::s
 
    if (!t.isNull()) {
       clang::QualType dest = TMetaUtils::GetNormalizedType(t, *fInterpreter, *fNormalizedCtxt);
-
-      // LLVM22: ElaboratedType comparison (dest != t) changed due to
-      // https://github.com/llvm/llvm-project/pull/147835
-      // There is no elaborated type and the codepath below is not taken
-      // for previous elaborated types where we need the enum/class/struct
-      // keywords to be stripped.
-
-      // TODO: Remove this comment once we upstream this.
-      // For types like "enum CustomEnum", SuppressTagKeyword no longer
-      // helps (unless we patch clang) because the keyword is printed
-      // unconditionally in the non-canonical elaborated path.
-      // We are using a patched clang for this.
-      if (!dest.isNull() && (dest != t || llvm::isa<clang::TagType>(dest.getTypePtr()))) {
+      if (!dest.isNull() && dest != t) {
          // Since our input is not a template instance name, rather than going through the full
          // TMetaUtils::GetNormalizedName, we just do the 'strip leading std' and fix
          // white space.

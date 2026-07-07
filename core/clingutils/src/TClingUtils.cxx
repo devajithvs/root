@@ -152,29 +152,6 @@ static bool CheckDefinition(const clang::CXXRecordDecl *cl, const clang::CXXReco
 }
 
 ////////////////////////////////////////////////////////////////////////////////
-/// Check if 'scope' or any of its template parameter was substituted when
-/// instantiating the class template instance and replace it with the
-/// partially sugared types we have from 'instance'.
-
-static clang::NestedNameSpecifier ReSubstTemplateArgNNS(const clang::ASTContext &Ctxt,
-                                                         clang::NestedNameSpecifier scope,
-                                                         const clang::Type *instance)
-{
-   if (scope.getKind() == clang::NestedNameSpecifier::Kind::Type) {
-      const clang::Type* scope_type = scope.getAsType();
-      clang::NestedNameSpecifier outer_scope = scope.getAsNamespaceAndPrefix().Prefix;
-      if (outer_scope) {
-         outer_scope = ReSubstTemplateArgNNS(Ctxt, outer_scope, instance);
-      }
-      clang::QualType substScope =
-         ROOT::TMetaUtils::ReSubstTemplateArg(clang::QualType(scope_type,0), instance);
-      // NOTE: Should check whether the type has changed or not.
-      scope = clang::NestedNameSpecifier(substScope.getTypePtr());
-   }
-   return scope;
-}
-
-////////////////////////////////////////////////////////////////////////////////
 
 static bool IsTypeInt(const clang::Type *type)
 {

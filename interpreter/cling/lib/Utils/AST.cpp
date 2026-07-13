@@ -660,17 +660,17 @@ namespace utils {
 
   // Does not exist upstream. Maybe upstream?
   QualType TypeName::QualifyTypeUnderPrefix(const ASTContext& Ctx, QualType QT,
-                                            NestedNameSpecifier prefix) {
+                                            NestedNameSpecifier prefix,
+                                            bool WithGlobalNsPrefix) {
     if (const auto* TT = dyn_cast<TagType>(QT.getTypePtr())) {
-      const Type* TypePtr = TypeName::getFullyQualifiedTemplateType(
-          Ctx, TT, ElaboratedTypeKeyword::None, prefix,
-          /*WithGlobalNsPrefix=*/false);
+      const Type* TypePtr =
+          TypeName::getFullyQualifiedTemplateType(Ctx, TT, TT->getKeyword(),
+                                                  prefix, WithGlobalNsPrefix);
       QT = QualType(TypePtr, 0);
     } else if (const auto* TT = dyn_cast<TypedefType>(QT.getTypePtr())) {
-      QT = Ctx.getTypedefType(
-          ElaboratedTypeKeyword::None, prefix, TT->getDecl(),
-          TypeName::getFullyQualifiedType(TT->desugar(), Ctx,
-                                          /*WithGlobalNsPrefix=*/false));
+      QT = Ctx.getTypedefType(TT->getKeyword(), prefix, TT->getDecl(),
+                              TypeName::getFullyQualifiedType(
+                                  TT->desugar(), Ctx, WithGlobalNsPrefix));
     } else if (const auto* UT = dyn_cast<UsingType>(QT.getTypePtr())) {
       QT =
           Ctx.getUsingType(UT->getKeyword(), prefix, UT->getDecl(),

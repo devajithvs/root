@@ -333,8 +333,7 @@ namespace cling {
 
     m_IncrParser->SetTransformers(parentInterp);
 
-    // Do we need this?
-    TSCtx->withContextDo([](llvm::LLVMContext *Ctx) {
+    this->withLLVMContextDo([](llvm::LLVMContext* Ctx) {
       if (!Ctx) {
         // Never true, but don't tell the compiler.
         // Force symbols needed by runtime to be included in binaries.

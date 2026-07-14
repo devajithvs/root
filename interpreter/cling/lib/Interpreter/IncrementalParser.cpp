@@ -316,15 +316,11 @@ namespace cling {
 
     DiagnosticsEngine& Diag = m_CI->getDiagnostics();
     if (m_CI->getFrontendOpts().ProgramAction != frontend::ParseSyntaxOnly) {
-      auto CG = m_Interpreter->TSCtx->withContextDo([&](llvm::LLVMContext *Ctx) {
-         return std::unique_ptr<clang::CodeGenerator>(CreateLLVMCodeGen(Diag,
-                                                               makeModuleName(),
-                                                  &m_CI->getVirtualFileSystem(),
-                                                    m_CI->getHeaderSearchOpts(),
-                                                    m_CI->getPreprocessorOpts(),
-                                                         m_CI->getCodeGenOpts(),
-                                                                          *Ctx)
-                                                );
+      auto CG = m_Interpreter->withLLVMContextDo([&](llvm::LLVMContext* Ctx) {
+        return std::unique_ptr<clang::CodeGenerator>(CreateLLVMCodeGen(
+            Diag, makeModuleName(), &m_CI->getVirtualFileSystem(),
+            m_CI->getHeaderSearchOpts(), m_CI->getPreprocessorOpts(),
+            m_CI->getCodeGenOpts(), *Ctx));
       });
       m_CodeGen = CG.get();
       assert(m_CodeGen);
@@ -559,10 +555,9 @@ namespace cling {
   }
 
   llvm::Module* IncrementalParser::StartModule() {
-    return m_Interpreter->TSCtx->withContextDo([&](llvm::LLVMContext *Ctx) {
-        return getCodeGenerator()->StartModule(makeModuleName(),
-                                              *Ctx,
-                                              getCI()->getCodeGenOpts());
+    return m_Interpreter->withLLVMContextDo([&](llvm::LLVMContext* Ctx) {
+      return getCodeGenerator()->StartModule(makeModuleName(), *Ctx,
+                                             getCI()->getCodeGenOpts());
     });
   }
 

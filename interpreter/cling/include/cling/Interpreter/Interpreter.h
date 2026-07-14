@@ -174,15 +174,15 @@ namespace cling {
     using ModuleFileExtensions =
         std::vector<std::shared_ptr<clang::ModuleFileExtension>>;
 
-    ///\brief Thread-safe llvm library state.
-    ///
-    std::unique_ptr<llvm::orc::ThreadSafeContext> TSCtx;
-
   private:
 
     ///\brief Interpreter invocation options.
     ///
     InvocationOptions m_Opts;
+
+    ///\brief Thread-safe llvm library state.
+    ///
+    std::unique_ptr<llvm::orc::ThreadSafeContext> TSCtx;
 
     ///\brief Cling's execution engine - a well wrapped llvm execution engine.
     ///
@@ -866,6 +866,15 @@ namespace cling {
                         llvm::raw_ostream* logs = nullptr,
                         IgnoreFilesFunc_t ignoreFiles =
                           [](const clang::PresumedLoc&) { return false;}) const;
+
+    // Forward to TSCtx->WithContextDo
+    template <typename Func> decltype(auto) withLLVMContextDo(Func&& F) {
+      return TSCtx->withContextDo(std::forward<Func>(F));
+    }
+
+    template <typename Func> decltype(auto) withLLVMContextDo(Func&& F) const {
+      return TSCtx->withContextDo(std::forward<Func>(F));
+    }
 
     friend class runtime::internal::LifetimeHandler;
   };

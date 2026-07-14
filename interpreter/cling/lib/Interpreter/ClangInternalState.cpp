@@ -139,7 +139,7 @@ namespace cling {
                                             m_Module, m_CodeGen, name));
     std::string differences = "";
     // Ignore the builtins
-    llvm::SmallVector<llvm::StringRef, 1024> builtinNames;
+    std::vector<std::string> builtinNames;
     const clang::Builtin::Context& BuiltinCtx = m_ASTContext.BuiltinInfo;
     for (auto i = clang::Builtin::NotBuiltin+1;
          i != clang::Builtin::FirstTSBuiltin; ++i) {

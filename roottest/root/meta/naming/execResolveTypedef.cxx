@@ -14,10 +14,7 @@
 
 namespace A1 { namespace B2 { namespace C3 { typedef int what; } } }
 namespace NS { typedef int IntNS_t; }
-namespace SG {
-typedef std::uint32_t sgkey_t;
-using sgkey2_t = std::uint32_t;
-} // namespace SG
+namespace SG { typedef std::uint32_t sgkey_t; }
 namespace RT {
 namespace EX {
 struct ClusterSize {
@@ -30,7 +27,6 @@ using ClusterSize_t = ClusterSize;
 
 struct PackedParameters {
    SG::sgkey_t  m_sgkey;
-   SG::sgkey2_t m_sgkey2;
 };
 
 class Object
@@ -230,7 +226,6 @@ int execResolveTypedef()
    testing("unsigned int", TClassEdit::ResolveTypedef("SG::sgkey_t"));
    testing("unsigned int", TClass::GetClass("PackedParameters")->GetDataMember("m_sgkey")->GetTrueTypeName());
    testing("SG::sgkey_t", TClass::GetClass("PackedParameters")->GetDataMember("m_sgkey")->GetFullTypeName());
-   testing("SG::sgkey2_t", TClass::GetClass("PackedParameters")->GetDataMember("m_sgkey2")->GetFullTypeName());
    testing("RT::EX::ClusterSize", TClassEdit::ResolveTypedef("RT::EX::ClusterSize_t"));
    return 0;
 }

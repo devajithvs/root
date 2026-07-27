@@ -10,7 +10,7 @@
 #ifndef CLING_DYNAMIC_LIBRARY_MANAGER_H
 #define CLING_DYNAMIC_LIBRARY_MANAGER_H
 
-#include "llvm/ExecutionEngine/Orc/Shared/LibraryResolver.h"
+#include "llvm/ExecutionEngine/Orc/TargetProcess/LibraryResolver.h"
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/ArrayRef.h"
 #include "llvm/ADT/StringRef.h"

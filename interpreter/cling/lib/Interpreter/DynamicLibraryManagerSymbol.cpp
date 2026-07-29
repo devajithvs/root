@@ -227,10 +227,10 @@ namespace cling {
         llvm::orc::LibraryResolver::Setup::create({});
     S.ShouldScanCall = [&,
                         shouldPermanentlyIgnore](llvm::StringRef lib) -> bool {
-      if (shouldPermanentlyIgnore) {
-        return !shouldPermanentlyIgnore(lib) || !isLibraryLoaded(lib);
+      if (shouldPermanentlyIgnore && shouldPermanentlyIgnore(lib)) {
+        return false; // permanently ignored -> never scan
       }
-      // fallback behavior if no callback provided
+      // skip if already loaded
       return !isLibraryLoaded(lib);
     };
     m_DyldController = llvm::orc::LibraryResolutionDriver::create(S);
